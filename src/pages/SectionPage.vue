@@ -31,8 +31,15 @@ const refreshing = ref(false)
 const sortOptions = [
   { key: 'new', label: '最新' },
   { key: 'hot', label: '热门' },
+  { key: 'price_asc', label: '价格升序' },
+  { key: 'price_desc', label: '价格降序' },
 ]
 const activeSort = ref('new')
+
+// 交易/失物筛选条件（上抛后端全局执行，避免客户端子集排序/筛选失真）
+const activePriceRange = ref('')   // 形如 "0-100" / "100-500" / "500-"
+const activeTimeRange = ref('')    // 天：1 / 7 / 30
+const activeSubType = ref('')      // extra_fields 子类型，形如 "tradeType:sell" / "itemType:card"
 
 // 下拉刷新相关
 const pullDistance = ref(0)
@@ -82,6 +89,9 @@ async function loadList(reset = false) {
       pageSize,
       sectionId: sectionId.value,
       sort: activeSort.value,
+      priceRange: activePriceRange.value || undefined,
+      timeRange: activeTimeRange.value || undefined,
+      subType: activeSubType.value || undefined,
     })
     const data = res.data
     if (reset || page.value === 1) list.value = data.list
@@ -99,6 +109,14 @@ async function loadList(reset = false) {
 function switchSort(key: string) {
   if (activeSort.value === key) return
   activeSort.value = key
+  loadList(true)
+}
+
+// 设置筛选条件后重置并重载（参数上抛后端）
+function setFilter(priceRange: string, timeRange: string, subType: string) {
+  activePriceRange.value = priceRange
+  activeTimeRange.value = timeRange
+  activeSubType.value = subType
   loadList(true)
 }
 
@@ -154,6 +172,22 @@ watch(sectionId, () => {
           {{ opt.label }}
           <span v-if="activeSort === opt.key" class="absolute left-1/2 -translate-x-1/2 bottom-0 w-6 h-0.5 bg-brand-500 rounded-full"></span>
         </button>
+      </div>
+
+      <!-- 交易/失物筛选（上抛后端全局执行） -->
+      <div class="max-w-[960px] mx-auto px-3 flex flex-wrap items-center gap-2 pb-2 text-xs">
+        <span class="text-zinc-400">价格</span>
+        <button v-for="p in [['', '不限'], ['0-100', '0-100'], ['100-500', '100-500'], ['500-', '500+']]"
+          :key="p[0]"
+          class="px-2 py-1 rounded-full border transition"
+          :class="activePriceRange === p[0] ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-zinc-200 text-zinc-500'"
+          @click="setFilter(p[0], activeTimeRange, activeSubType)">{{ p[1] }}</button>
+        <span class="text-zinc-400 ml-1">时间</span>
+        <button v-for="t in [['', '不限'], ['1', '一天内'], ['7', '一周内'], ['30', '一月内']]"
+          :key="t[0]"
+          class="px-2 py-1 rounded-full border transition"
+          :class="activeTimeRange === t[0] ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-zinc-200 text-zinc-500'"
+          @click="setFilter(activePriceRange, t[0], activeSubType)">{{ t[1] }}</button>
       </div>
     </header>
 

@@ -204,6 +204,19 @@ export function initDatabase() {
     );
   `);
 
+  // 常用复合索引（CREATE INDEX IF NOT EXISTS 保证幂等，重复执行无副作用）
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_posts_status_section_created ON posts (status, section_id, created_at);
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_comments_post_created ON comments (post_id, created_at);
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_messages_user_read ON messages (user_id, is_read);
+  `);
+  // likes 的 (user_id, target_type, target_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
+  // favorites 的 (user_id, post_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
+
   // 初始板块数据
   const sectionCount = db.prepare('SELECT COUNT(*) as count FROM sections').get() as { count: number };
   if (sectionCount.count === 0) {

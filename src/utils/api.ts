@@ -14,7 +14,7 @@ export const authApi = {
 
 // 帖子
 export const postApi = {
-  list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string }) => request.get('/posts', { params }),
+  list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string }) => request.get('/posts', { params }),
   detail: (id: number) => request.get(`/posts/${id}`),
   publish: (data: any) => request.post('/posts', data),
   edit: (id: number, data: any) => request.put(`/posts/${id}`, data),

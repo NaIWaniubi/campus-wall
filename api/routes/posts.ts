@@ -6,13 +6,19 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { upsertNotification } from '../utils/notification.js';
 
 const router = Router();
 
 /**
  * 格式化帖子对象（带作者、板块、互动状态）
  */
-function formatPost(post: any, currentUserId?: number) {
+function formatPost(
+  post: any,
+  currentUserId?: number,
+  likedMap?: Map<number, boolean>,
+  favoritedMap?: Map<number, boolean>
+) {
   let author: any;
   if (post.is_anonymous) {
     author = { id: 0, nickname: '匿名用户', avatar: '', college: '' };
@@ -25,13 +31,20 @@ function formatPost(post: any, currentUserId?: number) {
     };
   }
 
+  // 点赞/收藏状态优先使用列表处批量预加载的 Map，避免 N+1；
+  // 详情接口若未传 Map，则单条回退查询。
   let liked = false;
   let favorited = false;
   if (currentUserId) {
-    const like = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(currentUserId, 'post', post.id);
-    liked = !!like;
-    const fav = db.prepare('SELECT id FROM favorites WHERE user_id = ? AND post_id = ?').get(currentUserId, post.id);
-    favorited = !!fav;
+    if (likedMap && favoritedMap) {
+      liked = !!likedMap.get(post.id);
+      favorited = !!favoritedMap.get(post.id);
+    } else {
+      const like = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(currentUserId, 'post', post.id);
+      liked = !!like;
+      const fav = db.prepare('SELECT id FROM favorites WHERE user_id = ? AND post_id = ?').get(currentUserId, post.id);
+      favorited = !!fav;
+    }
   }
 
   return {
@@ -67,6 +80,10 @@ router.get('/', authOptional, (req, res) => {
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId as string) : 0;
   const keyword = (req.query.keyword as string) || '';
   const sort = (req.query.sort as string) || 'new';
+  // 交易/失物筛选项（全局执行，优于客户端二次排序）
+  const priceRange = (req.query.priceRange as string) || '';   // 形如 "0-100" / "100-500" / "500-"
+  const timeRange = (req.query.timeRange as string) || '';     // 形如 "1" / "7" / "30"（天）
+  const subType = (req.query.subType as string) || '';          // extra_fields 子类型，如 tradeType/itemType
 
   const currentUserId = req.currentUser?.id;
 
@@ -81,15 +98,48 @@ router.get('/', authOptional, (req, res) => {
     where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
     params.push(`%${keyword}%`, `%${keyword}%`);
   }
+  // 价格区间筛选（针对 extra_fields.price 数值字段，仅对带 price 的板块有效）
+  if (priceRange) {
+    const m = priceRange.match(/^(\d+)?-(\d+)?$/);
+    if (m) {
+      const min = m[1] ? parseFloat(m[1]) : null;
+      const max = m[2] ? parseFloat(m[2]) : null;
+      if (min !== null) {
+        where += ` AND CAST(json_extract(p.extra_fields, '$.price') AS REAL) >= ?`;
+        params.push(min);
+      }
+      if (max !== null) {
+        where += ` AND CAST(json_extract(p.extra_fields, '$.price') AS REAL) <= ?`;
+        params.push(max);
+      }
+    }
+  }
+  // 时间范围筛选
+  if (timeRange && /^\d+$/.test(timeRange)) {
+    where += ` AND p.created_at >= datetime('now', '-' || ? || ' days')`;
+    params.push(timeRange);
+  }
+  // 子类型筛选（extra_fields 中的某个 key 精确匹配）
+  if (subType) {
+    const [key, val] = subType.split(':');
+    if (key && val) {
+      where += ` AND json_extract(p.extra_fields, '$."${key}"') = ?`;
+      params.push(val);
+    }
+  }
 
   const offset = (page - 1) * pageSize;
 
   // top_type 排序：global(全局) 应排在 section(板块) 之前；按字母倒序会导致 section>none>global，错误
   // 使用 CASE 显式指定优先级：global=2, section=1, none=0
   const topTypeOrder = `CASE p.top_type WHEN 'global' THEN 2 WHEN 'section' THEN 1 ELSE 0 END DESC`;
-  const orderBy = sort === 'hot'
-    ? `ORDER BY p.is_top DESC, ${topTypeOrder}, (p.like_count + p.comment_count * 2 + p.view_count / 10) DESC, p.created_at DESC`
-    : `ORDER BY p.is_top DESC, ${topTypeOrder}, p.created_at DESC`;
+  // 价格排序（交易板块）
+  const orderBy =
+    sort === 'price_asc' ? `ORDER BY p.is_top DESC, ${topTypeOrder}, CAST(json_extract(p.extra_fields, '$.price') AS REAL) ASC, p.created_at DESC`
+    : sort === 'price_desc' ? `ORDER BY p.is_top DESC, ${topTypeOrder}, CAST(json_extract(p.extra_fields, '$.price') AS REAL) DESC, p.created_at DESC`
+    : sort === 'hot'
+      ? `ORDER BY p.is_top DESC, ${topTypeOrder}, (p.like_count + p.comment_count * 2 + p.view_count / 10) DESC, p.created_at DESC`
+      : `ORDER BY p.is_top DESC, ${topTypeOrder}, p.created_at DESC`;
 
   const posts = db.prepare(`
     SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college,
@@ -105,7 +155,23 @@ router.get('/', authOptional, (req, res) => {
   // 使用 INNER JOIN 避免在 LEFT JOIN 后用 `u.status != 'banned'` 过滤时 NULL 行为不一致
   const totalRow = db.prepare(`SELECT COUNT(*) as total FROM posts p INNER JOIN users u ON p.user_id = u.id ${where}`).get(...params) as any;
 
-  const list = posts.map((p) => formatPost(p, currentUserId));
+  // 批量预加载当前用户对这批帖子的点赞/收藏状态，消除 N+1（原 2N 次单查 -> 2 次 IN 查询）
+  const likedMap = new Map<number, boolean>();
+  const favoritedMap = new Map<number, boolean>();
+  if (currentUserId && posts.length > 0) {
+    const ids = posts.map((p) => p.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const likeRows = db.prepare(
+      `SELECT target_id FROM likes WHERE user_id = ? AND target_type = 'post' AND target_id IN (${placeholders})`
+    ).all(currentUserId, ...ids) as any[];
+    likeRows.forEach((r) => likedMap.set(r.target_id, true));
+    const favRows = db.prepare(
+      `SELECT post_id FROM favorites WHERE user_id = ? AND post_id IN (${placeholders})`
+    ).all(currentUserId, ...ids) as any[];
+    favRows.forEach((r) => favoritedMap.set(r.post_id, true));
+  }
+
+  const list = posts.map((p) => formatPost(p, currentUserId, likedMap, favoritedMap));
 
   success(res, {
     list,
@@ -224,6 +290,30 @@ router.put('/:id', authRequired, (req, res) => {
   const id = parseInt(req.params.id);
   const { title, content, images, isAnonymous, extraFields } = req.body;
 
+  // extraFields 扩展键白名单（校园墙业务字段，取前端与 routes 并集）
+  const EXTRA_FIELD_WHITELIST = [
+    'price', 'contact', 'location', 'tradeType',
+    'condition', 'time', 'itemType', 'organizer',
+  ];
+  const MAX_EXTRA_VALUE_LEN = 200;
+
+  // 校验并清洗 extraFields：仅允许白名单键，限制值长度与嵌套深度（防存储膨胀/注入）
+  function sanitizeExtraFields(input: any): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return cleaned;
+    for (const key of Object.keys(input)) {
+      if (!EXTRA_FIELD_WHITELIST.includes(key)) continue;
+      const val = input[key];
+      if (val === null || val === undefined) continue;
+      // 仅允许字符串/数字，拒绝对象/数组嵌套
+      if (typeof val === 'object') continue;
+      const str = String(val);
+      if (str.length > MAX_EXTRA_VALUE_LEN) continue;
+      cleaned[key] = str;
+    }
+    return cleaned;
+  }
+
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
   if (post.user_id !== req.currentUser!.id) return forbidden(res, '只能编辑自己的帖子');
@@ -234,11 +324,18 @@ router.put('/:id', authRequired, (req, res) => {
   const riskLevel = getRiskLevel((title || '') + ' ' + (content || ''));
   if (riskLevel === 'reject') return fail(res, '内容包含违规信息');
 
+  // status 始终由服务端规则推导，禁止客户端修改（防止越权改状态）
   const section = db.prepare('SELECT * FROM sections WHERE id = ?').get(post.section_id) as any;
   let status = post.status === 'published' ? 'published' : 'pending';
   if (riskLevel === 'review' || (section && section.need_audit)) {
     status = 'pending';
   }
+
+  // extraFields 经白名单校验清洗后再入库；缺省时保留原值
+  const sanitizedExtra = sanitizeExtraFields(extraFields);
+  const finalExtra = Object.keys(sanitizedExtra).length
+    ? sanitizedExtra
+    : JSON.parse(post.extra_fields || '{}');
 
   db.prepare(`
     UPDATE posts SET title = ?, content = ?, images = ?, is_anonymous = ?, extra_fields = ?, status = ?, updated_at = CURRENT_TIMESTAMP
@@ -248,7 +345,7 @@ router.put('/:id', authRequired, (req, res) => {
     content || post.content,
     JSON.stringify(Array.isArray(images) ? images.slice(0, 9) : JSON.parse(post.images)),
     isAnonymous ? 1 : 0,
-    JSON.stringify(extraFields || JSON.parse(post.extra_fields)),
+    JSON.stringify(finalExtra),
     status,
     id
   );
@@ -284,9 +381,9 @@ router.post('/:id/like', authRequired, (req, res) => {
   } else {
     db.prepare('INSERT INTO likes (user_id, target_type, target_id) VALUES (?, ?, ?)').run(req.currentUser!.id, 'post', id);
     db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').run(id);
-    // 通知作者
+    // 通知作者（去重：同人对同帖 7 天内反复点赞只更新一条）
     if (post.user_id !== req.currentUser!.id) {
-      db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
+      upsertNotification(
         post.user_id, 'like', `${req.currentUser!.nickname} 赞了你的帖子「${post.title}」`, id
       );
     }

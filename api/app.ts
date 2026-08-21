@@ -47,12 +47,20 @@ app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// 静态文件服务（上传的图片）
+// 受控上传文件访问：避免目录遍历/直接列举（替换原 express.static）
+// 校验规则：filename 必须为 <userId>_<timestamp>.<ext>，仅字母数字下划线点，禁止 .. 与路径分隔符，扩展名限 jpg/jpeg/png
 const uploadsDir = path.join(__dirname, '..', 'public', 'uploads')
-app.use('/uploads', express.static(uploadsDir, {
-  maxAge: '7d',
-  immutable: true,
-}))
+const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+\.(jpg|jpeg|png)$/
+app.get('/uploads/:file', (req: Request, res: Response) => {
+  const file = req.params.file
+  if (!UPLOAD_NAME_RE.test(file) || file.includes('..') || file.includes('/') || file.includes('\\')) {
+    return res.status(404).json({ code: 404, message: '文件不存在', data: null })
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.sendFile(path.join(uploadsDir, file), (err) => {
+    if (err) res.status(404).json({ code: 404, message: '文件不存在', data: null })
+  })
+})
 
 /**
  * 简易请求日志（生产环境也保留，便于排查问题）

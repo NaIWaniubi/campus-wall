@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { upsertNotification } from '../utils/notification.js';
 
 const router = Router();
 
@@ -109,9 +110,9 @@ router.post('/posts/:id/comments', authRequired, (req, res) => {
   const commentId = result.lastInsertRowid as number;
   db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(postId);
 
-  // 通知作者
+  // 通知作者（去重）
   if (post.user_id !== req.currentUser!.id) {
-    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
+    upsertNotification(
       post.user_id, 'comment', `${req.currentUser!.nickname} 评论了你的帖子「${post.title}」`, postId
     );
   }
@@ -150,9 +151,9 @@ router.post('/comments/:id/reply', authRequired, (req, res) => {
 
   const replyId = result.lastInsertRowid as number;
 
-  // 通知被回复者
+  // 通知被回复者（去重）
   if (parent.user_id !== req.currentUser!.id) {
-    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
+    upsertNotification(
       parent.user_id, 'comment', `${req.currentUser!.nickname} 回复了你的评论`, parent.post_id
     );
   }

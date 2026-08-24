@@ -24,7 +24,7 @@ function getPost(id: number): any {
   return db.prepare("SELECT id, user_id, title, status, extra_fields FROM posts WHERE id = ? AND status != 'deleted'").get(id);
 }
 
-// 标记交易完成（仅帖子作者；posts.extra_fields 写入 soldAt，最小侵入）
+// 标记交易完成（仅帖子作者；posts.extra_fields 写入 soldAt 与可选 soldTo 买家）
 router.post('/trades/:postId/complete', authRequired, (req, res) => {
   const postId = Number(req.params.postId);
   const post = getPost(postId);
@@ -35,12 +35,41 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
   if (extra.soldAt) return fail(res, '该交易已标记完成');
   extra.soldAt = new Date().toISOString();
 
+  // 可选登记买家（供作者后续定向互评）
+  const buyerId = Number(req.body?.buyerId);
+  if (buyerId) {
+    const buyer = db.prepare('SELECT id FROM users WHERE id = ?').get(buyerId);
+    if (!buyer) return fail(res, '买家用户不存在', 404, 404);
+    if (buyerId === req.currentUser!.id) return fail(res, '买家不能是自己');
+    extra.soldTo = buyerId;
+  }
+
   db.prepare('UPDATE posts SET extra_fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
     JSON.stringify(extra), postId
   );
   cacheInvalidate('posts'); // extra_fields 影响列表价格排序与筛选
 
-  success(res, { postId, soldAt: extra.soldAt }, '交易已完成');
+  success(res, { postId, soldAt: extra.soldAt, soldTo: extra.soldTo ?? null }, '交易已完成');
+});
+
+// 当前登录用户对某帖的交易评价状态：是否已评 / 卖家登记的买家
+router.get('/trades/:postId/my-rating', authRequired, (req, res) => {
+  const postId = Number(req.params.postId);
+  const post = getPost(postId);
+  if (!post) return fail(res, '帖子不存在', 404, 404);
+
+  const row = db.prepare('SELECT rating FROM trade_ratings WHERE post_id = ? AND rater_id = ?').get(
+    postId, req.currentUser!.id
+  ) as any;
+  const extra = JSON.parse(post.extra_fields || '{}');
+
+  success(res, {
+    hasRated: !!row,
+    rating: row?.rating ?? null,
+    isSold: !!extra.soldAt,
+    soldTo: extra.soldTo ?? null,
+    isSeller: post.user_id === req.currentUser!.id,
+  });
 });
 
 // 互评：作者可对指定用户评分一次；其他用户只能对该帖作者评分一次（每人每帖限一次）
@@ -55,12 +84,12 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
   const extra = JSON.parse(post.extra_fields || '{}');
   if (!extra.soldAt) return fail(res, '交易完成后才能评价');
 
-  // 评价对象：作者指定目标用户，非作者固定评帖子作者
+  // 评价对象：作者优先用登记的买家(soldTo)，未登记则须显式指定；非作者固定评帖子作者
   const isAuthor = post.user_id === req.currentUser!.id;
   let rateeId: number;
   if (isAuthor) {
-    rateeId = Number(targetUserId);
-    if (!rateeId) return fail(res, '请指定要评价的用户');
+    rateeId = Number(targetUserId) || Number(extra.soldTo) || 0;
+    if (!rateeId) return fail(res, '请先在标记完成时登记买家，或指定要评价的用户');
   } else {
     rateeId = post.user_id;
   }

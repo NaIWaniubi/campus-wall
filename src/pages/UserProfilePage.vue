@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
- * 他人主页（公开，游客可看）：资料卡 + 交易互评记录
- * 注：该用户公开帖子列表依赖 GET /posts?authorId= 参数，后端暂未支持，
- *     页面内已注明「暂未开放」，待后端补参数后接入（见任务 t2 说明）。
+ * 他人主页（公开，游客可看）：资料卡 + 交易互评记录 + 公开帖子列表
+ * 帖子列表走 GET /api/posts?authorId=（仅 published）
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Star, FileText } from '@lucide/vue'
-import { userApi, tradeApi } from '@/utils/api'
+import { userApi, tradeApi, postApi } from '@/utils/api'
 import { creditColor, formatTime } from '@/utils/helpers'
 import CreditBadge from '@/components/CreditBadge.vue'
 
@@ -24,6 +23,8 @@ const credit = computed(() => user.value?.credit_score || 0)
 const ratings = ref<any[]>([])
 const ratingTotal = ref(0)
 const ratingAvg = ref<number | null>(null)
+const posts = ref<any[]>([])
+const postsTotal = ref(0)
 
 async function loadUser() {
   loading.value = true
@@ -49,9 +50,20 @@ async function loadRatings() {
   }
 }
 
+async function loadPosts() {
+  try {
+    const res: any = await postApi.list({ authorId: userId.value, page: 1, pageSize: 10 })
+    posts.value = res.data.list || []
+    postsTotal.value = res.data.total || 0
+  } catch {
+    // 静默失败
+  }
+}
+
 onMounted(() => {
   loadUser()
   loadRatings()
+  loadPosts()
 })
 </script>
 
@@ -154,13 +166,34 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 公开帖子列表：后端 GET /posts 暂不支持 authorId 过滤，先占位注明 -->
+      <!-- 公开帖子列表（GET /posts?authorId=） -->
       <div class="bg-white rounded-xl shadow-sm p-4">
         <div class="flex items-center gap-2">
           <FileText class="w-4 h-4 text-brand-500" />
           <span class="text-sm font-medium text-zinc-700">TA 的帖子</span>
+          <span v-if="postsTotal > 0" class="text-xs text-zinc-400">共 {{ postsTotal }} 条</span>
         </div>
-        <p class="text-xs text-zinc-400 py-3 text-center">暂未开放，敬请期待</p>
+        <p v-if="!posts.length" class="text-xs text-zinc-400 py-3 text-center">暂无公开帖子</p>
+        <div v-else class="divide-y divide-zinc-50">
+          <button
+            v-for="p in posts"
+            :key="p.id"
+            class="w-full text-left py-2.5 flex items-start gap-2.5 hover:bg-zinc-50/60 transition rounded"
+            @click="router.push(`/post/${p.id}`)"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm text-zinc-800 font-medium truncate">{{ p.title }}</span>
+                <span v-if="p.isTop" class="px-1 py-0.5 rounded text-[10px] bg-brand-100 text-brand-600 flex-shrink-0">置顶</span>
+              </div>
+              <div class="flex items-center gap-3 mt-1 text-[11px] text-zinc-400">
+                <span>{{ formatTime(p.createdAt) }}</span>
+                <span>👍 {{ p.likeCount }}</span>
+                <span>💬 {{ p.commentCount }}</span>
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
     </main>
   </div>

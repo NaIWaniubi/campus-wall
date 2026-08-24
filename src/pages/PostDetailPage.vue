@@ -6,7 +6,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { postApi, commentApi, conversationApi, followApi, tradeApi } from '@/utils/api'
+import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -119,14 +119,37 @@ const soldAt = computed(() => post.value?.extraFields?.soldAt as string | undefi
 // 作者本人 + 二手交易板块 + 未标记售出 → 可标记已售
 const canMarkSold = computed(() => isAuthor.value && isTradeSection.value && !soldAt.value && post.value?.status === 'published')
 const markingSold = ref(false)
+const showMarkSold = ref(false)
+const buyerStudentId = ref('')
+const buyerPreview = ref<{ id: number; nickname: string } | null>(null)
+const resolvingBuyer = ref(false)
+
+async function resolveBuyer() {
+  const sid = buyerStudentId.value.trim()
+  if (!sid) { buyerPreview.value = null; return }
+  resolvingBuyer.value = true
+  try {
+    const res: any = await userApi.lookup(sid)
+    buyerPreview.value = res.data
+  } catch {
+    buyerPreview.value = null
+  } finally {
+    resolvingBuyer.value = false
+  }
+}
 
 async function markSold() {
   if (markingSold.value) return
   markingSold.value = true
   try {
-    const res: any = await tradeApi.complete(postId.value)
-    post.value.extraFields = { ...(post.value.extraFields || {}), soldAt: res.data.soldAt }
-    toast.success('已标记交易完成')
+    const res: any = await tradeApi.complete(postId.value, buyerPreview.value?.id)
+    post.value.extraFields = {
+      ...(post.value.extraFields || {}),
+      soldAt: res.data.soldAt,
+      ...(res.data.soldTo ? { soldTo: res.data.soldTo } : {}),
+    }
+    showMarkSold.value = false
+    toast.success(res.data.soldTo ? '已标记交易完成，可评价该买家' : '已标记交易完成')
   } catch {
     // 错误已由拦截器 toast
   } finally {
@@ -134,13 +157,23 @@ async function markSold() {
   }
 }
 
-// 买家互评：非作者 + 已登录 + 已售帖；每人每帖仅一次（重复提交由后端拦截）
-const canRateAsBuyer = computed(() => userStore.isLoggedIn && !isAuthor.value && !!soldAt.value && post.value?.status === 'published')
+// 互评状态：买家评作者 / 作者凭登记的 soldTo 评买家；每人每帖限一次
+const canRateAsBuyer = computed(() => userStore.isLoggedIn && !isAuthor.value && !!soldAt.value && post.value?.status === 'published' && !hasRated.value)
+const soldTo = computed(() => Number(post.value?.extraFields?.soldTo) || 0)
+const canRateAsSeller = computed(() => userStore.isLoggedIn && isAuthor.value && !!soldAt.value && !!soldTo.value && !hasRated.value)
 const hasRated = ref(false)
 const showRateDialog = ref(false)
 const rateScore = ref(0)
 const rateComment = ref('')
 const rateSubmitting = ref(false)
+
+async function loadTradeState() {
+  if (!userStore.isLoggedIn || !isTradeSection.value || !soldAt.value) return
+  try {
+    const res: any = await tradeApi.myRating(postId.value)
+    hasRated.value = !!res.data.hasRated
+  } catch {}
+}
 
 function openRateDialog() {
   rateScore.value = 0
@@ -153,7 +186,12 @@ async function submitRate() {
   if (rateSubmitting.value) return
   rateSubmitting.value = true
   try {
-    await tradeApi.rate(postId.value, { rating: rateScore.value, comment: rateComment.value.trim() })
+    // 作者评买家：自动带登记的 soldTo；买家评作者：后端固定指向帖子作者
+    await tradeApi.rate(postId.value, {
+      rating: rateScore.value,
+      comment: rateComment.value.trim(),
+      ...(canRateAsSeller.value ? { targetUserId: soldTo.value } : {}),
+    })
     hasRated.value = true
     showRateDialog.value = false
     toast.success('评价成功，感谢你的反馈')
@@ -171,6 +209,7 @@ async function fetchPost() {
     const res: any = await postApi.detail(postId.value)
     post.value = res.data
     loadFollowStatus()
+    loadTradeState()
   } catch {
     toast.error('帖子不存在或已删除')
     router.replace('/')
@@ -508,24 +547,22 @@ function closeMoreMenu(e: MouseEvent) {
         </div>
       </div>
 
-      <!-- 二手交易：作者标记已售 -->
+      <!-- 二手交易：作者标记已售（可选登记买家） -->
       <div v-if="canMarkSold" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
         <div class="min-w-0">
           <p class="text-sm font-medium text-zinc-800">物品已卖出去了？</p>
-          <p class="text-xs text-zinc-400 mt-0.5">标记已售后，买家可与你互相评价</p>
+          <p class="text-xs text-zinc-400 mt-0.5">标记已售后，双方可互相评价；可登记买家学号便于定向评价</p>
         </div>
         <button
-          :disabled="markingSold"
-          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition active:scale-95 flex items-center gap-1.5"
-          @click="markSold"
+          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition active:scale-95"
+          @click="showMarkSold = true; buyerStudentId = ''; buyerPreview = null"
         >
-          <Loader2 v-if="markingSold" class="w-4 h-4 animate-spin" />
           标记已售
         </button>
       </div>
 
       <!-- 二手交易：买家评价这次交易 -->
-      <div v-if="soldAt && canRateAsBuyer && !hasRated" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+      <div v-if="soldAt && canRateAsBuyer" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
         <div class="min-w-0">
           <p class="text-sm font-medium text-zinc-800">交易已完成</p>
           <p class="text-xs text-zinc-400 mt-0.5">为这次交易打个分吧（好评 +2 / 差评 -3 信誉分）</p>
@@ -535,6 +572,20 @@ function closeMoreMenu(e: MouseEvent) {
           @click="openRateDialog"
         >
           评价这次交易
+        </button>
+      </div>
+
+      <!-- 二手交易：作者评价登记的买家 -->
+      <div v-if="canRateAsSeller" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-zinc-800">给这次交易的买家打个分</p>
+          <p class="text-xs text-zinc-400 mt-0.5">你登记的买家可以收到你的评价</p>
+        </div>
+        <button
+          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-amber-400 text-white text-sm font-medium hover:bg-amber-500 transition active:scale-95"
+          @click="openRateDialog"
+        >
+          评价买家
         </button>
       </div>
 
@@ -687,6 +738,36 @@ function closeMoreMenu(e: MouseEvent) {
     <!-- 删除评论确认 -->
     <ConfirmDialog :visible="deleteCommentDialog.visible" content="确定删除该评论吗？删除后不可恢复" title="删除评论" confirm-text="删除" danger
       @confirm="confirmDeleteComment" @cancel="deleteCommentDialog.visible = false; deleteCommentDialog.comment = null" />
+
+    <!-- 标记已售弹窗（可选登记买家学号） -->
+    <Teleport to="body">
+      <div v-if="showMarkSold" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showMarkSold = false">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative w-full max-w-sm bg-white rounded-2xl p-5">
+          <h4 class="text-center font-medium text-zinc-900">标记交易完成</h4>
+          <p class="text-center text-xs text-zinc-400 mt-1">可选登记买家学号，便于你之后定向评价对方</p>
+          <input
+            v-model="buyerStudentId"
+            placeholder="买家学号（选填）"
+            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm mt-4"
+            @input="resolveBuyer"
+          />
+          <p v-if="buyerPreview" class="text-xs text-green-600 mt-1.5">✓ 找到买家：{{ buyerPreview.nickname }}</p>
+          <p v-else-if="buyerStudentId.trim() && !resolvingBuyer" class="text-xs text-zinc-400 mt-1.5">未找到该学号，可留空直接标记</p>
+          <div class="flex gap-2 mt-4">
+            <button class="flex-1 py-2.5 rounded-full bg-zinc-100 text-zinc-600 text-sm font-medium hover:bg-zinc-200 transition" @click="showMarkSold = false">取消</button>
+            <button
+              :disabled="markingSold || (buyerStudentId.trim() !== '' && !buyerPreview)"
+              class="flex-1 py-2.5 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition flex items-center justify-center gap-1.5"
+              @click="markSold"
+            >
+              <Loader2 v-if="markingSold" class="w-4 h-4 animate-spin" />
+              确认标记
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 交易互评弹窗 -->
     <Teleport to="body">

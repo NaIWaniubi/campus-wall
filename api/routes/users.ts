@@ -9,6 +9,15 @@ import { formatPost } from './posts.js';
 
 const router = Router();
 
+// 按学号查用户最小公开信息（标记交易买家等场景；仅暴露 id+昵称，须置于 /:id 之前）
+router.get('/lookup', authRequired, (req, res) => {
+  const studentId = (req.query.studentId as string) || '';
+  if (!studentId.trim()) return fail(res, '请提供学号');
+  const user = db.prepare("SELECT id, nickname FROM users WHERE student_id = ? AND status != 'banned'").get(studentId.trim()) as any;
+  if (!user) return fail(res, '该学号未注册或已被封禁', 404, 404);
+  success(res, user);
+});
+
 // 用户公开信息
 router.get('/:id', (req, res) => {
   const id = Number(req.params.id);

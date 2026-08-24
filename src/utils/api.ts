@@ -14,7 +14,7 @@ export const authApi = {
 
 // 帖子
 export const postApi = {
-  list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string }) => request.get('/posts', { params }),
+  list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string; authorId?: number }) => request.get('/posts', { params }),
   detail: (id: number) => request.get(`/posts/${id}`),
   matches: (id: number) => request.get(`/posts/${id}/matches`),
   publish: (data: any) => request.post('/posts', data),
@@ -37,6 +37,7 @@ export const commentApi = {
 // 用户
 export const userApi = {
   info: (id: number) => request.get(`/users/${id}`),
+  lookup: (studentId: string) => request.get('/users/lookup', { params: { studentId } }),
   updateProfile: (data: { nickname?: string; avatar?: string; signature?: string }) => request.put('/users/profile', data),
   myPosts: () => request.get('/users/me/posts'),
   myComments: () => request.get('/users/me/comments'),
@@ -175,7 +176,8 @@ export const subscriptionApi = {
 
 // 二手交易互评
 export const tradeApi = {
-  complete: (postId: number) => request.post(`/trades/${postId}/complete`),
+  complete: (postId: number, buyerId?: number) => request.post(`/trades/${postId}/complete`, buyerId ? { buyerId } : {}),
+  myRating: (postId: number) => request.get(`/trades/${postId}/my-rating`),
   rate: (postId: number, data: { targetUserId?: number; rating: number; comment?: string }) =>
     request.post(`/trades/${postId}/rate`, data),
   ratingsOf: (userId: number) => request.get(`/users/${userId}/trade-ratings`),

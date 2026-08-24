@@ -102,6 +102,12 @@ router.get('/', authOptional, (req, res) => {
     where += ` AND p.section_id = ?`;
     params.push(sectionId);
   }
+  // 按作者筛选（公开主页用；配合 status=published 即该作者的公开可见帖）
+  const authorId = req.query.authorId ? parseInt(req.query.authorId as string) : 0;
+  if (authorId > 0) {
+    where += ` AND p.user_id = ?`;
+    params.push(authorId);
+  }
   if (keyword) {
     where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
     params.push(`%${keyword}%`, `%${keyword}%`);

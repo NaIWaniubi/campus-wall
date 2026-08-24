@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
- * 私信聊天面板：升序气泡（自己右/对方左）、底部输入即时上屏、15s 轮询新消息
- * 进入会话时后端 GET 即清未读，通知父组件同步列表红点
+ * 私信聊天面板：升序气泡（自己右/对方左）、底部输入即时上屏、15s 增量轮询
+ * 进入会话时后端 GET 即清未读，通知父组件同步列表红点；
+ * 轮询只拉 afterId 增量，后台标签页暂停、恢复可见立即补拉一次；
+ * 收到/发出新消息 emit('activity') 让父级刷新会话列表顺序与 lastMessage
  */
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ArrowLeft, Send } from '@lucide/vue'
@@ -19,7 +21,11 @@ interface ChatMessage {
 const props = defineProps<{
   conv: { id: number; peer: { id: number; nickname: string; avatar: string } }
 }>()
-const emit = defineEmits<{ (e: 'back'): void; (e: 'read', convId: number): void }>()
+const emit = defineEmits<{
+  (e: 'back'): void
+  (e: 'read', convId: number): void
+  (e: 'activity', convId: number): void
+}>()
 
 const messages = ref<ChatMessage[]>([])
 const loading = ref(true)
@@ -40,7 +46,7 @@ function scrollToBottom() {
   })
 }
 
-// 后端按 id 升序分页（page=1 是最旧的一批），取最后一页拿到最近的≤100条
+// 后端按 id 升序分页（page=1 是最旧的一批），取最后一页拿到最近的≤100条（仅首次进入用）
 async function fetchTail(): Promise<ChatMessage[]> {
   const head: any = await conversationApi.messages(props.conv.id, { page: 1, pageSize: 1 })
   const total: number = head.data?.total || 0
@@ -49,19 +55,45 @@ async function fetchTail(): Promise<ChatMessage[]> {
   return res.data?.list || []
 }
 
+// 增量拉取：只取 id 大于本地最后一条的新消息（后端升序 limit 50），单请求替代原双请求全量
+async function fetchIncrement(afterId: number): Promise<{ list: ChatMessage[]; hasMore: boolean }> {
+  const res: any = await conversationApi.messages(props.conv.id, { afterId })
+  return { list: res.data?.list || [], hasMore: !!res.data?.hasMore }
+}
+
+function mergeIncoming(incoming: ChatMessage[]) {
+  if (!incoming.length) return
+  // 本地已有（含刚发送的消息）按 id 去重，仅追加新消息
+  const known = new Set(messages.value.map((m) => m.id))
+  let added = false
+  for (const m of incoming) {
+    if (!known.has(m.id)) {
+      messages.value.push(m)
+      added = true
+    }
+  }
+  if (!added) return
+  messages.value.sort((a, b) => a.id - b.id)
+  // 有新消息（收到或对端）→ 父级静默刷新会话列表顺序与 lastMessage
+  emit('activity', props.conv.id)
+}
+
+function lastLocalId(): number {
+  return messages.value.length ? messages.value[messages.value.length - 1].id : 0
+}
+
 async function load(initial = false) {
   const stick = nearBottom()
   try {
-    const incoming = await fetchTail()
     if (initial) {
-      messages.value = incoming
+      messages.value = await fetchTail()
     } else {
-      // 合并轮询增量：本地已有（含刚发送的消息）按 id 去重，仅追加新消息
-      const known = new Set(messages.value.map((m) => m.id))
-      for (const m of incoming) {
-        if (!known.has(m.id)) messages.value.push(m)
+      // 单次增量超过 50 条时用新 afterId 追平剩余分页
+      for (;;) {
+        const r = await fetchIncrement(lastLocalId())
+        mergeIncoming(r.list)
+        if (!r.list.length || !r.hasMore) break
       }
-      messages.value.sort((a, b) => a.id - b.id)
     }
     emit('read', props.conv.id)
   } catch {
@@ -85,6 +117,8 @@ async function send() {
       createdAt: new Date().toISOString(),
     })
     draft.value = ''
+    // 发送也会改变会话顺序/lastMessage → 通知父级刷新
+    emit('activity', props.conv.id)
     scrollToBottom()
   } catch {
     // 错误已由拦截器 toast
@@ -93,13 +127,37 @@ async function send() {
   }
 }
 
+// ---------- 轮询生命周期：后台标签页暂停，恢复可见立即补拉一次 ----------
+function startPoll() {
+  if (pollTimer !== null || document.hidden) return
+  pollTimer = setInterval(() => {
+    if (document.hidden) return
+    load(false)
+  }, 15000)
+}
+function stopPoll() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+function onVisibility() {
+  if (document.hidden) {
+    stopPoll()
+  } else {
+    load(false)
+    startPoll()
+  }
+}
+
 onMounted(() => {
   load(true)
-  pollTimer = setInterval(() => load(false), 15000)
+  startPoll()
+  document.addEventListener('visibilitychange', onVisibility)
 })
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
-  pollTimer = null
+  stopPoll()
+  document.removeEventListener('visibilitychange', onVisibility)
 })
 </script>
 

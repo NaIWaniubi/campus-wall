@@ -4,9 +4,9 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck } from '@lucide/vue'
+import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { postApi, commentApi, conversationApi, followApi } from '@/utils/api'
+import { postApi, commentApi, conversationApi, followApi, tradeApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -37,6 +37,9 @@ function onThumbError(e: Event, fallback: string) {
 const commentInputRef = ref<HTMLInputElement | null>(null)
 // 失物招领智能匹配：与本帖相似的候选帖列表
 const matches = ref<any[]>([])
+// 从消息中心匹配通知跳入（?showMatches=1）：定位并短暂高亮匹配卡片
+const matchesCardRef = ref<HTMLElement | null>(null)
+const matchesHighlighted = ref(false)
 
 const reportReasons = ['垃圾广告', '人身攻击', '色情低俗', '违法违规', '其他']
 const commentPosting = ref(false)
@@ -52,6 +55,12 @@ const canComment = computed(() => userStore.isLoggedIn && !isPending.value)
 const canInteractWithAuthor = computed(() =>
   !!post.value && !post.value.isAnonymous && !isAuthor.value && !!post.value.author?.id && !isPending.value
 )
+// 作者信息区可点击跳转他人主页（匿名帖不暴露身份）
+const canViewAuthorProfile = computed(() => !!post.value && !post.value.isAnonymous && !!post.value.author?.id)
+function goAuthorProfile() {
+  if (!canViewAuthorProfile.value) return
+  router.push(`/user/${post.value.author.id}`)
+}
 const showFollowBtn = computed(() => canInteractWithAuthor.value)
 const showDmBtn = computed(() => userStore.isLoggedIn && canInteractWithAuthor.value)
 const followFollowing = ref(false)
@@ -98,6 +107,61 @@ async function startChat() {
     // 错误已由拦截器 toast
   } finally {
     followBusy.value = false
+  }
+}
+
+// ---------- 二手交易闭环：标记已售 / 买家互评 ----------
+const isTradeSection = computed(() => {
+  const name = post.value?.section?.name || ''
+  return name.includes('二手') || name.includes('交易')
+})
+const soldAt = computed(() => post.value?.extraFields?.soldAt as string | undefined)
+// 作者本人 + 二手交易板块 + 未标记售出 → 可标记已售
+const canMarkSold = computed(() => isAuthor.value && isTradeSection.value && !soldAt.value && post.value?.status === 'published')
+const markingSold = ref(false)
+
+async function markSold() {
+  if (markingSold.value) return
+  markingSold.value = true
+  try {
+    const res: any = await tradeApi.complete(postId.value)
+    post.value.extraFields = { ...(post.value.extraFields || {}), soldAt: res.data.soldAt }
+    toast.success('已标记交易完成')
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    markingSold.value = false
+  }
+}
+
+// 买家互评：非作者 + 已登录 + 已售帖；每人每帖仅一次（重复提交由后端拦截）
+const canRateAsBuyer = computed(() => userStore.isLoggedIn && !isAuthor.value && !!soldAt.value && post.value?.status === 'published')
+const hasRated = ref(false)
+const showRateDialog = ref(false)
+const rateScore = ref(0)
+const rateComment = ref('')
+const rateSubmitting = ref(false)
+
+function openRateDialog() {
+  rateScore.value = 0
+  rateComment.value = ''
+  showRateDialog.value = true
+}
+
+async function submitRate() {
+  if (!rateScore.value) return toast.error('请先选择星级')
+  if (rateSubmitting.value) return
+  rateSubmitting.value = true
+  try {
+    await tradeApi.rate(postId.value, { rating: rateScore.value, comment: rateComment.value.trim() })
+    hasRated.value = true
+    showRateDialog.value = false
+    toast.success('评价成功，感谢你的反馈')
+  } catch (e: any) {
+    // 错误已由拦截器 toast；重复评价时记住状态隐藏入口
+    if (String(e?.message || '').includes('已评价')) hasRated.value = true
+  } finally {
+    rateSubmitting.value = false
   }
 }
 
@@ -154,7 +218,7 @@ async function toggleFavorite() {
 }
 
 async function toggleCommentLike(c: any) {
-  if (!userStore.isLoggedIn) return router.push('/login')
+  if (!userStore.isLoggedIn) return goLogin() // 带 redirect 回跳，与同页其他登录墙一致（eng-publish 补修）
   try {
     const res: any = await commentApi.like(c.id)
     c.liked = res.data.liked
@@ -276,11 +340,19 @@ function share() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchPost()
   fetchComments()
-  fetchMatches()
+  await fetchMatches()
   document.addEventListener('click', closeMoreMenu)
+  // 匹配通知跳入：滚动定位到「可能相关」卡片并短暂高亮（自动展开候选列表）
+  if (route.query.showMatches === '1' && matches.value.length) {
+    nextTick(() => {
+      matchesCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      matchesHighlighted.value = true
+      setTimeout(() => (matchesHighlighted.value = false), 2500)
+    })
+  }
 })
 onUnmounted(() => {
   document.removeEventListener('click', closeMoreMenu)
@@ -341,21 +413,27 @@ function closeMoreMenu(e: MouseEvent) {
     </main>
 
     <main v-if="post" class="max-w-[960px] mx-auto px-4 py-4">
-      <!-- 作者信息 -->
+      <!-- 作者信息（非匿名可点击跳转他人主页） -->
       <div class="flex items-center gap-3 mb-4">
-        <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
-          <img v-if="post.author.avatar" :src="post.author.avatar" class="w-full h-full object-cover" alt="" />
-          <span v-else class="text-base font-bold text-brand-700">{{ post.author.nickname?.charAt(0) || '匿' }}</span>
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-1.5">
-            <span class="font-medium text-zinc-900">{{ post.author.nickname || '匿名用户' }}</span>
-            <span v-if="post.isAnonymous" class="text-xs bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">匿名</span>
+        <div
+          class="flex items-center gap-3 flex-1 min-w-0"
+          :class="canViewAuthorProfile ? 'cursor-pointer group' : ''"
+          @click="goAuthorProfile"
+        >
+          <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
+            <img v-if="post.author.avatar" :src="post.author.avatar" class="w-full h-full object-cover" alt="" />
+            <span v-else class="text-base font-bold text-brand-700">{{ post.author.nickname?.charAt(0) || '匿' }}</span>
           </div>
-          <div class="text-xs text-zinc-400 flex items-center gap-2">
-            <span>{{ formatTime(post.createdAt) }}</span>
-            <span>·</span>
-            <span class="flex items-center gap-0.5"><Eye class="w-3 h-3" /> {{ post.viewCount }}</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="font-medium text-zinc-900 truncate transition-colors" :class="canViewAuthorProfile ? 'group-hover:text-brand-600' : ''">{{ post.author.nickname || '匿名用户' }}</span>
+              <span v-if="post.isAnonymous" class="text-xs bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">匿名</span>
+            </div>
+            <div class="text-xs text-zinc-400 flex items-center gap-2">
+              <span>{{ formatTime(post.createdAt) }}</span>
+              <span>·</span>
+              <span class="flex items-center gap-0.5"><Eye class="w-3 h-3" /> {{ post.viewCount }}</span>
+            </div>
           </div>
         </div>
         <!-- 作者互动：私信 / 关注 -->
@@ -383,7 +461,13 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 标题与正文 -->
-      <h1 class="text-xl font-bold text-zinc-900 mb-2">{{ post.title }}</h1>
+      <div class="flex items-center gap-2 mb-2">
+        <h1 class="text-xl font-bold text-zinc-900 flex-1 min-w-0">{{ post.title }}</h1>
+        <!-- 已售徽标：任何视角可见（对齐小程序 sold-badge） -->
+        <span v-if="soldAt" class="flex-shrink-0 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-medium border border-emerald-100">
+          ✓ 已售出
+        </span>
+      </div>
       <p class="text-sm text-zinc-700 leading-relaxed post-content mb-3">{{ post.content }}</p>
 
       <!-- 图片九宫格 -->
@@ -424,6 +508,36 @@ function closeMoreMenu(e: MouseEvent) {
         </div>
       </div>
 
+      <!-- 二手交易：作者标记已售 -->
+      <div v-if="canMarkSold" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-zinc-800">物品已卖出去了？</p>
+          <p class="text-xs text-zinc-400 mt-0.5">标记已售后，买家可与你互相评价</p>
+        </div>
+        <button
+          :disabled="markingSold"
+          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition active:scale-95 flex items-center gap-1.5"
+          @click="markSold"
+        >
+          <Loader2 v-if="markingSold" class="w-4 h-4 animate-spin" />
+          标记已售
+        </button>
+      </div>
+
+      <!-- 二手交易：买家评价这次交易 -->
+      <div v-if="soldAt && canRateAsBuyer && !hasRated" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-zinc-800">交易已完成</p>
+          <p class="text-xs text-zinc-400 mt-0.5">为这次交易打个分吧（好评 +2 / 差评 -3 信誉分）</p>
+        </div>
+        <button
+          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-amber-400 text-white text-sm font-medium hover:bg-amber-500 transition active:scale-95"
+          @click="openRateDialog"
+        >
+          评价这次交易
+        </button>
+      </div>
+
       <!-- 互动栏 -->
       <div class="flex items-center justify-around bg-white rounded-2xl py-3.5 mb-4 shadow-sm shadow-zinc-100/50" :class="isPending ? 'opacity-70' : ''">
         <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.liked ? 'text-red-500 bg-red-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleLike">
@@ -440,8 +554,8 @@ function closeMoreMenu(e: MouseEvent) {
         </button>
       </div>
 
-      <!-- 可能相关（失物招领智能匹配） -->
-      <div v-if="matches.length" class="bg-white rounded-xl p-4 mb-4">
+      <!-- 可能相关（失物招领智能匹配）：从匹配通知跳入时定位并高亮 -->
+      <div v-if="matches.length" ref="matchesCardRef" class="bg-white rounded-xl p-4 mb-4 transition-shadow duration-500" :class="matchesHighlighted ? 'ring-2 ring-brand-300 shadow-lg' : ''">
         <h3 class="font-medium text-zinc-900">可能相关</h3>
         <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">以下帖子与本帖内容相似，或许正是你在找的</p>
         <button
@@ -573,6 +687,40 @@ function closeMoreMenu(e: MouseEvent) {
     <!-- 删除评论确认 -->
     <ConfirmDialog :visible="deleteCommentDialog.visible" content="确定删除该评论吗？删除后不可恢复" title="删除评论" confirm-text="删除" danger
       @confirm="confirmDeleteComment" @cancel="deleteCommentDialog.visible = false; deleteCommentDialog.comment = null" />
+
+    <!-- 交易互评弹窗 -->
+    <Teleport to="body">
+      <div v-if="showRateDialog" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showRateDialog = false">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative w-full max-w-sm bg-white rounded-2xl p-5">
+          <h4 class="text-center font-medium text-zinc-900">评价这次交易</h4>
+          <p class="text-center text-xs text-zinc-400 mt-1">仅对方可见你的评分，评价提交后不可修改</p>
+          <div class="flex justify-center gap-2 my-5">
+            <button v-for="i in 5" :key="i" class="p-0.5 active:scale-90 transition" @click="rateScore = i">
+              <Star class="w-8 h-8 transition-colors" :class="i <= rateScore ? 'text-amber-400 fill-amber-400' : 'text-zinc-200 hover:text-amber-200'" />
+            </button>
+          </div>
+          <textarea
+            v-model="rateComment"
+            maxlength="200"
+            rows="3"
+            placeholder="说说这次交易的体验（选填，200 字内）"
+            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition resize-none text-sm post-content"
+          ></textarea>
+          <div class="flex gap-2 mt-4">
+            <button class="flex-1 py-2.5 rounded-full bg-zinc-100 text-zinc-600 text-sm font-medium hover:bg-zinc-200 transition" @click="showRateDialog = false">取消</button>
+            <button
+              :disabled="!rateScore || rateSubmitting"
+              class="flex-1 py-2.5 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition flex items-center justify-center gap-1.5"
+              @click="submitRate"
+            >
+              <Loader2 v-if="rateSubmitting" class="w-4 h-4 animate-spin" />
+              提交评价
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

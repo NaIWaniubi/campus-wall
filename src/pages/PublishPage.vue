@@ -3,15 +3,17 @@
  * 发布页：板块选择、标题、正文、图片、匿名、敏感词检测、板块差异化字段
  */
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, uploadApi, draftApi } from '@/utils/api'
-import { checkSensitive } from '@/utils/helpers'
+import { assessRisk } from '@/utils/helpers'
 import { toast } from '@/utils/request'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const router = useRouter()
+const route = useRoute()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
@@ -27,58 +29,134 @@ const loading = ref(false)
 const uploading = ref(false)
 const showSectionPicker = ref(false)
 
-const sensitive = computed(() => checkSensitive(form.title + ' ' + form.content))
+const sensitive = computed(() => assessRisk(form.title, form.content))
 const selectedSection = computed(() => appStore.sections.find((s) => s.id === form.sectionId))
-const sectionKind = computed(() => {
-  const name = selectedSection.value?.name || ''
-  if (name.includes('二手') || name.includes('交易')) return 'trade'
-  if (name.includes('失物') || name.includes('招领')) return 'lost'
-  if (name.includes('拼车')) return 'carpool'
-  if (name.includes('组队')) return 'teamup'
-  if (name.includes('活动')) return 'activity'
-  return ''
+// 差异化字段按板块稳定 id 映射（1二手 2失物 3表白 4树洞 5互助 6活动 7拼车 8组队），板块改名不受影响
+const SECTION_KIND_MAP: Record<number, string> = {
+  1: 'trade',
+  2: 'lost',
+  3: 'confession',
+  4: 'treehole',
+  5: 'help',
+  6: 'activity',
+  7: 'carpool',
+  8: 'teamup',
+}
+const sectionKind = computed(() => SECTION_KIND_MAP[form.sectionId] || '')
+const creditScore = computed(() => userStore.user?.credit_score ?? 0)
+
+// 所有信誉门槛拒绝统一文案：讲清门槛、现状与恢复路径
+function creditDenyToast(need: number) {
+  toast.error(`需要信誉分 ${need}，当前 ${creditScore.value}。通过交易互评可提升信誉`)
+}
+
+// ── 编辑模式（?edit=:id）：读取详情回填表单，提交切换到 PUT /posts/:id（24h 内可编辑）──
+// TODO(eng-publish 联调)：本接入点只做脚本层数据流（回填 + 提交路由切换），
+// 模板差异化字段渲染如与回填的 extraFields 有冲突，以发布页现有结构为准再对齐。
+const editId = computed(() => {
+  const n = Number(route.query.edit)
+  return Number.isInteger(n) && n > 0 ? n : 0
 })
+const editingPost = ref<any>(null) // 编辑中的原帖详情（含 rejectReason）
+
+async function loadEditing() {
+  try {
+    const res: any = await postApi.detail(editId.value)
+    const p = res.data
+    if (!p.isMine) {
+      toast.error('只能编辑自己的帖子')
+      router.replace('/publish')
+      return
+    }
+    editingPost.value = p
+    applyDraftData({
+      sectionId: p.section?.id,
+      title: p.title,
+      content: p.content,
+      images: p.images,
+      isAnonymous: p.isAnonymous,
+      // 剥离非表单字段：soldAt/riskFlag 由服务端白名单/合并语义维护，不随表单带回
+      extraFields: Object.fromEntries(
+        Object.entries(p.extraFields || {}).filter(([k]) => k !== 'soldAt' && k !== 'riskFlag')
+      ),
+    })
+  } catch {
+    // 错误已由拦截器 toast
+    router.replace('/publish')
+  }
+}
 
 onMounted(() => {
   if (!appStore.sections.length) appStore.fetchSections()
   if (!userStore.canPost) {
-    toast.error('信誉分低于60，暂不可发帖')
+    creditDenyToast(60)
   }
-  // 恢复草稿
+  // 编辑模式：回填帖子详情，跳过草稿恢复
+  if (editId.value) {
+    loadEditing()
+    return
+  }
+  // 恢复草稿：优先草稿箱跳转带入的云端草稿，其次本地未发布的实时草稿
   const restore = sessionStorage.getItem('campus-wall-draft-restore')
   if (restore) {
     try {
-      const d = JSON.parse(restore)
-      form.sectionId = d.sectionId || 0
-      form.title = d.title || ''
-      form.content = d.content || ''
-      form.images = d.images || []
-      form.isAnonymous = !!d.isAnonymous
-      form.extraFields = d.extraFields || {}
+      applyDraftData(JSON.parse(restore))
       sessionStorage.removeItem('campus-wall-draft-restore')
+      localStorage.removeItem(LOCAL_DRAFT_KEY)
       toast.info('已恢复草稿内容')
     } catch {}
+  } else {
+    const local = localStorage.getItem(LOCAL_DRAFT_KEY)
+    if (local) {
+      try {
+        applyDraftData(JSON.parse(local))
+        toast.info('已恢复上次未发布的编辑')
+      } catch {
+        localStorage.removeItem(LOCAL_DRAFT_KEY)
+      }
+    }
   }
 })
 
-// 自动保存草稿（30秒一次）；登录用户进入页面后立即启动定时器
-const autoSaveTimer = ref<any>(null)
-function startAutoSave() {
-  if (autoSaveTimer.value) return
-  autoSaveTimer.value = setInterval(() => {
-    if (form.title.trim() || form.content.trim()) {
-      autoSaveDraft()
-    }
-  }, 30000)
+// ── 本地草稿：localStorage 实时保存，不再定时自动 POST 云端；显式「存草稿」才上传 ──
+const LOCAL_DRAFT_KEY = 'campus-wall-draft-local'
+
+function applyDraftData(d: any) {
+  form.sectionId = d.sectionId || 0
+  form.title = d.title || ''
+  form.content = d.content || ''
+  form.images = d.images || []
+  form.isAnonymous = !!d.isAnonymous
+  form.extraFields = d.extraFields || {}
 }
-function stopAutoSave() {
-  if (autoSaveTimer.value) {
-    clearInterval(autoSaveTimer.value)
-    autoSaveTimer.value = null
+
+watch(form, () => {
+  // 编辑模式不写本地草稿：避免把「对已发布帖的修改」误存成新建草稿
+  if (editId.value) return
+  const hasContent = form.title.trim() || form.content.trim() || form.images.length
+  if (hasContent) {
+    localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify({
+      sectionId: form.sectionId,
+      title: form.title,
+      content: form.content,
+      images: form.images,
+      isAnonymous: form.isAnonymous,
+      extraFields: form.extraFields,
+    }))
+  } else {
+    localStorage.removeItem(LOCAL_DRAFT_KEY)
   }
-}
-async function autoSaveDraft() {
-  if (!userStore.isLoggedIn) return
+}, { deep: true })
+
+async function saveDraft() {
+  if (!userStore.isLoggedIn) {
+    toast.info('登录后才能保存云端草稿')
+    return
+  }
+  if (!form.title.trim() && !form.content.trim()) {
+    toast.info('还没有可保存的内容')
+    return
+  }
   try {
     await draftApi.save({
       sectionId: form.sectionId || undefined,
@@ -88,30 +166,43 @@ async function autoSaveDraft() {
       isAnonymous: form.isAnonymous,
       extraFields: form.extraFields,
     })
+    // 已上云的本地副本清掉，避免与云端重复
+    localStorage.removeItem(LOCAL_DRAFT_KEY)
+    toast.success('草稿已保存到云端草稿箱')
   } catch {}
 }
-// 登录用户进入页面后启动自动保存（不再要求标题先有内容）
-onMounted(() => {
-  if (userStore.isLoggedIn) {
-    setTimeout(startAutoSave, 2000)
-  }
-})
-onUnmounted(() => {
-  stopAutoSave()
-  // 离开前若有内容，自动保存草稿
-  if (userStore.isLoggedIn && (form.title.trim() || form.content.trim())) {
-    autoSaveDraft()
-  }
-})
 
-// 当选中板块为强制匿名时，自动开启匿名开关
-watch(() => form.sectionId, (id) => {
-  const sec = appStore.sections.find((s) => s.id === id)
-  if (sec?.forceAnonymous && !form.isAnonymous) {
-    form.isAnonymous = true
-    toast.info('该板块要求匿名发布，已自动开启匿名')
+// 强匿名板块不再自动开启匿名（<90 用户会被提交时拦截、自相矛盾），
+// 改为在模板中展示说明；见「选择板块」卡片内的提示与匿名开关旁注。
+
+// 切换板块：已填差异化字段时先弹确认再清空，避免静默丢失
+const showSwitchConfirm = ref(false)
+const pendingSectionId = ref(0)
+const hasExtraFields = computed(() =>
+  Object.values(form.extraFields).some((v) => v !== '' && v !== undefined && v !== null),
+)
+
+function applySection(id: number) {
+  form.sectionId = id
+  form.extraFields = {}
+}
+
+function pickSection(id: number) {
+  showSectionPicker.value = false
+  if (id === form.sectionId) return
+  if (hasExtraFields.value) {
+    pendingSectionId.value = id
+    showSwitchConfirm.value = true
+    return
   }
-})
+  applySection(id)
+}
+
+function confirmSwitch() {
+  showSwitchConfirm.value = false
+  if (pendingSectionId.value) applySection(pendingSectionId.value)
+  pendingSectionId.value = 0
+}
 
 // 板块选择面板点击外部关闭
 const sectionPickerRef = ref<HTMLElement | null>(null)
@@ -128,6 +219,26 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
 })
+
+// 浏览器端 canvas 压缩：最长边 ≤1600、jpeg 质量 0.85；≤200KB 不压
+async function compressImage(file: File): Promise<File> {
+  if (file.size <= 200 * 1024) return file
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    return file // 解码失败（如部分环境的 HEIC）则原样上传，交由服务端处理
+  }
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+  if (!blob || blob.size >= file.size) return file
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg' })
+}
 
 async function onUpload(e: Event) {
   const input = e.target as HTMLInputElement
@@ -146,11 +257,13 @@ async function onUpload(e: Event) {
   try {
     for (const file of files) {
       if (form.images.length >= 9) break
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(`${file.name} 超过5MB，请压缩后上传`)
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error(`${file.name} 超过20MB，无法上传`)
         continue
       }
-      const res: any = await uploadApi.upload(file)
+      // 大图先本地压缩再上传，服务端仍有 sharp 二次处理兜底
+      const payload = await compressImage(file)
+      const res: any = await uploadApi.upload(payload)
       form.images.push(res.data.url)
     }
   } catch {
@@ -167,7 +280,7 @@ function removeImage(idx: number) {
 
 function onAnonymousChange(v: boolean) {
   if (v && !userStore.canAnonymous) {
-    toast.error('信誉分低于90，不可匿名发布')
+    creditDenyToast(90)
     return
   }
   if (v) toast.info('匿名发布后台可溯源，请文明发言')
@@ -181,7 +294,7 @@ function setExtra(key: string, value: any) {
 async function handleSubmit() {
   if (loading.value) return
   if (!userStore.canPost) {
-    toast.error('信誉分过低，暂不可发帖')
+    creditDenyToast(60)
     return
   }
   if (!form.sectionId) {
@@ -200,12 +313,13 @@ async function handleSubmit() {
     toast.error('正文需10-500字')
     return
   }
-  if (sensitive.value.hit) {
-    toast.error(`内容包含敏感词：${sensitive.value.words.join('、')}`)
+  // 与后端分级一致：review 硬词才拦截，warn 仅提示不阻断
+  if (sensitive.value.level === 'review') {
+    toast.error(`内容包含违规敏感词：${sensitive.value.hits.join('、')}，请修改后再发布`)
     return
   }
   if (form.isAnonymous && !userStore.canAnonymous) {
-    toast.error('信誉分低于90，不可匿名发布')
+    creditDenyToast(90)
     return
   }
   if (selectedSection.value?.forceAnonymous && !form.isAnonymous) {
@@ -214,6 +328,20 @@ async function handleSubmit() {
   }
   loading.value = true
   try {
+    // 编辑模式：提交走 PUT /posts/:id（服务端 24h 窗口校验，状态由服务端推导）
+    if (editId.value) {
+      const res: any = await postApi.edit(editId.value, {
+        sectionId: form.sectionId,
+        title: form.title.trim(),
+        content: form.content,
+        images: form.images,
+        isAnonymous: form.isAnonymous,
+        extraFields: form.extraFields,
+      })
+      toast.success(res.message || '修改成功')
+      router.replace(`/post/${editId.value}`)
+      return
+    }
     const res: any = await postApi.publish({
       sectionId: form.sectionId,
       title: form.title.trim(),
@@ -223,6 +351,8 @@ async function handleSubmit() {
       extraFields: form.extraFields,
     })
     toast.success(res.message || '发布成功')
+    // 发布成功：清空本地草稿，且不再回存云端草稿
+    localStorage.removeItem(LOCAL_DRAFT_KEY)
     // 失物招领智能匹配：命中候选帖时提示
     if (res.data?.matchedCount > 0) toast.info('发现疑似匹配的帖子，可在详情页查看')
     router.replace(`/post/${res.data.id}`)
@@ -242,9 +372,9 @@ async function handleSubmit() {
         <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="font-medium text-zinc-900">发布</span>
+        <span class="font-medium text-zinc-900">{{ editId ? '编辑帖子' : '发布' }}</span>
         <div class="flex items-center gap-2">
-          <button class="p-2 text-zinc-500 hover:text-zinc-700" title="草稿箱" @click="router.push('/profile/drafts')">
+          <button v-if="!editId" class="p-2 text-zinc-500 hover:text-zinc-700" title="草稿箱" @click="router.push('/profile/drafts')">
             <FileText class="w-5 h-5" />
           </button>
           <button
@@ -252,7 +382,7 @@ async function handleSubmit() {
             class="px-4 py-1.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition"
             @click="handleSubmit"
           >
-            发布
+            {{ editId ? '保存' : '发布' }}
           </button>
         </div>
       </div>
@@ -261,7 +391,13 @@ async function handleSubmit() {
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
       <!-- 信誉分提示 -->
       <div v-if="!userStore.canPost" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-xs">
-        <ShieldAlert class="w-4 h-4 flex-shrink-0" /> 信誉分低于60，暂不可发帖
+        <ShieldAlert class="w-4 h-4 flex-shrink-0" /> 需要信誉分 60，当前 {{ creditScore }} 分。通过交易互评可提升信誉
+      </div>
+
+      <!-- 编辑模式：驳回原因提示（修改重发场景） -->
+      <div v-if="editId && editingPost?.rejectReason" class="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs leading-relaxed">
+        <ShieldAlert class="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>该帖曾被驳回：{{ editingPost.rejectReason }}。请修改内容后保存，将重新提交审核</span>
       </div>
 
       <!-- 板块选择 -->
@@ -282,11 +418,15 @@ async function handleSubmit() {
             :key="s.id"
             class="px-2 py-2 rounded-lg text-sm border transition"
             :class="form.sectionId === s.id ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-zinc-200 text-zinc-600 hover:border-brand-300'"
-            @click="form.sectionId = s.id; form.extraFields = {}; showSectionPicker = false"
+            @click="pickSection(s.id)"
           >
             {{ s.name }}
           </button>
         </div>
+        <!-- 强匿名板块说明：不再自动开启匿名开关，改为明示规则 -->
+        <p v-if="selectedSection?.forceAnonymous" class="mt-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-600 text-xs leading-relaxed">
+          「{{ selectedSection.name }}」为强匿名板块：需开启下方「匿名发布」后才能发布<template v-if="!userStore.canAnonymous">；开启匿名需要信誉分 ≥90，当前 {{ creditScore }} 分，暂不能在该板块发布</template>。
+        </p>
       </div>
 
       <!-- 标题 -->
@@ -307,10 +447,14 @@ async function handleSubmit() {
         </div>
         <textarea v-model="form.content" maxlength="500" rows="6" placeholder="说点什么，至少10个字"
           class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition resize-none post-content"></textarea>
-        <!-- 敏感词提示 -->
-        <div v-if="sensitive.hit" class="mt-2 flex items-start gap-1.5 text-xs text-red-500">
+        <!-- 敏感词提示：review 拦截、warn 仅提示 -->
+        <div v-if="sensitive.level === 'review'" class="mt-2 flex items-start gap-1.5 text-xs text-red-500">
           <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          <span>检测到敏感词：{{ sensitive.words.join('、') }}，请修改后再发布</span>
+          <span>内容包含违规敏感词：{{ sensitive.hits.join('、') }}，请修改后再发布</span>
+        </div>
+        <div v-else-if="sensitive.level === 'warn'" class="mt-2 flex items-start gap-1.5 text-xs text-amber-500">
+          <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>检测到敏感表述：{{ sensitive.hits.join('、') }}，建议斟酌用词（不影响发布）</span>
         </div>
       </div>
 
@@ -329,7 +473,7 @@ async function handleSubmit() {
             <Loader2 v-else class="w-7 h-7 animate-spin" />
             <span v-if="!uploading" class="text-xs">上传图片</span>
             <span v-else class="text-xs">上传中</span>
-            <input type="file" accept="image/jpeg,image/png" multiple class="hidden" :disabled="uploading" @change="onUpload" />
+            <input type="file" accept="image/jpeg,image/png,image/heic" multiple class="hidden" :disabled="uploading" @change="onUpload" />
           </label>
         </div>
       </div>
@@ -450,25 +594,47 @@ async function handleSubmit() {
         <div>
           <p class="text-sm font-medium text-zinc-700">匿名发布</p>
           <p class="text-xs text-zinc-400 mt-0.5">匿名发布后台可溯源，请文明发言</p>
+          <p v-if="!userStore.canAnonymous" class="text-xs text-red-400 mt-0.5">信誉分 ≥90 可匿名，当前 {{ creditScore }} 分</p>
+          <p v-if="selectedSection?.forceAnonymous" class="text-xs text-blue-500 mt-0.5">当前板块要求匿名发布</p>
         </div>
         <button
           class="relative w-11 h-6 rounded-full transition"
-          :class="form.isAnonymous ? 'bg-brand-500' : 'bg-zinc-200'"
+          :class="[form.isAnonymous ? 'bg-brand-500' : 'bg-zinc-200', !userStore.canAnonymous ? 'opacity-50 cursor-not-allowed' : '']"
+          :disabled="!userStore.canAnonymous"
           @click="onAnonymousChange(!form.isAnonymous)"
         >
           <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" :class="form.isAnonymous ? 'translate-x-5' : ''"></span>
         </button>
       </div>
 
-      <button
-        :disabled="loading"
-        class="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
-        @click="handleSubmit"
-      >
-        <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
-        {{ loading ? '发布中...' : '发布' }}
-      </button>
+      <div class="flex gap-3">
+        <button
+          v-if="!editId"
+          class="px-6 py-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-full font-medium transition"
+          @click="saveDraft"
+        >
+          存草稿
+        </button>
+        <button
+          :disabled="loading"
+          class="flex-1 py-3 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
+          @click="handleSubmit"
+        >
+          <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
+          {{ loading ? (editId ? '保存中...' : '发布中...') : (editId ? '保存修改' : '发布') }}
+        </button>
+      </div>
     </main>
+
+    <!-- 切换板块确认：避免静默清空已填的差异化字段 -->
+    <ConfirmDialog
+      :visible="showSwitchConfirm"
+      title="切换板块"
+      content="切换板块将清空已填的板块专属信息"
+      confirm-text="继续切换"
+      @confirm="confirmSwitch"
+      @cancel="showSwitchConfirm = false"
+    />
   </div>
 </template>
 

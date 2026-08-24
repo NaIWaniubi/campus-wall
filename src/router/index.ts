@@ -21,6 +21,7 @@ import MyLikesPage from '@/pages/MyLikesPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
 import DraftsPage from '@/pages/DraftsPage.vue'
 import SectionPage from '@/pages/SectionPage.vue'
+import UserProfilePage from '@/pages/UserProfilePage.vue'
 
 // 管理后台页面
 import AdminLoginPage from '@/pages/admin/AdminLoginPage.vue'
@@ -42,6 +43,7 @@ const routes = [
   { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册' } },
   { path: '/search', name: 'search', component: SearchPage, meta: { title: '搜索' } },
   { path: '/post/:id', name: 'postDetail', component: PostDetailPage, meta: { title: '帖子详情' } },
+  { path: '/user/:id', name: 'userProfile', component: UserProfilePage, meta: { title: '个人主页' } },
   { path: '/section/:id', name: 'section', component: SectionPage, meta: { title: '板块' } },
   { path: '/publish', name: 'publish', component: PublishPage, meta: { title: '发布', requireAuth: true } },
   { path: '/message', name: 'message', component: MessagePage, meta: { title: '消息', requireAuth: true } },
@@ -60,15 +62,15 @@ const routes = [
     component: AdminLayout,
     meta: { requireAuth: true, requireAdmin: true },
     children: [
-      { path: '', name: 'adminDashboard', component: DashboardPage, meta: { title: '数据总览' } },
+      { path: '', name: 'adminDashboard', component: DashboardPage, meta: { title: '数据总览', superOnly: true } },
       { path: 'posts', name: 'adminPosts', component: ContentPage, meta: { title: '帖子治理' } },
       { path: 'comments', name: 'adminComments', component: CommentsPage, meta: { title: '评论管理' } },
       { path: 'reports', name: 'adminReports', component: ReportsPage, meta: { title: '举报处理' } },
-      { path: 'users', name: 'adminUsers', component: UsersPage, meta: { title: '用户管理' } },
-      { path: 'sections', name: 'adminSections', component: SectionsPage, meta: { title: '板块管理' } },
-      { path: 'feedbacks', name: 'adminFeedbacks', component: FeedbacksPage, meta: { title: '意见反馈' } },
-      { path: 'announcements', name: 'adminAnnouncements', component: AnnouncementsPage, meta: { title: '公告管理' } },
-      { path: 'ai', name: 'adminAi', component: AdminAiPage, meta: { title: 'AI 设置' } },
+      { path: 'users', name: 'adminUsers', component: UsersPage, meta: { title: '用户管理', superOnly: true } },
+      { path: 'sections', name: 'adminSections', component: SectionsPage, meta: { title: '板块管理', superOnly: true } },
+      { path: 'feedbacks', name: 'adminFeedbacks', component: FeedbacksPage, meta: { title: '意见反馈', superOnly: true } },
+      { path: 'announcements', name: 'adminAnnouncements', component: AnnouncementsPage, meta: { title: '公告管理', superOnly: true } },
+      { path: 'ai', name: 'adminAi', component: AdminAiPage, meta: { title: 'AI 设置', superOnly: true } },
     ],
   },
 
@@ -100,6 +102,13 @@ router.beforeEach((to, _from, next) => {
     // 非管理员（角色以登录响应 user.role 为准）访问后台：重定向首页并提示无权限
     toast.error('无权限访问管理后台')
     next('/')
+    return
+  }
+
+  if (to.meta.superOnly && !userStore.isSuperAdmin) {
+    // 板块管理员越权访问超管专属页：已登录管理员回落到内容审核，其余回首页
+    toast.error('该页面仅超级管理员可访问')
+    next(userStore.isAdmin ? '/admin/posts' : '/')
     return
   }
 

@@ -6,7 +6,7 @@
  * - 处理动作：核实处理(resolve) / 驳回举报(dismiss) 二选一，均需二次确认
  */
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ExternalLink, ChevronLeft, ChevronRight, Check, XCircle } from '@lucide/vue'
 import { adminApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
@@ -15,6 +15,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const chips = [
   { label: '待处理', value: 'pending' },
@@ -27,7 +28,8 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const loading = ref(false)
-const activeChip = ref('pending')
+// 支持 Dashboard 下钻：?status=pending 预置筛选
+const activeChip = ref(chips.some((c) => c.value === route.query.status) ? (route.query.status as string) : 'pending')
 
 async function load() {
   loading.value = true

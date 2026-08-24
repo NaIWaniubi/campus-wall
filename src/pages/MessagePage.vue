@@ -3,9 +3,9 @@
  * 消息中心：顶层「通知 / 私信」双 Tab
  * 通知：Tab切换、列表、标记已读；私信：会话列表 + 同页分栏 ChatPanel
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, MessageCircle, Heart, Bell, CheckCheck } from '@lucide/vue'
+import { ArrowLeft, MessageCircle, Heart, Bell, CheckCheck, MapPin, Newspaper } from '@lucide/vue'
 import { messageApi, conversationApi } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
 import { formatTime } from '@/utils/helpers'
@@ -24,6 +24,8 @@ const tabs = [
   { key: 'all', label: '全部' },
   { key: 'comment', label: '评论' },
   { key: 'like', label: '点赞' },
+  { key: 'match', label: '匹配' },
+  { key: 'digest', label: '摘要' },
   { key: 'system', label: '系统通知' },
 ]
 const activeTab = ref('all')
@@ -33,7 +35,20 @@ const loading = ref(true)
 function typeMeta(type: string) {
   if (type === 'comment') return { icon: MessageCircle, color: 'text-brand-500', bg: 'bg-brand-50' }
   if (type === 'like') return { icon: Heart, color: 'text-red-500', bg: 'bg-red-50' }
+  // 失物匹配：related_id 即对方帖子 id
+  if (type === 'match') return { icon: MapPin, color: 'text-emerald-500', bg: 'bg-emerald-50' }
+  // 每日板块摘要
+  if (type === 'digest') return { icon: Newspaper, color: 'text-violet-500', bg: 'bg-violet-50' }
   return { icon: Bell, color: 'text-amber-500', bg: 'bg-amber-50' }
+}
+
+// digest 摘要较长：默认收起两行，点击展开全文
+const expandedDigest = ref<Set<number>>(new Set())
+function toggleDigest(id: number) {
+  const s = new Set(expandedDigest.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  expandedDigest.value = s
 }
 
 async function load() {
@@ -64,8 +79,14 @@ async function onItemClick(msg: any) {
       // 错误已由拦截器 toast
     }
   }
+  // digest：不跳转，展开/收起全文
+  if (msg.type === 'digest') return toggleDigest(msg.id)
   if ((msg.type === 'comment' || msg.type === 'like') && msg.postId) {
-    router.push(`/post/${msg.postId}`)
+    return router.push(`/post/${msg.postId}`)
+  }
+  // match：related_id 即对方帖子 id，带 showMatches 让详情页定位并展开匹配卡片
+  if (msg.type === 'match' && msg.postId) {
+    return router.push(`/post/${msg.postId}?showMatches=1`)
   }
 }
 
@@ -91,8 +112,9 @@ const pendingConvId = Number(route.query.conv) || null
 const activeConv = computed(() => convs.value.find((c) => c.id === activeConvId.value) || null)
 const chatUnread = computed(() => convs.value.reduce((s, c) => s + (c.unread || 0), 0))
 
-async function loadConvs() {
-  convsLoading.value = true
+async function loadConvs(silent = false) {
+  // 静默刷新（聊天中的增量同步）不闪骨架屏，失败保留旧列表
+  if (!silent) convsLoading.value = true
   try {
     const res: any = await conversationApi.list()
     convs.value = res.data || []
@@ -101,9 +123,9 @@ async function loadConvs() {
       activeConvId.value = pendingConvId
     }
   } catch {
-    convs.value = []
+    if (!silent) convs.value = []
   } finally {
-    convsLoading.value = false
+    if (!silent) convsLoading.value = false
     convsLoaded.value = true
   }
 }
@@ -126,9 +148,25 @@ function switchView(v: 'notice' | 'chat') {
   if (v === 'chat' && !convsLoaded.value) loadConvs()
 }
 
+// ChatPanel 轮询到新消息/发送消息后静默刷新会话列表（节流 2s，避免高频重拉）
+let convRefreshTimer: ReturnType<typeof setTimeout> | null = null
+function onConvActivity() {
+  if (convRefreshTimer !== null) return
+  convRefreshTimer = setTimeout(() => {
+    convRefreshTimer = null
+    if (view.value === 'chat') loadConvs(true)
+  }, 2000)
+}
+
 onMounted(() => {
   load()
   if (view.value === 'chat') loadConvs()
+})
+onUnmounted(() => {
+  if (convRefreshTimer !== null) {
+    clearTimeout(convRefreshTimer)
+    convRefreshTimer = null
+  }
 })
 </script>
 
@@ -195,8 +233,10 @@ onMounted(() => {
             <component :is="typeMeta(msg.type).icon" class="w-5 h-5" :class="typeMeta(msg.type).color" />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-zinc-800 post-content" :class="!msg.isRead ? 'font-medium' : ''">{{ msg.content }}</p>
+            <p class="text-sm text-zinc-800 post-content"
+              :class="[!msg.isRead ? 'font-medium' : '', msg.type === 'digest' && !expandedDigest.has(msg.id) ? 'line-clamp-2' : '']">{{ msg.content }}</p>
             <span class="text-xs text-zinc-400">{{ formatTime(msg.createdAt) }}</span>
+            <span v-if="msg.type === 'digest'" class="text-xs text-brand-600 ml-2">{{ expandedDigest.has(msg.id) ? '收起' : '展开全文' }}</span>
           </div>
           <span v-if="!msg.isRead" class="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
         </button>
@@ -246,7 +286,7 @@ onMounted(() => {
         <!-- 聊天面板 -->
         <section class="flex-1 min-w-0" :class="activeConvId ? '' : 'hidden sm:block'">
           <div class="sm:h-[calc(100vh-11rem)] sm:min-h-[420px]">
-            <ChatPanel v-if="activeConv" :key="activeConv.id" :conv="activeConv" @back="activeConvId = null" @read="onConvRead" />
+            <ChatPanel v-if="activeConv" :key="activeConv.id" :conv="activeConv" @back="activeConvId = null" @read="onConvRead" @activity="onConvActivity" />
             <div v-else class="hidden sm:flex h-full min-h-[420px] items-center justify-center bg-white rounded-xl shadow-sm">
               <EmptyState text="选择一个会话开始聊天" />
             </div>

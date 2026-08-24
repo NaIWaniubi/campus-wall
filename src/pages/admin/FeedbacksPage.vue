@@ -6,6 +6,7 @@
 import { ref, onMounted } from 'vue'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { adminApi } from '@/utils/api'
+import { toast } from '@/utils/request'
 import { formatTime } from '@/utils/helpers'
 import EmptyState from '@/components/EmptyState.vue'
 
@@ -34,6 +35,20 @@ function switchTab(tab: 'open' | 'closed') {
   activeTab.value = tab
   page.value = 1
   load()
+}
+
+// 反馈闭环：标记已处理（PUT /admin/feedbacks/:id/status {status:'closed'}）
+const closingId = ref<number | null>(null)
+async function closeFeedback(f: any) {
+  if (closingId.value) return
+  closingId.value = f.id
+  try {
+    await adminApi.closeFeedback(f.id, 'closed')
+    toast.success('已标记为已处理')
+    load()
+  } catch {} finally {
+    closingId.value = null
+  }
 }
 function prevPage() {
   if (page.value > 1) { page.value--; load() }
@@ -83,7 +98,18 @@ onMounted(load)
           <span class="text-xs text-zinc-400 whitespace-nowrap ml-2">{{ formatTime(f.createdAt) }}</span>
         </div>
         <p class="text-sm text-zinc-700 whitespace-pre-wrap break-words">{{ f.content }}</p>
-        <p v-if="f.contact" class="text-xs text-zinc-400 mt-2">联系方式：{{ f.contact }}</p>
+        <div class="flex items-center justify-between mt-2">
+          <p v-if="f.contact" class="text-xs text-zinc-400">联系方式：{{ f.contact }}</p>
+          <span v-else></span>
+          <button
+            v-if="activeTab === 'open'"
+            class="px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50 whitespace-nowrap"
+            :disabled="closingId === f.id"
+            @click="closeFeedback(f)"
+          >
+            {{ closingId === f.id ? '处理中...' : '标记已处理' }}
+          </button>
+        </div>
       </div>
       <EmptyState v-if="!loading && !list.length" :text="activeTab === 'open' ? '暂无待处理反馈' : '暂无已关闭反馈'" />
       <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>

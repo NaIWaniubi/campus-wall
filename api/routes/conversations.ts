@@ -78,20 +78,32 @@ router.post('/', authRequired, (req, res) => {
 });
 
 // 会话消息分页（升序），进入时把我侧未读清零
+// 支持增量模式：?afterId=N 只返回 id > N 的消息（升序，最多 50 条），供客户端轻量轮询
 router.get('/:id/messages', authRequired, (req, res) => {
   const convId = Number(req.params.id);
   const found = getConvForUser(convId, req.currentUser!.id);
   if (!found) return fail(res, '会话不存在', 404, 404);
 
+  const afterId = Math.max(0, parseInt(req.query.afterId as string) || 0);
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
-  const offset = (page - 1) * pageSize;
+  const total = (db.prepare('SELECT COUNT(*) as total FROM chat_messages WHERE conversation_id = ?').get(convId) as any).total;
 
-  const where = `WHERE conversation_id = ?`;
-  const rows = db
-    .prepare(`SELECT * FROM chat_messages ${where} ORDER BY id ASC LIMIT ? OFFSET ?`)
-    .all(convId, pageSize, offset) as any[];
-  const total = (db.prepare(`SELECT COUNT(*) as total FROM chat_messages ${where}`).get(convId) as any).total;
+  let rows: any[];
+  let hasMore: boolean;
+  if (afterId > 0) {
+    // 增量模式固定单次上限 50 条，超出由客户端用新 afterId 续拉
+    rows = db
+      .prepare('SELECT * FROM chat_messages WHERE conversation_id = ? AND id > ? ORDER BY id ASC LIMIT 50')
+      .all(convId, afterId) as any[];
+    hasMore = rows.length === 50;
+  } else {
+    const offset = (page - 1) * pageSize;
+    rows = db
+      .prepare('SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT ? OFFSET ?')
+      .all(convId, pageSize, offset) as any[];
+    hasMore = (page - 1) * pageSize + pageSize < total;
+  }
 
   // 进入会话即视为已读：清零我侧 unread 并把该会话内我收到的消息标记已读
   db.prepare(`UPDATE conversations SET ${found.isA ? 'unread_a' : 'unread_b'} = 0 WHERE id = ?`).run(convId);
@@ -106,7 +118,7 @@ router.get('/:id/messages', authRequired, (req, res) => {
     createdAt: toIso(m.created_at),
   }));
 
-  success(res, { list, total, page, pageSize, hasMore: offset + pageSize < total });
+  success(res, { list, total, page, pageSize, hasMore });
 });
 
 // 发送消息（≤500字）：写消息 + 更新会话摘要 + 对方未读+1 + 站内通知

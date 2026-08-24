@@ -63,15 +63,23 @@ router.get('/', (req, res) => {
   success(res, list);
 });
 
-// 发布公告
+// 发布公告（targetUserId 选填：定向公告，仅该用户可见——展示侧 /active 已按 target_user_id 过滤）
 router.post('/', (req, res) => {
-  const { title, content, expiresAt } = req.body;
+  const { title, content, expiresAt, targetUserId } = req.body;
   if (!title || !content) return fail(res, '标题和内容不能为空');
+  let targetId: number | null = null;
+  if (targetUserId !== undefined && targetUserId !== null && String(targetUserId).trim() !== '') {
+    const uid = Number(targetUserId);
+    if (!Number.isInteger(uid) || uid <= 0) return fail(res, '定向用户ID无效');
+    const u = db.prepare('SELECT id FROM users WHERE id = ?').get(uid) as any;
+    if (!u) return fail(res, '定向用户不存在');
+    targetId = uid;
+  }
   const result = db.prepare(`
-    INSERT INTO announcements (title, content, expires_at, is_active, created_by)
-    VALUES (?, ?, ?, 1, ?)
-  `).run(title.trim(), content.trim(), expiresAt || null, req.currentUser!.id);
-  success(res, { id: result.lastInsertRowid }, '公告已发布');
+    INSERT INTO announcements (title, content, expires_at, target_user_id, is_active, created_by)
+    VALUES (?, ?, ?, ?, 1, ?)
+  `).run(title.trim(), content.trim(), expiresAt || null, targetId, req.currentUser!.id);
+  success(res, { id: result.lastInsertRowid }, targetId ? '定向公告已发布' : '公告已发布');
 });
 
 // 停用公告

@@ -53,7 +53,7 @@ export const feedbackApi = {
 export const conversationApi = {
   list: () => request.get('/conversations'),
   create: (peerId: number) => request.post('/conversations', { peerId }),
-  messages: (id: number, params?: { page?: number; pageSize?: number }) =>
+  messages: (id: number, params?: { page?: number; pageSize?: number; afterId?: number }) =>
     request.get(`/conversations/${id}/messages`, { params }),
   send: (id: number, content: string) => request.post(`/conversations/${id}/messages`, { content }),
 }
@@ -159,11 +159,12 @@ export const adminApi = {
   deleteSection: (id: number) => request.delete(`/admin/sections/${id}`),
   // 公告管理
   announcements: () => request.get('/announcements'),
-  createAnnouncement: (data: { title: string; content: string; expiresAt?: string }) => request.post('/announcements', data),
+  createAnnouncement: (data: { title: string; content: string; expiresAt?: string; targetUserId?: number }) => request.post('/announcements', data),
   deactivateAnnouncement: (id: number) => request.put(`/announcements/${id}/deactivate`),
   // 意见反馈
   feedbacks: (params?: { keyword?: string; status?: string; page?: number; pageSize?: number }) =>
     request.get('/admin/feedbacks', { params }),
+  closeFeedback: (id: number, status: 'closed' | 'open' = 'closed') => request.put(`/admin/feedbacks/${id}/status`, { status }),
 }
 
 // 板块订阅

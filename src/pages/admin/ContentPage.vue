@@ -4,9 +4,9 @@
  * 行内操作：审核通过 / 驳回（必填原因）/ 置顶切换（全局·板块）/ 查看详情跳前台 / 删除
  */
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
-  Search, Check, X, PinOff, ExternalLink, Trash2, ChevronLeft, ChevronRight,
+  Search, Check, X, PinOff, Pin, ExternalLink, Trash2, ChevronLeft, ChevronRight,
 } from '@lucide/vue'
 import { adminApi, postApi, sectionApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
@@ -14,6 +14,7 @@ import { toast } from '@/utils/request'
 import EmptyState from '@/components/EmptyState.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
+const route = useRoute()
 const router = useRouter()
 
 const tabs = [
@@ -112,16 +113,29 @@ async function submitReject() {
   } catch {}
 }
 
+// 置顶二选一（板块置顶 topType=section / 全局置顶 topType=global），untop 不变
+const topModal = reactive({ visible: false, post: null as any })
+function openTop(p: any) {
+  topModal.post = p
+  topModal.visible = true
+}
+async function submitTop(topType: 'section' | 'global') {
+  if (!topModal.post) return
+  try {
+    await adminApi.topPost(topModal.post.id, 'top', topType)
+    toast.success(topType === 'global' ? '已设为全局置顶' : '已设为板块置顶')
+    topModal.visible = false
+    load()
+  } catch {}
+}
+
 async function toggleTop(p: any) {
   try {
     if (p.isTop) {
       await adminApi.topPost(p.id, 'untop')
       toast.success('已取消置顶')
-    } else {
-      await adminApi.topPost(p.id, 'top', 'global')
-      toast.success('已设为全局置顶')
+      load()
     }
-    load()
   } catch {}
 }
 
@@ -152,6 +166,9 @@ async function submitDelete() {
 }
 
 onMounted(() => {
+  // Dashboard 下钻：?tab=pending_review|published|deleted... 预置筛选
+  const qTab = route.query.tab as string | undefined
+  if (qTab && tabs.some((t) => t.value === qTab)) activeTab.value = qTab
   load()
   loadSections()
 })
@@ -240,11 +257,18 @@ onMounted(() => {
                   <X class="w-3 h-3" />驳回
                 </button>
                 <button
-                  v-if="p.status === 'published'"
+                  v-if="p.status === 'published' && !p.isTop"
                   class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-brand-50 text-brand-600 hover:bg-brand-100"
+                  @click="openTop(p)"
+                >
+                  <Pin class="w-3 h-3" />置顶
+                </button>
+                <button
+                  v-if="p.status === 'published' && p.isTop"
+                  class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                   @click="toggleTop(p)"
                 >
-                  <PinOff v-if="p.isTop" class="w-3 h-3" />{{ p.isTop ? '取消置顶' : '全局置顶' }}
+                  <PinOff class="w-3 h-3" />取消置顶
                 </button>
                 <button
                   v-if="p.status !== 'deleted'"
@@ -299,6 +323,32 @@ onMounted(() => {
             <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="rejectModal.visible = false">取消</button>
             <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitReject">确定驳回</button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 置顶二选一弹窗 -->
+    <Teleport to="body">
+      <div v-if="topModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="topModal.visible = false">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
+          <h3 class="text-lg font-semibold mb-3">设置置顶</h3>
+          <p class="text-sm text-zinc-500 mb-4 truncate">{{ topModal.post?.title }}</p>
+          <div class="space-y-2 mb-2">
+            <button
+              class="w-full px-4 py-2.5 rounded-lg border border-zinc-200 text-sm text-left hover:border-brand-400 hover:bg-brand-50/50"
+              @click="submitTop('section')"
+            >
+              板块置顶<span class="block text-xs text-zinc-400 mt-0.5">仅在该板块列表内置顶展示</span>
+            </button>
+            <button
+              class="w-full px-4 py-2.5 rounded-lg border border-zinc-200 text-sm text-left hover:border-brand-400 hover:bg-brand-50/50"
+              @click="submitTop('global')"
+            >
+              全局置顶<span class="block text-xs text-zinc-400 mt-0.5">全站首页置顶，最多 3 条</span>
+            </button>
+          </div>
+          <button class="w-full py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="topModal.visible = false">取消</button>
         </div>
       </div>
     </Teleport>

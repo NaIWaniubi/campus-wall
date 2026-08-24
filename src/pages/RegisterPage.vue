@@ -3,12 +3,13 @@
  * 注册页：学号、密码、昵称、学院、年级
  */
 import { ref, reactive, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Eye, EyeOff, Loader2, GraduationCap } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const form = reactive({
@@ -55,7 +56,8 @@ async function handleSubmit() {
       grade: form.grade.trim() || undefined,
     })
     toast.success('注册成功，已自动登录')
-    router.replace('/')
+    // 回到登录前想去的页面，不再固定落首页
+    router.replace((route.query.redirect as string) || '/')
   } catch {
     // 错误已由拦截器 toast
   } finally {

@@ -4,7 +4,7 @@
  */
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Eye, EyeOff, GraduationCap, Loader2 } from '@lucide/vue'
+import { Eye, EyeOff, GraduationCap, Loader2, X } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
@@ -18,6 +18,7 @@ const form = reactive({
 })
 const showPassword = ref(false)
 const loading = ref(false)
+const showForgot = ref(false)
 
 async function handleSubmit() {
   if (!form.studentId.trim()) {
@@ -98,13 +99,53 @@ async function handleSubmit() {
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
           {{ loading ? '登录中...' : '登录' }}
         </button>
+
+        <button
+          type="button"
+          class="w-full text-center text-xs text-zinc-400 hover:text-zinc-600 transition"
+          @click="showForgot = true"
+        >
+          忘记密码？
+        </button>
       </div>
 
       <p class="text-center text-sm text-zinc-500 mt-6">
         没有账号？
-        <router-link to="/register" class="text-brand-600 font-medium hover:text-brand-700">去注册</router-link>
+        <router-link
+          :to="{ path: '/register', query: route.query.redirect ? { redirect: route.query.redirect } : {} }"
+          class="text-brand-600 font-medium hover:text-brand-700"
+        >去注册</router-link>
       </p>
     </div>
+
+    <!-- 忘记密码引导：本站无自助找回，唯一途径是管理员重置 -->
+    <Teleport to="body">
+      <div v-if="showForgot" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" @click.self="showForgot = false">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6 animate-scale-in">
+          <button class="absolute top-3 right-3 text-zinc-400 hover:text-zinc-600" @click="showForgot = false">
+            <X class="w-5 h-5" />
+          </button>
+          <h3 class="text-lg font-semibold text-zinc-900 mb-2">忘记密码</h3>
+          <div class="text-sm text-zinc-600 space-y-2 mb-4">
+            <p>暂不支持自助找回密码，可通过以下方式重置：</p>
+            <p>1. 请管理员在后台为你重置；</p>
+            <p>2. 或携带学生证到 XX 处办理。</p>
+          </div>
+          <div class="rounded-xl bg-zinc-50 px-4 py-3 text-xs text-zinc-500 leading-relaxed">
+            <p>管理员联系方式（占位，请替换为实际信息）：</p>
+            <p>QQ / 微信：__________</p>
+            <p>邮箱：admin@example.edu.cn</p>
+          </div>
+          <button
+            class="mt-4 w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-full text-sm font-medium transition"
+            @click="showForgot = false"
+          >
+            我知道了
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

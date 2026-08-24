@@ -4,7 +4,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Trash2, Pencil } from '@lucide/vue'
 import { userApi, postApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -39,6 +39,19 @@ function statusMeta(post: any) {
 function onDelete(post: any) {
   targetId.value = post.id
   showDelete.value = true
+}
+
+// ---------- 编辑 / 驳回修改重发（复用 PublishPage ?edit= 模式，提交走 PUT /posts/:id） ----------
+function isWithin24h(post: any) {
+  const t = post.createdAt ? new Date(post.createdAt).getTime() : 0
+  return t > 0 && Date.now() - t < 24 * 60 * 60 * 1000
+}
+// 服务端对一切编辑统一限制发布后 24h 内（posts.ts PUT /:id），published 可改、rejected 走修改重发
+function canEdit(post: any) {
+  return (post.status === 'published' || post.status === 'rejected') && isWithin24h(post)
+}
+function goEdit(post: any) {
+  router.push(`/publish?edit=${post.id}`)
 }
 
 async function confirmDelete() {
@@ -95,11 +108,18 @@ onMounted(load)
             class="mt-1 px-3 py-2 rounded-lg bg-red-50 text-xs text-red-600">
             驳回原因：{{ post.rejectReason || post.reason }}
           </div>
-          <!-- 删除按钮 -->
-          <button class="absolute bottom-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-xs hover:bg-red-100 transition"
-            @click.stop="onDelete(post)">
-            <Trash2 class="w-3.5 h-3.5" /> 删除
-          </button>
+          <!-- 操作按钮：编辑/修改重发 + 删除 -->
+          <div class="absolute bottom-3 right-3 flex items-center gap-2">
+            <button v-if="canEdit(post)"
+              class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 text-xs hover:bg-brand-100 transition"
+              @click.stop="goEdit(post)">
+              <Pencil class="w-3.5 h-3.5" /> {{ post.status === 'rejected' ? '修改重发' : '编辑' }}
+            </button>
+            <button class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-xs hover:bg-red-100 transition"
+              @click.stop="onDelete(post)">
+              <Trash2 class="w-3.5 h-3.5" /> 删除
+            </button>
+          </div>
         </div>
 
         <EmptyState v-if="!list.length" text="还没有发布内容" action-text="去发布" @action="router.push('/publish')" />

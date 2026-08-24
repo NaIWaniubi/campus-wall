@@ -35,26 +35,33 @@ function fmtDate(v: string) {
   return isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN')
 }
 
-// 新建公告弹窗
-const createModal = reactive({ visible: false, title: '', content: '', expiresAt: '' })
+// 新建公告弹窗（targetUserId 选填：定向公告仅该用户可见）
+const createModal = reactive({ visible: false, title: '', content: '', expiresAt: '', targetUserId: '' })
 const submitting = ref(false)
 function openCreate() {
   createModal.title = ''
   createModal.content = ''
   createModal.expiresAt = ''
+  createModal.targetUserId = ''
   createModal.visible = true
 }
 async function submitCreate() {
   if (!createModal.title.trim()) return toast.error('请输入公告标题')
   if (!createModal.content.trim()) return toast.error('请输入公告内容')
+  const uidStr = createModal.targetUserId.trim()
+  const targetUserId = uidStr ? Number(uidStr) : undefined
+  if (uidStr && (!Number.isInteger(targetUserId) || (targetUserId as number) <= 0)) {
+    return toast.error('定向用户ID需为正整数')
+  }
   submitting.value = true
   try {
     await adminApi.createAnnouncement({
       title: createModal.title.trim(),
       content: createModal.content.trim(),
       expiresAt: createModal.expiresAt ? new Date(createModal.expiresAt).toISOString() : undefined,
+      targetUserId,
     })
-    toast.success('公告已发布')
+    toast.success(targetUserId ? '定向公告已发布' : '公告已发布')
     createModal.visible = false
     load()
   } catch {
@@ -93,6 +100,7 @@ onMounted(load)
         <div class="flex items-start justify-between gap-3 mb-1">
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-sm font-medium text-zinc-900 truncate">{{ a.title }}</span>
+            <span v-if="a.target_user_id" class="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-600 whitespace-nowrap shrink-0">定向 #{{ a.target_user_id }}</span>
             <span class="px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap shrink-0" :class="statusOf(a).cls">{{ statusOf(a).label }}</span>
           </div>
           <button
@@ -143,6 +151,15 @@ onMounted(load)
             <input
               v-model="createModal.expiresAt"
               type="datetime-local"
+              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm text-zinc-600 mb-1">定向用户ID（选填，仅该用户可见此公告）</label>
+            <input
+              v-model="createModal.targetUserId"
+              placeholder="留空则全员可见"
+              maxlength="10"
               class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
             />
           </div>

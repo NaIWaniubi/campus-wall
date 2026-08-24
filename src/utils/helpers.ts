@@ -1,24 +1,59 @@
 /**
- * 前端敏感词检测工具
+ * 前端敏感词检测工具（与 api/utils/sensitive.ts 保持一致语义）
+ *
+ * 分级：review 硬词命中才拦截；warn 灰词/一般敏感词仅提示不拦截。
+ * 匹配规则：中文词直接包含匹配；纯 ASCII 词（如 sb/nm）加 \b 词边界，
+ * 避免「USB」「nm 段落里的英文单词」被子串误杀。
  */
-const sensitiveWords = [
-  '傻逼', '操你', '滚蛋', '去死', '杀你', '废物',
-  '色情', '裸体', '做爱', '性服务', '约炮', '一夜情',
-  '赌博', '吸毒', '毒品', '大麻', '冰毒',
-  '反动', '颠覆', '台独', '藏独', '疆独',
-  '诈骗', '传销', '洗钱',
+const REVIEW_WORDS = [
+  '色情', '做爱', '约炮', '吸毒', '毒品', '大麻', '冰毒', '诈骗', '反动', '颠覆',
+]
+
+const WARN_WORDS = [
+  '刷单', '代考', '代写论文', '代写作业', '私彩', '套现', '外挂代练',
+]
+
+/** 基础词库中非硬词部分（与后端 sensitiveWords 去 REVIEW_WORDS 后一致） */
+const MILD_WORDS = [
+  '傻逼', '操你', '滚蛋', '去死', '杀你', '废物', '垃圾人',
+  '裸体', '一夜情',
+  '赌博',
+  '台独', '藏独', '疆独',
+  '传销', '洗钱',
   '傻b', 'sb', 'nm', 'nmsl', 'mdzz', 'wqnmd',
 ]
 
-export function checkSensitive(text: string): { hit: boolean; words: string[] } {
-  const lower = text.toLowerCase()
-  const hitWords: string[] = []
-  for (const word of sensitiveWords) {
-    if (lower.includes(word.toLowerCase())) {
-      hitWords.push(word)
-    }
+function matchWord(lowerText: string, word: string): boolean {
+  const w = word.toLowerCase()
+  // 纯 ASCII 词用词边界正则，防止 USB/nmsl 等正常文本被子串误伤
+  if (/^[a-z0-9]+$/i.test(w)) {
+    return new RegExp(`\\b${w}\\b`).test(lowerText)
   }
-  return { hit: hitWords.length > 0, words: hitWords }
+  return lowerText.includes(w)
+}
+
+function matchWords(text: string, words: string[]): string[] {
+  const lower = text.toLowerCase()
+  return words.filter((w) => matchWord(lower, w))
+}
+
+export type RiskLevel = 'pass' | 'warn' | 'review'
+
+/**
+ * 与后端 assessRisk 对齐的风险分级：
+ * - review 硬词 → 'review'（前端拦截提交）
+ * - 灰词或基础词库非硬词 → 'warn'（仅提示）
+ * - 无命中 → 'pass'
+ */
+export function assessRisk(title: string, content: string): { level: RiskLevel; hits: string[] } {
+  const text = `${title || ''} ${content || ''}`
+  const hardHits = matchWords(text, REVIEW_WORDS)
+  if (hardHits.length) return { level: 'review', hits: hardHits }
+
+  const warnHits = [...matchWords(text, WARN_WORDS), ...matchWords(text, MILD_WORDS)]
+  if (warnHits.length) return { level: 'warn', hits: warnHits }
+
+  return { level: 'pass', hits: [] }
 }
 
 /**

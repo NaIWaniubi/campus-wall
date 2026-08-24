@@ -14,17 +14,22 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const navItems = [
-  { name: '数据总览', path: '/admin', icon: LayoutDashboard },
+// 权限矩阵与后端对齐：superOnly 项仅超管可见；section_admin 只见 内容审核/评论管理/举报处理
+const navItems: { name: string; path: string; icon: any; superOnly?: boolean }[] = [
+  { name: '数据总览', path: '/admin', icon: LayoutDashboard, superOnly: true },
   { name: '帖子治理', path: '/admin/posts', icon: FileCheck },
   { name: '评论管理', path: '/admin/comments', icon: MessageSquare },
   { name: '举报处理', path: '/admin/reports', icon: Flag },
-  { name: '用户管理', path: '/admin/users', icon: Users },
-  { name: '板块管理', path: '/admin/sections', icon: LayoutGrid },
-  { name: '意见反馈', path: '/admin/feedbacks', icon: Inbox },
-  { name: '公告管理', path: '/admin/announcements', icon: Megaphone },
-  { name: 'AI 助手', path: '/admin/ai', icon: Bot },
+  { name: '用户管理', path: '/admin/users', icon: Users, superOnly: true },
+  { name: '板块管理', path: '/admin/sections', icon: LayoutGrid, superOnly: true },
+  { name: '意见反馈', path: '/admin/feedbacks', icon: Inbox, superOnly: true },
+  { name: '公告管理', path: '/admin/announcements', icon: Megaphone, superOnly: true },
+  { name: 'AI 助手', path: '/admin/ai', icon: Bot, superOnly: true },
 ]
+
+const visibleNav = computed(() =>
+  userStore.isSuperAdmin ? navItems : navItems.filter((item) => !item.superOnly)
+)
 
 const roleLabel = computed(() => (userStore.isSuperAdmin ? '超级管理员' : '板块管理员'))
 const currentTitle = computed(() => (route.meta.title as string) || '管理后台')
@@ -49,7 +54,7 @@ function onLogout() {
       </div>
       <nav class="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
         <router-link
-          v-for="item in navItems"
+          v-for="item in visibleNav"
           :key="item.path"
           :to="item.path"
           class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition"
@@ -104,7 +109,7 @@ function onLogout() {
       <div class="md:hidden bg-white border-b border-zinc-100 sticky top-14 z-10">
         <div class="flex items-center gap-1 px-2 h-11 overflow-x-auto scrollbar-hide">
           <router-link
-            v-for="item in navItems"
+            v-for="item in visibleNav"
             :key="item.path"
             :to="item.path"
             class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs whitespace-nowrap"

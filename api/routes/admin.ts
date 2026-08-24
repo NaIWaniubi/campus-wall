@@ -2,16 +2,34 @@
  * 管理后台路由：用户管理、内容审核、举报处理、数据统计、板块管理
  */
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
-import { authRequired, superAdminRequired } from '../middleware/auth.js';
-import { success, fail } from '../utils/response.js';
+import { authRequired } from '../middleware/auth.js';
+import { success, fail, unauthorized, forbidden } from '../utils/response.js';
 import { cacheInvalidate } from '../utils/cache.js';
 
 const router = Router();
 
-// 所有管理后台接口都需要登录 + 超级管理员权限
-router.use(authRequired, superAdminRequired);
+/**
+ * 权限矩阵：所有 /api/admin/* 需登录；
+ * - superOnly：用户/板块/统计/置顶/公告侧(见 announcements.ts)/反馈等超管专属
+ * - sectionAllowed（allowSection=true）：额外放行 section_admin 的三类接口——
+ *   内容审核(GET /posts、PUT /posts/:id/audit)、评论管理(GET /comments、DELETE /comments/:id)、
+ *   举报处理(GET /reports、PUT /reports/:id)
+ */
+function requireAdmin(allowSection = false) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.currentUser) return unauthorized(res);
+    const role = req.currentUser.role;
+    if (role === 'super_admin' || (allowSection && role === 'section_admin')) return next();
+    return forbidden(res, allowSection ? '需要管理员权限' : '需要超级管理员权限');
+  };
+}
+const superOnly = requireAdmin(false);
+const sectionAllowed = requireAdmin(true);
+
+router.use(authRequired);
 
 // 匿名帖作者身份揭示阈值：对齐「3 人举报提升优先级」机制。
 // posts.ts 在插入新举报前统计 pending 数 >=2 即置 high（第 3 个举报人触发），
@@ -20,7 +38,7 @@ const REPORT_REVEAL_THRESHOLD = 3;
 
 // ============ 用户管理 ============
 
-router.get('/users', (req, res) => {
+router.get('/users', superOnly, (req, res) => {
   const { keyword, status, role, page = '1', pageSize = '20' } = req.query;
   let where = `WHERE 1=1`;
   const params: any[] = [];
@@ -63,8 +81,8 @@ router.get('/users', (req, res) => {
   success(res, { list, total: totalRow.total, page: p, pageSize: ps });
 });
 
-// 封禁/解封用户
-router.put('/users/:id/ban', (req, res) => {
+// 封禁/解封用户（duration：'1'|'7'|'30' 天数或 'forever'，空 = 永久）
+router.put('/users/:id/ban', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const { action, reason, duration } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
@@ -95,7 +113,7 @@ router.put('/users/:id/ban', (req, res) => {
 });
 
 // 重置密码
-router.put('/users/:id/reset-password', (req, res) => {
+router.put('/users/:id/reset-password', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) return fail(res, '密码至少6位');
@@ -105,7 +123,7 @@ router.put('/users/:id/reset-password', (req, res) => {
 });
 
 // 调整信誉分
-router.put('/users/:id/credit', (req, res) => {
+router.put('/users/:id/credit', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const { score, reason } = req.body;
   if (typeof score !== 'number') return fail(res, '请输入有效分值');
@@ -123,9 +141,10 @@ router.put('/users/:id/credit', (req, res) => {
 
 // ============ 内容审核 ============
 
-router.get('/posts', (req, res) => {
+router.get('/posts', sectionAllowed, (req, res) => {
   const { status, sectionId, keyword, page = '1', pageSize = '20' } = req.query;
-  let where = `WHERE p.status != 'deleted'`;
+  // 「已删除」仅在显式 status=deleted 时放行（误删复核入口），其余查询默认硬排除
+  let where = status === 'deleted' ? `WHERE 1=1` : `WHERE p.status != 'deleted'`;
   const params: any[] = [];
   if (status) {
     where += ` AND p.status = ?`;
@@ -178,7 +197,7 @@ router.get('/posts', (req, res) => {
 });
 
 // 审核帖子
-router.put('/posts/:id/audit', (req, res) => {
+router.put('/posts/:id/audit', sectionAllowed, (req, res) => {
   const id = Number(req.params.id);
   const { action, reason } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
@@ -204,8 +223,8 @@ router.put('/posts/:id/audit', (req, res) => {
   }
 });
 
-// 设置/取消置顶
-router.put('/posts/:id/top', (req, res) => {
+// 设置/取消置顶（置顶不在板块管理员授权清单，超管专属）
+router.put('/posts/:id/top', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const { action, topType } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
@@ -228,7 +247,7 @@ router.put('/posts/:id/top', (req, res) => {
 });
 
 // 评论管理列表
-router.get('/comments', (req, res) => {
+router.get('/comments', sectionAllowed, (req, res) => {
   const { keyword, page = '1', pageSize = '20' } = req.query;
   let where = `WHERE c.status = 'active'`;
   const params: any[] = [];
@@ -280,7 +299,7 @@ router.delete('/comments/:id', (req, res) => {
 
 // ============ 举报处理 ============
 
-router.get('/reports', (req, res) => {
+router.get('/reports', sectionAllowed, (req, res) => {
   const { status, page = '1', pageSize = '20' } = req.query;
   let where = `WHERE 1=1`;
   const params: any[] = [];
@@ -335,7 +354,7 @@ router.get('/reports', (req, res) => {
 });
 
 // 处理举报
-router.put('/reports/:id', (req, res) => {
+router.put('/reports/:id', sectionAllowed, (req, res) => {
   const id = Number(req.params.id);
   const { action, result } = req.body;
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id) as any;
@@ -392,7 +411,7 @@ router.put('/reports/:id', (req, res) => {
 
 // ============ 数据统计 ============
 
-router.get('/stats', (_req, res) => {
+router.get('/stats', superOnly, (_req, res) => {
   const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = \'user\'').get() as any;
   const todayUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE date(created_at) = date('now')").get() as any;
   const totalPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status != 'deleted'").get() as any;
@@ -449,7 +468,7 @@ router.get('/stats', (_req, res) => {
 
 // ============ 板块管理 ============
 
-router.post('/sections', (req, res) => {
+router.post('/sections', superOnly, (req, res) => {
   const { name, icon, sort, isActive, forceAnonymous, needAudit } = req.body;
   if (!name || !name.trim()) return fail(res, '板块名称不能为空');
   const result = db.prepare('INSERT INTO sections (name, icon, sort, is_active, force_anonymous, need_audit) VALUES (?, ?, ?, ?, ?, ?)').run(
@@ -473,7 +492,7 @@ router.put('/sections/:id', (req, res) => {
   success(res, null, '板块已更新');
 });
 
-router.delete('/sections/:id', (req, res) => {
+router.delete('/sections/:id', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const postCount = db.prepare('SELECT COUNT(*) as count FROM posts WHERE section_id = ? AND status = \'published\'').get(id) as any;
   if (postCount.count > 0) return fail(res, '该板块下还有帖子，不可删除，可停用板块');
@@ -484,7 +503,7 @@ router.delete('/sections/:id', (req, res) => {
 // ============ 意见反馈 ============
 
 // 反馈列表（分页，status 过滤 open/closed，keyword 搜内容/联系方式/用户）
-router.get('/feedbacks', (req, res) => {
+router.get('/feedbacks', superOnly, (req, res) => {
   const { keyword, status, page = '1', pageSize = '20' } = req.query;
   let where = `WHERE 1=1`;
   const params: any[] = [];
@@ -524,6 +543,17 @@ router.get('/feedbacks', (req, res) => {
   }));
 
   success(res, { list, total: totalRow.total, page: p, pageSize: ps });
+});
+
+// 反馈闭环：标记已处理(closed) / 重新打开(open)
+router.put('/feedbacks/:id/status', superOnly, (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body;
+  if (status !== 'closed' && status !== 'open') return fail(res, '无效状态，仅支持 open/closed');
+  const fb = db.prepare('SELECT id FROM feedback WHERE id = ?').get(id) as any;
+  if (!fb) return fail(res, '反馈不存在', 404, 404);
+  db.prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
+  success(res, null, status === 'closed' ? '反馈已标记为已处理' : '反馈已重新打开');
 });
 
 export default router;

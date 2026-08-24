@@ -95,7 +95,7 @@ async function handleSubmit() {
       </div>
 
       <div class="mt-6 p-3 rounded-xl bg-brand-50/60 border border-brand-100 text-xs text-brand-700 text-center">
-        默认管理员账号：admin / admin123
+        默认账号见 README
       </div>
       <p class="text-center text-sm text-zinc-500 mt-4">
         <router-link to="/" class="text-brand-600 font-medium hover:text-brand-700">返回前台</router-link>

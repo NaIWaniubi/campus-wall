@@ -90,6 +90,8 @@ router.put('/users/:id/ban', (req, res) => {
     db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(id, 'system', '您的账号已解封');
     success(res, null, '已解封用户');
   }
+  // 封禁/解封影响列表可见性，失效帖子缓存（审计 quality P2-7）
+  cacheInvalidate('posts');
 });
 
 // 重置密码
@@ -114,6 +116,8 @@ router.put('/users/:id/credit', (req, res) => {
   db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
     id, 'system', `您的信誉分${score >= 0 ? '增加' : '减少'}${Math.abs(score)}分，当前信誉分：${newScore}${reason ? `，原因：${reason}` : ''}`
   );
+  // 信誉分变化影响列表排序/可见性，失效帖子缓存（审计 quality P2-7）
+  cacheInvalidate('posts');
   success(res, { creditScore: newScore }, '信誉分已调整');
 });
 

@@ -77,10 +77,16 @@ async function submitBan() {
 // 重置密码弹窗：前端生成一次性密码，提交成功后展示给管理员转告用户
 const pwdModal = reactive({ visible: false, user: null as any, password: '', done: false })
 function genPassword() {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  let s = ''
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)]
-  return s
+  // crypto.getRandomValues 4 字节 → 8 位 hex（Web Crypto 等价于后端 randomBytes(4).toString('hex')）
+  return [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+async function copyPwd() {
+  try {
+    await navigator.clipboard.writeText(pwdModal.password)
+    toast.success('已复制')
+  } catch {
+    toast.error('复制失败，请手动选择复制')
+  }
 }
 function openPwd(u: any) {
   pwdModal.user = u
@@ -272,7 +278,10 @@ onMounted(load)
           <template v-else>
             <p class="text-sm text-zinc-600 mb-1">已生效的一次性新密码：</p>
             <p class="text-base font-mono font-semibold text-brand-600 tracking-wider bg-brand-50 rounded-lg px-3 py-2 mb-4 select-all">{{ pwdModal.password }}</p>
-            <button class="w-full py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="pwdModal.visible = false">我已记录，关闭</button>
+            <div class="flex gap-3">
+              <button class="flex-1 py-2 rounded-full border border-brand-200 text-brand-600 text-sm hover:bg-brand-50" @click="copyPwd">复制密码</button>
+              <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="pwdModal.visible = false">我已记录，关闭</button>
+            </div>
           </template>
         </div>
       </div>

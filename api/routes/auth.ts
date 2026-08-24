@@ -7,7 +7,8 @@ import https from 'https';
 import crypto from 'crypto';
 import { db } from '../db.js';
 import { generateToken } from '../utils/jwt.js';
-import { authRequired } from '../middleware/auth.js';
+import { authRequired, liftExpiredBan } from '../middleware/auth.js';
+import { authRateLimit, recordAuthFailure, clearAuthFailures } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 
 const router = Router();
@@ -73,6 +74,8 @@ router.post('/wx-login', async (req, res) => {
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
   }
 
+  if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
+
   if (user.status === 'banned') {
     const banUntil = user.ban_until ? new Date(user.ban_until).toLocaleString('zh-CN') : '永久';
     return fail(res, `账号已被封禁，原因：${user.ban_reason || '违规'}，解封时间：${banUntil}`, 1003);
@@ -103,7 +106,7 @@ function isValidStudentId(id: string): boolean {
 }
 
 // 注册
-router.post('/register', (req, res) => {
+router.post('/register', authRateLimit, (req, res) => {
   const { studentId, password, nickname, college, grade } = req.body;
 
   if (!studentId || !password || !nickname) {
@@ -121,6 +124,7 @@ router.post('/register', (req, res) => {
 
   const exist = db.prepare('SELECT id FROM users WHERE student_id = ?').get(studentId);
   if (exist) {
+    recordAuthFailure(req);
     return fail(res, '该学号已注册');
   }
 
@@ -131,6 +135,7 @@ router.post('/register', (req, res) => {
 
   const userId = result.lastInsertRowid as number;
   const token = generateToken({ id: userId, studentId, role: 'user' });
+  clearAuthFailures(req);
 
   const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(userId) as any;
 
@@ -138,7 +143,7 @@ router.post('/register', (req, res) => {
 });
 
 // 登录
-router.post('/login', (req, res) => {
+router.post('/login', authRateLimit, (req, res) => {
   const { studentId, password } = req.body;
 
   if (!studentId || !password) {
@@ -146,9 +151,13 @@ router.post('/login', (req, res) => {
   }
 
   const user = db.prepare('SELECT * FROM users WHERE student_id = ?').get(studentId) as any;
+  // 不区分「账号不存在」与「密码错误」，防账号枚举（审计 P0-3）
   if (!user) {
-    return fail(res, '账号不存在，请前往注册', 1001);
+    recordAuthFailure(req);
+    return fail(res, '学号或密码错误', 1002);
   }
+
+  if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
 
   if (user.status === 'banned') {
     const banUntil = user.ban_until ? new Date(user.ban_until).toLocaleString('zh-CN') : '永久';
@@ -157,8 +166,10 @@ router.post('/login', (req, res) => {
 
   const isMatch = bcrypt.compareSync(password, user.password);
   if (!isMatch) {
-    return fail(res, '密码错误', 1002);
+    recordAuthFailure(req);
+    return fail(res, '学号或密码错误', 1002);
   }
+  clearAuthFailures(req);
 
   const token = generateToken({ id: user.id, studentId: user.student_id, role: user.role });
   const userData = {

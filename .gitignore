@@ -26,6 +26,9 @@ api/data.db-wal
 *.db-shm
 *.db-wal
 
+# Backup archives
+api/backups/
+
 # User uploads (运行时生成的用户上传文件)
 public/uploads/
 !public/uploads/.gitkeep

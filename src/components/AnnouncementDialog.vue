@@ -3,7 +3,6 @@
  * 官方公告弹窗：用户必须确认后才可继续浏览
  */
 import { ref, onMounted } from 'vue'
-import { Megaphone, X } from 'lucide-vue-next'
 import { announcementApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { useUserStore } from '@/stores/user'
@@ -61,3 +60,5 @@ onMounted(() => {
     </div>
   </Teleport>
 </template>
+
+

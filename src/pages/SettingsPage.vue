@@ -4,7 +4,7 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Camera, Loader2, Lock, LogOut, UserX } from 'lucide-vue-next'
+import { ArrowLeft, Camera, Loader2, Lock, LogOut, UserX } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { uploadApi, authApi } from '@/utils/api'
 import { toast } from '@/utils/request'
@@ -240,3 +240,4 @@ onMounted(() => {
       @confirm="confirmDeleteAccount" @cancel="showDelete = false" />
   </div>
 </template>
+

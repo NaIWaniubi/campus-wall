@@ -1,8 +1,10 @@
 /**
- * 认证路由：注册、登录、获取当前用户、修改密码
+ * 认证路由：注册、登录、获取当前用户、修改密码、微信登录
  */
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import https from 'https';
+import crypto from 'crypto';
 import { db } from '../db.js';
 import { generateToken } from '../utils/jwt.js';
 import { authRequired } from '../middleware/auth.js';
@@ -10,14 +12,94 @@ import { success, fail } from '../utils/response.js';
 
 const router = Router();
 
+/**
+ * 调用微信 jscode2session（https.get，5 秒超时）
+ * 返回微信原始响应；网络失败/超时/非 JSON 统一返回空对象
+ */
+function wxCode2Session(appid: string, secret: string, code: string): Promise<any> {
+  return new Promise((resolve) => {
+    const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(appid)}&secret=${encodeURIComponent(secret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`;
+    const req = https.get(url, { timeout: 5000 }, (r) => {
+      let body = '';
+      r.on('data', (chunk) => (body += chunk));
+      r.on('end', () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch {
+          resolve({});
+        }
+      });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({});
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+// 微信登录：按 openid 找/建用户并签发常规 JWT（响应形状与 /login 一致）
+router.post('/wx-login', async (req, res) => {
+  const { code } = req.body || {};
+  if (!code || typeof code !== 'string') {
+    return fail(res, 'code 为必填项');
+  }
+
+  const appid = process.env.WX_APPID;
+  const secret = process.env.WX_SECRET;
+  if (!appid || !secret) {
+    return fail(res, '微信登录未配置', 501);
+  }
+
+  const session = await wxCode2Session(appid, secret, code);
+  if (!session.openid) {
+    const msg = session.errmsg ? `微信登录失败：${session.errmsg}` : '微信登录失败，请稍后重试';
+    return fail(res, msg);
+  }
+  const openid: string = session.openid;
+
+  let user = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid) as any;
+  if (!user) {
+    // 自动建号：学号 wx_+openid 前 8 位（冲突加后缀）、昵称'微信用户'+随机数、随机密码不可知
+    let studentId = `wx_${openid.slice(0, 8)}`;
+    while (db.prepare('SELECT id FROM users WHERE student_id = ?').get(studentId)) {
+      studentId = `wx_${openid.slice(0, 8)}_${crypto.randomBytes(2).toString('hex')}`;
+    }
+    const nickname = `微信用户${Math.floor(100000 + Math.random() * 900000)}`;
+    const randomPassword = bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10);
+    const result = db
+      .prepare("INSERT INTO users (student_id, password, nickname, openid, role, status, credit_score) VALUES (?, ?, ?, ?, 'user', 'active', 100)")
+      .run(studentId, randomPassword, nickname, openid);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
+  }
+
+  if (user.status === 'banned') {
+    const banUntil = user.ban_until ? new Date(user.ban_until).toLocaleString('zh-CN') : '永久';
+    return fail(res, `账号已被封禁，原因：${user.ban_reason || '违规'}，解封时间：${banUntil}`, 1003);
+  }
+
+  const token = generateToken({ id: user.id, studentId: user.student_id, role: user.role });
+  success(res, {
+    token,
+    user: {
+      id: user.id,
+      student_id: user.student_id,
+      nickname: user.nickname,
+      avatar: user.avatar,
+      college: user.college,
+      grade: user.grade,
+      signature: user.signature,
+      credit_score: user.credit_score,
+      role: user.role,
+      status: user.status,
+      created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at,
+    },
+  }, '登录成功');
+});
+
 // 学号格式校验：纯数字，6-12位
 function isValidStudentId(id: string): boolean {
   return /^\d{6,12}$/.test(id) || id === 'admin';
-}
-
-// 密码格式校验：6-20位，包含字母和数字
-function isValidPassword(pwd: string): boolean {
-  return /^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{6,20}$/.test(pwd) || pwd.length >= 6;
 }
 
 // 注册

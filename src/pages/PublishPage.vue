@@ -4,7 +4,7 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText } from 'lucide-vue-next'
+import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, uploadApi, draftApi } from '@/utils/api'
@@ -33,6 +33,8 @@ const sectionKind = computed(() => {
   const name = selectedSection.value?.name || ''
   if (name.includes('二手') || name.includes('交易')) return 'trade'
   if (name.includes('失物') || name.includes('招领')) return 'lost'
+  if (name.includes('拼车')) return 'carpool'
+  if (name.includes('组队')) return 'teamup'
   if (name.includes('活动')) return 'activity'
   return ''
 })
@@ -221,6 +223,8 @@ async function handleSubmit() {
       extraFields: form.extraFields,
     })
     toast.success(res.message || '发布成功')
+    // 失物招领智能匹配：命中候选帖时提示
+    if (res.data?.matchedCount > 0) toast.info('发现疑似匹配的帖子，可在详情页查看')
     router.replace(`/post/${res.data.id}`)
   } catch {
     // 错误已由拦截器 toast
@@ -393,6 +397,54 @@ async function handleSubmit() {
         </div>
       </div>
 
+      <div v-else-if="sectionKind === 'carpool'" class="bg-white rounded-xl p-4 space-y-3">
+        <h4 class="text-sm font-medium text-zinc-700">拼车信息</h4>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">出发时间</span>
+          <input v-model="form.extraFields.time" type="text" placeholder="如：周五 18:00" @input="setExtra('time', form.extraFields.time)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">集合点</span>
+          <input v-model="form.extraFields.location" type="text" placeholder="如：东门/校车站" @input="setExtra('location', form.extraFields.location)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">分摊费用</span>
+          <input v-model="form.extraFields.price" type="text" placeholder="如：人均 ¥30" @input="setExtra('price', form.extraFields.price)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">联系方式</span>
+          <input v-model="form.extraFields.contact" type="text" placeholder="微信/QQ" @input="setExtra('contact', form.extraFields.contact)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+      </div>
+
+      <div v-else-if="sectionKind === 'teamup'" class="bg-white rounded-xl p-4 space-y-3">
+        <h4 class="text-sm font-medium text-zinc-700">组队信息</h4>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">活动时间</span>
+          <input v-model="form.extraFields.time" type="text" placeholder="如：周六全天" @input="setExtra('time', form.extraFields.time)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">集合地点</span>
+          <input v-model="form.extraFields.location" type="text" placeholder="集合地点" @input="setExtra('location', form.extraFields.location)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">主办方</span>
+          <input v-model="form.extraFields.organizer" type="text" placeholder="主办方/社团" @input="setExtra('organizer', form.extraFields.organizer)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">联系方式</span>
+          <input v-model="form.extraFields.contact" type="text" placeholder="微信/QQ" @input="setExtra('contact', form.extraFields.contact)"
+            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+        </div>
+      </div>
+
       <!-- 匿名开关 -->
       <div class="bg-white rounded-xl p-4 flex items-center justify-between">
         <div>
@@ -419,3 +471,4 @@ async function handleSubmit() {
     </main>
   </div>
 </template>
+

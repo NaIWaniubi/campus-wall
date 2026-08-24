@@ -1,12 +1,24 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import path from 'path'
+import { resolve } from 'path'
 import Inspector from 'unplugin-vue-dev-locator/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   build: {
     sourcemap: 'hidden',
+    rollupOptions: {
+      output: {
+        // 框架代码独立分包：业务迭代不影响 vendor 缓存（Rolldown 仅支持函数形式）
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (/[\\/]node_modules[\\/](vue|@vue|vue-router|pinia|pinia-plugin-persistedstate|axios)[\\/]/.test(id)) {
+            return 'vendor'
+          }
+          return undefined
+        },
+      },
+    },
   },
   plugins: [
     vue(),
@@ -14,7 +26,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': resolve(import.meta.dirname, './src'),
     },
   },
   server: {

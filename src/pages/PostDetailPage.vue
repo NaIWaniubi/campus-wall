@@ -4,9 +4,9 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { postApi, commentApi } from '@/utils/api'
+import { postApi, commentApi, conversationApi, followApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -26,7 +26,17 @@ const showMoreMenu = ref(false)
 const showReportSheet = ref(false)
 const showDeleteDialog = ref(false)
 const previewIndex = ref(-1)
+// 九宫格用服务端缩略图，点击预览用原图；缩略图缺失时回退原图
+const gridImages = computed(() =>
+  (post.value?.images || []).map((img: string, i: number) => post.value?.thumbImages?.[i] || img)
+)
+function onThumbError(e: Event, fallback: string) {
+  const el = e.target as HTMLImageElement
+  if (el.src.endsWith('.thumb.webp')) el.src = fallback
+}
 const commentInputRef = ref<HTMLInputElement | null>(null)
+// 失物招领智能匹配：与本帖相似的候选帖列表
+const matches = ref<any[]>([])
 
 const reportReasons = ['垃圾广告', '人身攻击', '色情低俗', '违法违规', '其他']
 const commentPosting = ref(false)
@@ -37,11 +47,66 @@ const canInteract = computed(() => !isPending.value)
 // 未登录时也禁用评论输入，提示登录
 const canComment = computed(() => userStore.isLoggedIn && !isPending.value)
 
+// ---------- 作者互动：私信 / 关注 ----------
+// 非匿名且非本人时才展示（匿名作者不可私信/关注，避免暴露身份）
+const canInteractWithAuthor = computed(() =>
+  !!post.value && !post.value.isAnonymous && !isAuthor.value && !!post.value.author?.id && !isPending.value
+)
+const showFollowBtn = computed(() => canInteractWithAuthor.value)
+const showDmBtn = computed(() => userStore.isLoggedIn && canInteractWithAuthor.value)
+const followFollowing = ref(false)
+const followBusy = ref(false)
+
+async function loadFollowStatus() {
+  if (!showDmBtn.value) return
+  try {
+    const res: any = await followApi.followStatus(post.value.author.id)
+    followFollowing.value = !!res.data.following
+  } catch {
+    // 静默失败，按钮按未关注处理
+  }
+}
+
+function goLogin() {
+  router.push({ path: '/login', query: { redirect: route.fullPath } })
+}
+
+async function toggleFollow() {
+  if (!userStore.isLoggedIn || !canInteractWithAuthor.value) return goLogin()
+  if (followBusy.value) return
+  followBusy.value = true
+  const prev = followFollowing.value
+  followFollowing.value = !prev // 乐观更新，失败回滚
+  try {
+    const res: any = await followApi.followToggle(post.value.author.id)
+    followFollowing.value = !!res.data.following
+  } catch {
+    followFollowing.value = prev
+  } finally {
+    followBusy.value = false
+  }
+}
+
+async function startChat() {
+  if (!userStore.isLoggedIn || !canInteractWithAuthor.value) return goLogin()
+  if (followBusy.value) return
+  followBusy.value = true
+  try {
+    const res: any = await conversationApi.create(post.value.author.id)
+    router.push({ path: '/message', query: { tab: 'chat', conv: res.data.id } })
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    followBusy.value = false
+  }
+}
+
 async function fetchPost() {
   loading.value = true
   try {
     const res: any = await postApi.detail(postId.value)
     post.value = res.data
+    loadFollowStatus()
   } catch {
     toast.error('帖子不存在或已删除')
     router.replace('/')
@@ -56,6 +121,15 @@ async function fetchComments() {
     comments.value = res.data || []
   } catch {
     comments.value = []
+  }
+}
+
+async function fetchMatches() {
+  try {
+    const res: any = await postApi.matches(postId.value)
+    matches.value = res.data || []
+  } catch {
+    matches.value = []
   }
 }
 
@@ -140,7 +214,7 @@ function visibleReplies(c: any) {
 
 function toggleExpand(c: any) {
   const s = new Set(expandedReplies.value)
-  s.has(c.id) ? s.delete(c.id) : s.add(c.id)
+  if (s.has(c.id)) { s.delete(c.id) } else { s.add(c.id) }
   expandedReplies.value = s
 }
 
@@ -205,6 +279,7 @@ function share() {
 onMounted(() => {
   fetchPost()
   fetchComments()
+  fetchMatches()
   document.addEventListener('click', closeMoreMenu)
 })
 onUnmounted(() => {
@@ -283,6 +358,22 @@ function closeMoreMenu(e: MouseEvent) {
             <span class="flex items-center gap-0.5"><Eye class="w-3 h-3" /> {{ post.viewCount }}</span>
           </div>
         </div>
+        <!-- 作者互动：私信 / 关注 -->
+        <div v-if="showFollowBtn || showDmBtn" class="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs border transition active:scale-95"
+            :class="followFollowing ? 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200' : 'bg-brand-50 text-brand-600 border-brand-100 hover:bg-brand-100'"
+            @click="toggleFollow">
+            <UserCheck v-if="followFollowing" class="w-3.5 h-3.5" />
+            <UserPlus v-else class="w-3.5 h-3.5" />
+            {{ followFollowing ? '已关注' : '关注' }}
+          </button>
+          <button
+            class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs bg-brand-500 text-white hover:bg-brand-600 transition active:scale-95"
+            @click="startChat">
+            <MessagesSquare class="w-3.5 h-3.5" /> 私信
+          </button>
+        </div>
       </div>
 
       <!-- 审核状态提示 -->
@@ -297,8 +388,8 @@ function closeMoreMenu(e: MouseEvent) {
 
       <!-- 图片九宫格 -->
       <div v-if="post.images?.length" class="grid grid-cols-3 gap-1.5 mb-3">
-        <div v-for="(img, i) in post.images" :key="i" class="aspect-square rounded-lg overflow-hidden bg-zinc-100 cursor-pointer" @click="previewIndex = i">
-          <img :src="img" class="w-full h-full object-cover" loading="lazy" alt="" />
+        <div v-for="(img, i) in gridImages" :key="i" class="aspect-square rounded-lg overflow-hidden bg-zinc-100 cursor-pointer" @click="previewIndex = Number(i)">
+          <img :src="img" class="w-full h-full object-cover" loading="lazy" alt="" @error="onThumbError($event, post.images[i])" />
         </div>
       </div>
 
@@ -346,6 +437,24 @@ function closeMoreMenu(e: MouseEvent) {
         </button>
         <button v-if="!isAuthor" class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95" @click="showReportSheet = true">
           <Flag class="w-5 h-5" /> 举报
+        </button>
+      </div>
+
+      <!-- 可能相关（失物招领智能匹配） -->
+      <div v-if="matches.length" class="bg-white rounded-xl p-4 mb-4">
+        <h3 class="font-medium text-zinc-900">可能相关</h3>
+        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">以下帖子与本帖内容相似，或许正是你在找的</p>
+        <button
+          v-for="m in matches"
+          :key="m.id"
+          class="w-full text-left px-2 py-2.5 rounded-lg border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition"
+          @click="router.push(`/post/${m.id}`)"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs bg-brand-50 text-brand-600 px-1.5 py-0.5 rounded flex-shrink-0">{{ m.section }}</span>
+            <span class="text-sm text-zinc-800 truncate flex-1">{{ m.title }}</span>
+          </div>
+          <p class="text-xs text-zinc-400 mt-0.5 truncate pl-0.5">{{ m.author }} · {{ m.excerpt }}</p>
         </button>
       </div>
 
@@ -466,3 +575,4 @@ function closeMoreMenu(e: MouseEvent) {
       @confirm="confirmDeleteComment" @cancel="deleteCommentDialog.visible = false; deleteCommentDialog.comment = null" />
   </div>
 </template>
+

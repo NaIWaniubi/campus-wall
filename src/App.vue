@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
+import AiAssistant from '@/components/AiAssistant.vue'
 
 const appStore = useAppStore()
 const userStore = useUserStore()
@@ -23,6 +24,7 @@ onMounted(async () => {
       </transition>
     </RouterView>
     <AnnouncementDialog />
+    <AiAssistant />
   </div>
 </template>
 

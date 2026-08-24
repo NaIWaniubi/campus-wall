@@ -2,7 +2,7 @@
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
 
-校园墙按场景分类提供**二手交易、失物招领、表白墙、吐槽树洞、互助问答、校园活动**等垂直板块，解决校园信息碎片化、传播效率低、匿名表达需求强等痛点。
+校园墙按场景分类提供**二手交易、失物招领、表白墙、吐槽树洞、互助问答、校园活动、拼车、组队**八大垂直板块，支持 **Web 网页端 + 微信小程序**双端访问，解决校园信息碎片化、传播效率低、匿名表达需求强等痛点。
 
 - 信息高效聚合 · 纯净校园生态 · 匿名合规表达 · 轻量化体验
 
@@ -18,6 +18,14 @@
 - **搜索**：300ms 防抖搜索、本地搜索历史（10 条）、热门搜索词
 - **互动**：点赞、收藏、楼中楼回复、热门评论标识、举报（24h 频控、3 人升优先级）
 - **消息通知**：评论/点赞/系统通知分类 Tab、未读红点、全部已读
+- **私信会话**：会话列表（头像+最后消息+未读红点）、气泡式聊天、进入会话即清未读
+- **关注体系**：帖子作者一键关注/取关、关注与粉丝双列表、个人页数字汇总
+- **我的点赞**：点赞过的帖子聚合页，滚动分页浏览
+- **失物招领智能匹配**：发布时关键词打分自动匹配站内相似物品，双向站内通知
+- **板块订阅**：订阅感兴趣板块，每日定时摘要推送新帖数与最热帖
+- **二手交易互评**：交易完成后买卖双方星级互评，好评/差评联动信誉分升降
+- **AI 助手**：站内智能助手，基于知识库与帖子检索答疑（OpenRouter）
+- **意见反馈**：一键提交使用建议直达后台
 - **匿名合规**：匿名发布后台可溯源、强制匿名板块（树洞）、信誉分阈值控制
 
 ### 管理后台
@@ -28,12 +36,27 @@
 - **举报处理**：待处理/已处理 Tab、驳回/删内容/封号
 - **板块管理**：新增/编辑/删除、排序、强制匿名、需要审核
 - **公告管理**：发布全站公告、用户确认后不再弹出
+- **人工审核队列**：敏感词风险分级（高驳回/中进队列/低放行），中风险内容进待审核 Tab
+- **匿名帖阈值曝光**：同一匿名帖待处理举报 ≥3 时向管理员揭示作者（昵称+学号）
+- **AI 助手配置**：官方知识库维护、模型与开关设置
+
+### 微信小程序端
+- **原生实现**：`miniprogram/` 目录，26 个页面，与 Web 共用同一套后端契约
+- **五大 Tab**：首页 / 话题（八板块分类页）/ 发布 / 消息 / 我的（自定义 TabBar）
+- **登录双通道**：学号密码 JWT；wx.login 静默登录（服务端未配置 `WX_APPID`/`WX_SECRET` 时自动回退表单登录）
+- **完整能力**：私信会话、关注体系、失物招领方向双 Tab（丢失/拾获）、我的点赞/收藏、内容审核、订阅按钮
+- **API 适配层**：`utils/api.js` 将旧版页面调用路径/字段名翻译为新后端契约并归一化响应
 
 ### 内容安全
-- 前后端双重敏感词检测（高风险词直接驳回、中风险进人工审核队列）
+- 前后端双重敏感词检测，风险三级评定：高风险直接驳回、中风险进人工审核队列、低风险正常发布
 - 信誉分阈值控制发帖/评论/匿名权限
 - 频控：发帖每日上限、评论 10s 频控、举报 24h 频控
 - 软删除机制，数据可追溯
+
+### 可靠性与性能
+- 信息流读缓存：LRU（200 条）+ TTL（60s），写路径前缀失效，`X-Cache: HIT/MISS` 可观测
+- SQLite 在线热备份（WAL 安全），默认保留 7 份自动轮换
+- 图片上传压缩管线：大图重编码 + WebP 缩略图
 
 ---
 
@@ -42,12 +65,13 @@
 | 层 | 技术 |
 |---|---|
 | 前端 | Vue 3 + TypeScript + Vite + Tailwind CSS + Vue Router + Pinia |
+| 小程序 | 原生 WXML / WXSS / JavaScript（自定义 TabBar，无第三方框架） |
 | 后端 | Express.js + TypeScript（tsx 运行时） |
 | 数据库 | SQLite（better-sqlite3，开箱即用，可替换 MySQL/PostgreSQL） |
 | 认证 | JWT（jsonwebtoken） |
 | 密码加密 | bcryptjs |
 | HTTP 客户端 | axios |
-| 图标 | lucide-vue-next |
+| 图标 | @lucide/vue（Web）/ 原生图片资源（小程序） |
 | 部署 | Vercel / 自托管 Node 服务 |
 
 ---
@@ -72,6 +96,12 @@
 │   ├── utils/              # 工具（api/request/helpers）
 │   ├── App.vue
 │   └── main.ts
+├── miniprogram/              # 微信小程序端（原生，26 页）
+│   ├── app.json              # 页面注册 + 自定义 TabBar
+│   ├── pages/                # 五大 Tab + 八板块分类页 + 我的子页 + 审核/协议页
+│   ├── components/           # post-card/comment-item/user-row 等 7 组件
+│   ├── utils/api.js          # API 适配层（旧路径→新契约翻译 + 响应归一化）
+│   └── utils/constants.js    # 板块 id（1-8）↔ 旧分类 key 双向映射
 ├── public/                 # 静态资源（favicon、用户上传）
 ├── index.html
 ├── vite.config.ts
@@ -98,7 +128,10 @@ npm install
 cp .env.example .env
 # 按需修改 .env 中的 JWT_SECRET 等
 
-# 3. 启动开发服务（前后端同时启动）
+# 3. (可选) 灌入演示数据（幂等，重复执行无副作用）
+npm run seed
+
+# 4. 启动开发服务（前后端同时启动）
 npm run dev
 ```
 
@@ -106,13 +139,21 @@ npm run dev
 - 前端：http://localhost:5173
 - 后端 API：http://localhost:3001
 
-### 默认管理员账号
-```
-学号：admin
-密码：admin123
-```
+### 演示账号
 
-> 普通用户请通过注册页面创建。管理员登录入口：http://localhost:5173/admin/login
+| 角色 | 学号 | 密码 |
+|---|---|---|
+| 管理员 | `admin` | `admin123` |
+| 演示用户 | `23770001` ~ `23770005`（陈小北/林晚晴/王大力/苏沐橙/赵小满） | `demo1234` |
+
+> 管理员登录入口：http://localhost:5173/admin/login 。演示账号覆盖各信誉分档位与全板块帖子，便于体验风控/互评/匹配等机制。
+
+### 微信小程序端运行
+
+1. 微信开发者工具「导入项目」，目录选择本仓库的 `miniprogram/`
+2. 联调期 `project.config.json` 已关闭 `urlCheck`（上线前必须改回 `true` 并配置 HTTPS 合法域名）
+3. 后端地址：默认 `http://localhost:3001/api`（见 `miniprogram/utils/api.js` 的 `DEFAULT_BASE_URL`；真机预览改为局域网 IP）
+4. `WX_APPID` / `WX_SECRET` 为可选配置：不配置时 wx.login 静默登录返回 501，自动回退学号密码表单登录
 
 ---
 
@@ -128,6 +169,7 @@ npm run dev
 | `npm run preview` | 预览前端构建产物 |
 | `npm run check` | TypeScript 类型检查 |
 | `npm run lint` | ESLint 代码检查 |
+| `npm run seed` | 灌入全板块演示数据种子（幂等；`--force` 重种） |
 
 ---
 
@@ -176,25 +218,33 @@ pm2 save && pm2 startup
 | `JWT_EXPIRES_IN` | JWT 过期时间 | `7d` |
 | `DB_PATH` | SQLite 数据库文件路径 | `api/data.db` |
 | `NODE_ENV` | 运行环境 | `development` |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | AI 助手密钥与模型（选填） | 空 / `nvidia/nemotron-3-super-120b-a12b:free` |
+| `WX_APPID` / `WX_SECRET` | 小程序静默登录凭据（选填，不配则回退学号密码登录） | 空 |
 
 ---
 
 ## 🔌 API 概览
 
-完整 API 定义见 [`技术架构文档`](.trae/documents/技术架构文档.md)。主要接口分组：
+完整 API 定义见 [`API 映射文档`](docs/API-MAPPING.md) 与 [`架构文档`](docs/ARCHITECTURE.md)。主要接口分组：
 
 | 模块 | 路径前缀 | 说明 |
 |---|---|---|
-| 认证 | `/api/auth` | 注册、登录、当前用户、修改密码、登出 |
-| 帖子 | `/api/posts` | 列表、详情、发布、编辑、删除、点赞、收藏、举报 |
+| 认证 | `/api/auth` | 注册、登录、当前用户、修改密码、登出、微信登录（wx-login） |
+| 帖子 | `/api/posts` | 列表（板块/子类型/价格区间/失物方向/热度排序）、详情、发布、编辑、删除、点赞、收藏、举报、失物匹配 |
 | 评论 | `/api/posts/:id/comments`、`/api/comments/:id/...` | 列表、发布、楼中楼回复、删除、点赞 |
-| 用户 | `/api/users` | 公开信息、资料更新、我的帖子/评论/收藏 |
-| 消息 | `/api/messages` | 列表、标记已读、全部已读 |
+| 用户 | `/api/users` | 公开信息、资料更新、我的帖子/评论/收藏/**点赞** |
+| 关注 | `/api/users/:id/follow` 等 ×4 | 关注/取关、关注列表、粉丝列表、关注状态 |
+| 私信会话 | `/api/conversations` ×5 | 会话列表、建会话、消息收发、未读数 |
+| 消息通知 | `/api/messages` | 列表、标记已读、全部已读（含匹配提醒/每日摘要类型） |
 | 板块/搜索 | `/api/sections`、`/api/search` | 板块列表、搜索、热门词 |
+| 订阅 | `/api/subscriptions` | 板块订阅 toggle/list，驱动每日摘要 |
+| 交易互评 | `/api`（trades） | 标记完成、双向星级互评、信誉分联动 |
+| 反馈 | `/api/feedback`、`/api/admin/feedbacks` | 提交反馈、后台检索 |
 | 草稿 | `/api/drafts` | 列表、保存、删除、清空 |
 | 公告 | `/api/announcements` | 当前公告、确认、管理 |
-| 上传 | `/api/upload` | 图片上传（JPG/PNG，≤5MB） |
-| 管理后台 | `/api/admin` | 用户/内容/评论/举报/统计/板块管理 |
+| AI 助手 | `/api/ai`、`/api/admin/ai` | 助手问答；管理端知识库/设置/统计 |
+| 上传 | `/api/upload` | 图片上传（JPG/PNG，≤5MB，自动压缩+缩略图） |
+| 管理后台 | `/api/admin` | 用户/内容/评论/举报/统计/板块/反馈管理 |
 
 健康检查：`GET /api/health`
 
@@ -202,11 +252,12 @@ pm2 save && pm2 startup
 
 ## 🗄 数据模型
 
-共 9 张表，详见 [`技术架构文档`](.trae/documents/技术架构文档.md) 第 6 节：
+共 **18 张表**，详见 [`架构文档`](docs/ARCHITECTURE.md)：
 
-`users` · `sections` · `posts` · `comments` · `likes` · `favorites` · `messages` · `reports` · `drafts` · `announcements` · `announcement_acks`
+- 核心：`users` · `sections` · `posts` · `comments` · `likes` · `favorites` · `messages` · `reports` · `drafts` · `announcements` · `announcement_acks` · `settings`
+- 扩展：`subscriptions`（板块订阅）· `trade_ratings`（交易互评）· `feedback`（意见反馈）· `conversations` / `chat_messages`(私信会话) · `follows`(关注关系)
 
-首次启动会自动建表并初始化 6 个板块和默认管理员账号。
+首次启动会自动建表并初始化 8 个板块与默认管理员账号；老库升级时拼车/组队板块幂等补种。
 
 ---
 
@@ -233,8 +284,9 @@ pm2 save && pm2 startup
 
 ## 📄 文档
 
-- [产品需求文档 PRD](.trae/documents/校园墙PRD.md)
-- [技术架构文档](.trae/documents/技术架构文档.md)
+- [架构与机制详解](docs/ARCHITECTURE.md)
+- [API 映射文档](docs/API-MAPPING.md)
+- [产品需求文档 PRD](.trae/documents/校园墙PRD.md)（早期版本存档）
 
 ---
 

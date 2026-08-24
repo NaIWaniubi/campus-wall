@@ -4,7 +4,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, MessageCircle, ChevronRight } from 'lucide-vue-next'
+import { ArrowLeft, MessageCircle, ChevronRight } from '@lucide/vue'
 import { userApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import EmptyState from '@/components/EmptyState.vue'
@@ -74,3 +74,4 @@ onMounted(load)
     </main>
   </div>
 </template>
+

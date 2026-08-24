@@ -3,7 +3,7 @@
  * 403 无权限页
  */
 import { useRouter } from 'vue-router'
-import { ShieldX, Home } from 'lucide-vue-next'
+import { ShieldX, Home } from '@lucide/vue'
 
 const router = useRouter()
 </script>
@@ -21,3 +21,4 @@ const router = useRouter()
     </button>
   </div>
 </template>
+

@@ -41,14 +41,14 @@ router.get('/', authRequired, (req, res) => {
 
 // 标记单条已读
 router.put('/read/:id', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   db.prepare('UPDATE messages SET is_read = 1 WHERE id = ? AND user_id = ?').run(id, req.currentUser!.id);
   success(res, null, '已标记已读');
 });
 
 // 标记单条已读（PATCH 形式，需 authRequired 且只能标记自己的消息）
 router.patch('/:id/read', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const result = db.prepare('UPDATE messages SET is_read = 1 WHERE id = ? AND user_id = ?').run(id, req.currentUser!.id);
   if (result.changes === 0) return fail(res, '消息不存在或无权限', 404, 404);
   success(res, null, '已标记已读');
@@ -61,3 +61,4 @@ router.put('/read-all', authRequired, (req, res) => {
 });
 
 export default router;
+

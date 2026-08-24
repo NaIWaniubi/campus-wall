@@ -40,7 +40,7 @@ router.get('/active', authOptional, (req, res) => {
 
 // 确认公告（不再向该用户展示）
 router.post('/:id/ack', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   // 记录确认（仅对登录用户有效）
   db.prepare(`
     INSERT OR IGNORE INTO announcement_acks (announcement_id, user_id) VALUES (?, ?)
@@ -76,9 +76,10 @@ router.post('/', (req, res) => {
 
 // 停用公告
 router.put('/:id/deactivate', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   db.prepare('UPDATE announcements SET is_active = 0 WHERE id = ?').run(id);
   success(res, null, '公告已停用');
 });
 
 export default router;
+

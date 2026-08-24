@@ -4,10 +4,11 @@
  */
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Plus, RefreshCw } from 'lucide-vue-next'
+import { ArrowLeft, Plus, RefreshCw, Bell, BellRing } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { postApi } from '@/utils/api'
+import { postApi, subscriptionApi } from '@/utils/api'
+import { toast } from '@/utils/request'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -135,8 +136,41 @@ function goPublish() {
   router.push('/publish')
 }
 
+// 板块订阅
+const subscribed = ref(false)
+const subLoading = ref(false)
+
+async function loadSubscribed() {
+  if (!userStore.isLoggedIn || !sectionId.value) return
+  try {
+    const res: any = await subscriptionApi.list()
+    subscribed.value = (res.data as any[]).some((s) => s.sectionId === sectionId.value)
+  } catch {
+    // 错误已由拦截器 toast，订阅状态加载失败不阻塞页面
+  }
+}
+
+async function toggleSubscribe() {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  if (subLoading.value) return
+  subLoading.value = true
+  try {
+    const res: any = await subscriptionApi.toggle(sectionId.value)
+    subscribed.value = res.data.subscribed
+    toast.success(res.message)
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    subLoading.value = false
+  }
+}
+
 onMounted(() => {
   window.addEventListener('scroll', onScroll)
+  loadSubscribed()
   if (!appStore.sections.length) appStore.fetchSections().then(() => loadList(true))
   else loadList(true)
 })
@@ -146,6 +180,7 @@ onUnmounted(() => {
 
 watch(sectionId, () => {
   loadList(true)
+  loadSubscribed()
 })
 </script>
 
@@ -158,6 +193,18 @@ watch(sectionId, () => {
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-2 font-medium text-zinc-900 flex-1">{{ section?.name || '板块详情' }}</span>
+        <button
+          class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm transition disabled:opacity-60"
+          :class="subscribed
+            ? 'border-brand-500 text-brand-600 bg-brand-50'
+            : 'border-zinc-200 text-zinc-500 hover:border-brand-300 hover:text-brand-600'"
+          :disabled="subLoading"
+          @click="toggleSubscribe"
+        >
+          <BellRing v-if="subscribed" class="w-4 h-4" />
+          <Bell v-else class="w-4 h-4" />
+          {{ subscribed ? '已订阅' : '订阅' }}
+        </button>
       </div>
 
       <!-- 排序 Tab -->
@@ -230,3 +277,4 @@ watch(sectionId, () => {
     </button>
   </div>
 </template>
+

@@ -2,6 +2,7 @@
  * SQLite 数据库初始化与连接
  */
 import Database from 'better-sqlite3';
+import type BetterSqlite3 from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -21,7 +22,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-export const db = new Database(dbPath);
+export const db: BetterSqlite3.Database = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
@@ -204,6 +205,15 @@ export function initDatabase() {
     );
   `);
 
+  // 键值配置表（AI 模型等运行时设置）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // 常用复合索引（CREATE INDEX IF NOT EXISTS 保证幂等，重复执行无副作用）
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_posts_status_section_created ON posts (status, section_id, created_at);
@@ -235,6 +245,15 @@ export function initDatabase() {
     insertMany(sections);
   }
 
+  // 板块幂等补种（老库升级自动获得新板块）：按名称查重，重复执行无副作用
+  const ensureSection = db.prepare(`
+    INSERT INTO sections (name, icon, sort, is_active, force_anonymous, need_audit)
+    SELECT ?, ?, ?, 1, 0, ?
+    WHERE NOT EXISTS (SELECT 1 FROM sections WHERE name = ?)
+  `);
+  ensureSection.run('拼车', 'car', 7, 0, '拼车');
+  ensureSection.run('组队', 'users', 8, 0, '组队');
+
   // 初始管理员账号
   const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'super_admin'").get() as { count: number };
   if (adminCount.count === 0) {
@@ -246,3 +265,156 @@ export function initDatabase() {
 }
 
 initDatabase();
+
+/**
+ * 运行时设置读写（settings 表）
+ */
+export function getSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
+  ).run(key, value);
+}
+
+/**
+ * 板块订阅表（幂等追加：CREATE TABLE IF NOT EXISTS，重复执行无副作用）
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    section_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, section_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (section_id) REFERENCES sections(id)
+  );
+`);
+// (user_id, section_id) 已被 UNIQUE 约束隐式覆盖；摘要任务按板块遍历，补 section_id 索引
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_subscriptions_section ON subscriptions (section_id);
+`);
+
+/**
+ * 二手交易互评表（幂等追加：CREATE TABLE IF NOT EXISTS，重复执行无副作用）
+ * 每个交易帖每人只能评价一次（UNIQUE(post_id, rater_id)），支持买卖双方互评
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS trade_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    rater_id INTEGER NOT NULL,
+    ratee_id INTEGER NOT NULL,
+    rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+    comment TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, rater_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id),
+    FOREIGN KEY (rater_id) REFERENCES users(id),
+    FOREIGN KEY (ratee_id) REFERENCES users(id)
+  );
+`);
+// 个人主页按被评人查互评记录
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_trade_ratings_ratee ON trade_ratings (ratee_id, created_at);
+`);
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_trade_ratings_post ON trade_ratings (post_id);
+`);
+
+/**
+ * 意见反馈表（幂等追加：CREATE TABLE IF NOT EXISTS，重复执行无副作用）
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    contact TEXT DEFAULT '',
+    status TEXT DEFAULT 'open',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+// 老库升级： interim 版本建的表缺 status 列时补齐（幂等）
+const feedbackHasStatus = (db.prepare('PRAGMA table_info(feedback)').all() as { name: string }[])
+  .some((c) => c.name === 'status');
+if (!feedbackHasStatus) {
+  db.exec(`ALTER TABLE feedback ADD COLUMN status TEXT DEFAULT 'open'`);
+}
+// 管理端反馈列表按时间倒序分页
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
+`);
+
+/**
+ * 私信会话表（幂等追加：CREATE TABLE IF NOT EXISTS，重复执行无副作用）
+ * 双方约定 user_a_id < user_b_id 存储，配合 UNIQUE 防止同一对用户产生两条会话
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_a_id INTEGER NOT NULL,
+    user_b_id INTEGER NOT NULL,
+    last_message TEXT DEFAULT '',
+    last_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    unread_a INTEGER DEFAULT 0,
+    unread_b INTEGER DEFAULT 0,
+    UNIQUE (user_a_id, user_b_id),
+    CHECK (user_a_id < user_b_id),
+    FOREIGN KEY (user_a_id) REFERENCES users(id),
+    FOREIGN KEY (user_b_id) REFERENCES users(id)
+  );
+`);
+
+/**
+ * 私信消息表：按会话存储，升序读取；is_read 供单条已读回执扩展
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+  );
+`);
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages (conversation_id, id);
+`);
+
+/**
+ * 关注表：follower 关注 following，主键天然防重，CHECK 禁止自我关注
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL,
+    following_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    CHECK (follower_id <> following_id),
+    FOREIGN KEY (follower_id) REFERENCES users(id),
+    FOREIGN KEY (following_id) REFERENCES users(id)
+  );
+`);
+// 粉丝列表按被关注人查询；关注列表走主键前缀
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_follows_following ON follows (following_id, created_at);
+`);
+
+// 微信登录：users 表幂等补列 openid（PRAGMA 检测 + ALTER）
+const userCols = db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
+if (!userCols.some((c) => c.name === 'openid')) {
+  db.exec('ALTER TABLE users ADD COLUMN openid TEXT');
+}
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_users_openid ON users (openid);
+`);

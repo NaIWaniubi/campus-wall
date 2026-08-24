@@ -2,7 +2,7 @@
 /**
  * 确认弹窗组件
  */
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 
 defineProps<{
   visible: boolean
@@ -50,3 +50,4 @@ const emit = defineEmits<{
     </div>
   </Teleport>
 </template>
+

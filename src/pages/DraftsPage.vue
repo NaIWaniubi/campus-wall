@@ -4,7 +4,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, FileText, Trash2, ChevronRight } from 'lucide-vue-next'
+import { ArrowLeft, FileText, Trash2 } from '@lucide/vue'
 import { draftApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
@@ -109,3 +109,5 @@ onMounted(load)
     />
   </div>
 </template>
+
+

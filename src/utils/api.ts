@@ -16,6 +16,7 @@ export const authApi = {
 export const postApi = {
   list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string }) => request.get('/posts', { params }),
   detail: (id: number) => request.get(`/posts/${id}`),
+  matches: (id: number) => request.get(`/posts/${id}/matches`),
   publish: (data: any) => request.post('/posts', data),
   edit: (id: number, data: any) => request.put(`/posts/${id}`, data),
   delete: (id: number) => request.delete(`/posts/${id}`),
@@ -40,6 +41,31 @@ export const userApi = {
   myPosts: () => request.get('/users/me/posts'),
   myComments: () => request.get('/users/me/comments'),
   myFavorites: () => request.get('/users/me/favorites'),
+  myLikes: (params: { page?: number; pageSize?: number }) => request.get('/users/me/likes', { params }),
+}
+
+// 意见反馈
+export const feedbackApi = {
+  submit: (data: { content: string; contact?: string }) => request.post('/feedback', data),
+}
+
+// 私信会话
+export const conversationApi = {
+  list: () => request.get('/conversations'),
+  create: (peerId: number) => request.post('/conversations', { peerId }),
+  messages: (id: number, params?: { page?: number; pageSize?: number }) =>
+    request.get(`/conversations/${id}/messages`, { params }),
+  send: (id: number, content: string) => request.post(`/conversations/${id}/messages`, { content }),
+}
+
+// 关注体系（挂载于 /users）
+export const followApi = {
+  followToggle: (id: number) => request.post(`/users/${id}/follow`),
+  followStatus: (id: number) => request.get(`/users/${id}/follow-status`),
+  followingList: (id: number, params?: { page?: number; pageSize?: number }) =>
+    request.get(`/users/${id}/following`, { params }),
+  followersList: (id: number, params?: { page?: number; pageSize?: number }) =>
+    request.get(`/users/${id}/followers`, { params }),
 }
 
 // 消息
@@ -82,6 +108,32 @@ export const uploadApi = {
   },
 }
 
+// AI 助手（回答耗时较长，单独放宽超时）
+export interface AiForumItem {
+  id: number
+  commentId?: number
+  title: string
+  excerpt: string
+  section: string
+  likeCount: number
+  commentCount: number
+  createdAt: string
+  type: 'post' | 'comment'
+}
+export const aiApi = {
+  chat: (data: { message: string; history?: { role: 'user' | 'assistant'; content: string }[] }) =>
+    request.post<{ reply: string; forums: AiForumItem[] }>('/ai/chat', data, { timeout: 65000 }),
+}
+
+// 管理端 AI 设置
+export const adminAiApi = {
+  getKnowledge: () => request.get('/admin/ai/knowledge'),
+  saveKnowledge: (content: string) => request.put('/admin/ai/knowledge', { content }),
+  getSettings: () => request.get('/admin/ai/settings'),
+  saveSettings: (model: string) => request.put('/admin/ai/settings', { model }),
+  stats: () => request.get('/admin/ai/stats'),
+}
+
 // 管理后台
 export const adminApi = {
   // 用户管理
@@ -109,4 +161,21 @@ export const adminApi = {
   announcements: () => request.get('/announcements'),
   createAnnouncement: (data: { title: string; content: string; expiresAt?: string }) => request.post('/announcements', data),
   deactivateAnnouncement: (id: number) => request.put(`/announcements/${id}/deactivate`),
+  // 意见反馈
+  feedbacks: (params?: { keyword?: string; status?: string; page?: number; pageSize?: number }) =>
+    request.get('/admin/feedbacks', { params }),
+}
+
+// 板块订阅
+export const subscriptionApi = {
+  list: () => request.get('/subscriptions'),
+  toggle: (sectionId: number) => request.post(`/subscriptions/${sectionId}`),
+}
+
+// 二手交易互评
+export const tradeApi = {
+  complete: (postId: number) => request.post(`/trades/${postId}/complete`),
+  rate: (postId: number, data: { targetUserId?: number; rating: number; comment?: string }) =>
+    request.post(`/trades/${postId}/rate`, data),
+  ratingsOf: (userId: number) => request.get(`/users/${userId}/trade-ratings`),
 }

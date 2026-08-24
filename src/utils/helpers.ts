@@ -57,3 +57,20 @@ export function creditLevel(score: number): string {
   if (score >= 60) return '一般'
   return '较低'
 }
+
+/**
+ * 信誉分等级称号（四档徽章）：与 creditLevel 阈值对齐
+ * icon 为图标键名，CreditBadge 组件内映射为 lucide 图标
+ */
+export interface CreditTitleInfo {
+  name: string
+  icon: 'trophy' | 'medal' | 'award' | 'shield-alert'
+  color: string
+}
+
+export function creditTitle(score: number): CreditTitleInfo {
+  if (score >= 90) return { name: '信誉之星', icon: 'trophy', color: '#f59e0b' }
+  if (score >= 80) return { name: '可靠达人', icon: 'medal', color: '#3b82f6' }
+  if (score >= 60) return { name: '诚信新人', icon: 'award', color: '#f97316' }
+  return { name: '待改进', icon: 'shield-alert', color: '#9ca3af' }
+}

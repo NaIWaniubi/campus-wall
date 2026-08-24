@@ -2,7 +2,7 @@
 /**
  * 空状态组件
  */
-import { Inbox } from 'lucide-vue-next'
+import { Inbox } from '@lucide/vue'
 
 defineProps<{
   text?: string
@@ -27,3 +27,4 @@ const emit = defineEmits<{ action: [] }>()
     </button>
   </div>
 </template>
+

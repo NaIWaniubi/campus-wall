@@ -4,7 +4,7 @@
  */
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Bell, Plus, RefreshCw } from 'lucide-vue-next'
+import { Search, Bell, Plus, RefreshCw } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi } from '@/utils/api'
@@ -18,6 +18,12 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 
 const activeSection = ref(0) // 0 = 全部
+type SortKey = 'hot' | 'new'
+const sortOptions: { key: SortKey; label: string }[] = [
+  { key: 'hot', label: '热门' },
+  { key: 'new', label: '最新' },
+]
+const activeSort = ref<SortKey>('hot')
 const list = ref<any[]>([])
 const page = ref(1)
 const pageSize = 20
@@ -73,6 +79,7 @@ async function loadList(reset = false) {
       page: page.value,
       pageSize,
       sectionId: activeSection.value || undefined,
+      sort: activeSort.value,
     })
     const data = res.data
     if (reset || page.value === 1) list.value = data.list
@@ -94,6 +101,13 @@ function selectSection(id: number) {
     return
   }
   activeSection.value = id
+  loadList(true)
+}
+
+// 切换热门/最新排序：重置到第一页重新请求（带 sort 参数）
+function selectSort(key: SortKey) {
+  if (activeSort.value === key) return
+  activeSort.value = key
   loadList(true)
 }
 
@@ -202,6 +216,20 @@ onUnmounted(() => {
         {{ refreshing ? '刷新中...' : pullDistance >= pullThreshold ? '松开刷新' : '下拉刷新' }}
       </div>
 
+      <!-- 排序切换：热门 / 最新（风格与板块 Tab 一致） -->
+      <div class="flex items-center gap-1">
+        <button
+          v-for="opt in sortOptions"
+          :key="opt.key"
+          class="relative px-3 py-2 text-sm whitespace-nowrap transition rounded-lg"
+          :class="activeSort === opt.key ? 'text-brand-600 font-medium bg-brand-50' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'"
+          @click="selectSort(opt.key)"
+        >
+          {{ opt.label }}
+          <span v-if="activeSort === opt.key" class="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-5 h-0.5 bg-brand-500 rounded-full"></span>
+        </button>
+      </div>
+
       <PostSkeleton v-if="loading" :count="4" />
 
       <template v-else>
@@ -228,3 +256,4 @@ onUnmounted(() => {
     </button>
   </div>
 </template>
+

@@ -1,0 +1,1 @@
+{"id":"9836e703-b7e4-4da2-bc8e-e636def1500e","from":"captain","to":"eng-lostfound","content":"你的任务 t1「失物招领智能匹配」已创建并指派给你。请用 agent_teams_claim_task 认领 t1 后立即开工。任务描述里有完整的实现要点和约束（先读 docs/ARCHITECTURE.md 与相关源码）。完成前必须自跑 npm run check 和 npm run lint 零错误，然后用 agent_teams_update_task 汇报结果。遇到设计取舍拿不准的，发消息问队长再动手。","ts":1787489675840,"deliveredAt":1787489675859,"readAt":1787489675859}

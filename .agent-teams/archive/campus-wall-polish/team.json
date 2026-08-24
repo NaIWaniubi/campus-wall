@@ -1,0 +1,81 @@
+{
+  "name": "campus-wall-polish",
+  "id": "campus-wall-polish",
+  "description": "项目完善轮：网页端补齐与新后端的能力差（我的点赞/私信会话/关注体系/意见反馈/拼车组队发布字段）+ 文档全面更新（README 八板块双端形态、ARCHITECTURE 补小程序章节），队长跑三闸门与端到端收口。",
+  "captainSessionId": "session-cfaf93a4-d069-45d4-b745-8be9a7c42508",
+  "createdAt": 1787544601822,
+  "members": [
+    {
+      "id": "66438e1f-dd7c-4f6c-9756-5bf27b40b0e9",
+      "name": "eng-web-a",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787544610056,
+      "status": "removed"
+    },
+    {
+      "id": "ac32d621-c51a-4067-8f41-93bed23c8e9e",
+      "name": "eng-web-b",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787544610162,
+      "status": "removed"
+    },
+    {
+      "id": "9ec20cf6-7592-4aa6-9939-1e23d1dfe169",
+      "name": "eng-docs",
+      "role": "writer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787544610280,
+      "status": "removed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "subject": "Web 补齐A：私信会话页 + 关注体系 UI",
+      "description": "项目：E:\\校园墙（Vue3.5 + script setup TS + Pinia，路由 history 模式；后端契约 {code,message,data}、Bearer JWT、axios 封装在 src/api 或 utils——动手前先读现有封装与 MessagePage/PostDetailPage/ProfilePage）。任务：私信会话 + 关注体系网页端补齐。\n\n【私信】MessagePage 重构为双区或双 tab「通知 / 私信」：\n- 私信 tab 对接 GET /api/conversations（data 为裸数组：{id,peer{id,nickname,avatar},lastMessage,lastAt,unread}），列表项头像+昵称+最后消息+相对时间+未读红点\n- 新增 ChatPanel 组件（同页右侧滑出或路由子视图二选一，倾向同页分栏保持轻量）：GET /:id/messages 升序气泡（自己右/对方左）、底部输入 POST 发送即时上屏、进入清未读（GET 即清）、15s 轮询新消息 onUnmounted 清理\n- PostDetailPage 作者信息区加「私信」按钮（登录态才显示）：点击建会话(POST {peerId})并打开面板定位到该会话\n【关注】\n- api 封装加 followToggle/followStatus/followingList/followersList\n- PostDetailPage 作者区加「关注/已关注」按钮：非匿名且非本人显示；游客点击引导登录；乐观 toggle\n- ProfilePage 加「关注/粉丝」区块或 tab：双列表分页，条目昵称+CreditBadge；主卡数字用 followingList/followersList 各 pageSize=1 取 total\n边界：只动 MessagePage/ChatPanel(新)/PostDetailPage/ProfilePage 与 api 封装追加；HomePage/PublishPage 禁碰。自验 npm run check + npm run lint 零 error，数据流推演清单。完成私信队长（无法更新任务则队长代登）。",
+      "status": "completed",
+      "assignee": "eng-web-a",
+      "dependencies": [],
+      "attempt": 1,
+      "createdAt": 1787544645212,
+      "updatedAt": 1787545207166,
+      "attemptId": "1d5fbee4-f9e8-4051-b259-7d2c71fff388",
+      "reassigning": false,
+      "output": "t1 完成。改动范围：src/utils/api.ts（追加 conversationApi/followApi）、新组件 src/components/ChatPanel.vue、重构 MessagePage.vue（通知/私信双tab+同页分栏）、PostDetailPage.vue（作者区 私信+关注按钮）、ProfilePage.vue（主卡关注/粉丝数+关注粉丝区块）。npm run check + lint 均 0 error。注意：后端消息分页为 id 升序，ChatPanel 已做取尾页处理保证长会话能看到最新消息；期间 lint 曾撞上队友对 ProfilePage 的并发编辑中间态，复检已通过。"
+    },
+    {
+      "id": "t2",
+      "subject": "Web 补齐B：我的点赞页 + 反馈入口 + 拼车组队字段",
+      "description": "项目：E:\\校园墙（Vue3.5 TS）。先读 src/api 封装、ProfilePage、PublishPage、router。任务：我的点赞 + 意见反馈 + 拼车组队发布字段。\n\n【我的点赞】新页面 MyLikesPage.vue：对接 GET /api/users/me/likes（形状 {list,total,page,pageSize,hasMore}），列表复用 PostCard，滚动分页；注册路由 /my-likes；ProfilePage 入口卡与「我的收藏」并列\n【意见反馈】ProfilePage 设置区新增「意见反馈」入口→对话框组件（content≤500 必填 + contact 选填）→POST /api/feedback 成功 toast\n【拼车/组队发布字段】PublishPage 的 sectionId watch 现只覆盖 1-6 差异化字段模板：补 7拼车（time 出发时间/location 集合点/price 分摊费用/contact 联系方式）与 8组队（time 活动时间/location 集合地点/organizer 主办方/contact 联系方式）两套模板（键名全部在后端白名单 price/time/location/organizer/contact 内）；首页板块筛选无需改（动态）\n边界：MyLikesPage(新)/router/ProfilePage/PublishPage 与 api 追加；PostDetailPage/MessagePage 禁碰（另一成员在改）。自验 check/lint 零 error。完成私信队长代登。",
+      "status": "completed",
+      "assignee": "eng-web-b",
+      "dependencies": [],
+      "attempt": 1,
+      "createdAt": 1787544645472,
+      "updatedAt": 1787545224290,
+      "attemptId": "fecde734-78b8-45b9-91c8-3ae93fa4e72c",
+      "reassigning": false,
+      "output": "t2 完成。改动：① api.ts 追加 userApi.myLikes(page/pageSize) 与 feedbackApi.submit；② 新建 src/pages/MyLikesPage.vue：对接 GET /users/me/likes（{list,total,page,pageSize,hasMore}），复用 PostCard，滚动到底自动加载下一页，头部显示总数；③ router 注册 /my-likes（requireAuth）；④ ProfilePage：入口卡新增「我的点赞」与我的收藏并列、「意见反馈」入口；⑤ 新建 src/components/FeedbackDialog.vue：content 必填≤500 + contact 选填≤100，POST /api/feedback 成功 toast；⑥ PublishPage：sectionKind 补 carpool/teamup 两套差异化字段模板（time/location/price/contact、time/location/organizer/contact，全部在后端白名单内）。自验 npm run check（vue-tsc）与 npm run lint 均 0 error。未触碰 PostDetailPage/MessagePage。注：期间另一成员并发修改了 api.ts/ProfilePage.vue（关注体系），已在最新版本上合入我的改动，未动其代码。"
+    },
+    {
+      "id": "t3",
+      "subject": "文档更新：README 全面重写 + ARCHITECTURE 小程序章节与新端点",
+      "description": "项目：E:\\校园墙。文档全面更新至当前真实形态（先通读 README.md 全文与 docs/ARCHITECTURE.md 目录结构再动笔）：\n\n1. README.md 重写过时部分：板块从 6 → **8**（补拼车、组队）；功能特性补齐本轮全量能力——智能失物匹配、举报阈值曝光、交易互评与信誉徽章、订阅+每日摘要、敏感词风控审核队列、LRU 缓存、每日备份轮换、AI 助手、官方公告确认流、**微信小程序端**（26 页、学号密码 JWT、wx.login 可选静默、私信/关注/失物方向）；快速开始补 `npm run seed`（演示账号 2377xxx/demo1234、admin/admin123）与小程序导入指引（微信开发者工具导 E:\\校园墙\\miniprogram、urlCheck 已关、WX_APPID/WX_SECRET 可选）\n2. docs/ARCHITECTURE.md 增补：a)「微信小程序端」章节（目录结构 miniprogram/、utils/api.js normalizePost 适配层设计、constants 板块映射、降级策略演进史一句话）；b) 后端 API 面增补新端点：conversations×5、follows×4、feedback×2、users/me/likes、auth/wx-login、posts direction 过滤与 extraFields 浅合并编辑语义（含为何这样改一行记录）\n3. 文风对齐现有文档（表格化、简洁），不虚构未实现的能力\n自验：markdown 无断裂链接（相对路径检查）；完成后私信队长代登。",
+      "status": "completed",
+      "assignee": "eng-docs",
+      "dependencies": [],
+      "attempt": 1,
+      "createdAt": 1787544645534,
+      "updatedAt": 1787545405072,
+      "attemptId": "7f48efd3-4424-4851-bdf2-e9c75b649a46",
+      "reassigning": false,
+      "output": "文档更新完成。README.md：8 板块双端形态、功能特性补齐本轮全量机制（智能失物匹配/举报阈值曝光/交易互评信誉徽章/订阅摘要/风控审核队列/LRU 缓存/备份轮换/AI 助手/公告确认流/微信小程序端）、快速开始补 npm run seed+演示账号+小程序导入指引、API 概览与数据模型（18 表）刷新、技术栈补小程序行。docs/ARCHITECTURE.md：新增「微信小程序端」章节（26 页结构/api.js 适配层 normalizePost 设计/constants 板块映射/降级演进一句话/登录双通道/联调注意）、新增 §4.7 本轮新端点表（conversations×5、follows×4、feedback×2、users/me/likes、auth/wx-login、posts direction 过滤）+ extraFields 浅合并编辑语义（含为何这样改记录）。全部数字经代码核实（18 表/17 路由模块/小程序 app.json 26 页），相对链接无断裂。另顺手补了 .env.example 的 WX_APPID/WX_SECRET 可选注释块。注意：用户端页数按本轮收口态写为 16 页/27 路由（MyLikesPage 由 eng-web-b 落地后即吻合），三闸门时如未落地需回调。"
+    }
+  ],
+  "taskSeq": 3
+}

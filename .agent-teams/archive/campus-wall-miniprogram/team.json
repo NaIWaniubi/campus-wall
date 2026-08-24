@@ -1,0 +1,161 @@
+{
+  "name": "campus-wall-miniprogram",
+  "id": "campus-wall-miniprogram",
+  "description": "以桌面版原生小程序为骨架，在 E:\\校园墙\\miniprogram 产出对接新后端的完美小程序成品：适配层改造、四组页面移植、创新机制 UI 落地，队长统一用微信开发者工具验收。",
+  "captainSessionId": "session-cfaf93a4-d069-45d4-b745-8be9a7c42508",
+  "createdAt": 1787533240608,
+  "members": [
+    {
+      "id": "6f1d526c-691c-4f26-9c1e-f3e40149ed59",
+      "name": "eng-api",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787533260329,
+      "status": "removed"
+    },
+    {
+      "id": "2efdc842-e029-453c-ba74-936bd0505771",
+      "name": "eng-core",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787533260362,
+      "status": "removed"
+    },
+    {
+      "id": "61541a89-c96b-4625-93e4-443b18f040f5",
+      "name": "eng-feed",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787533260440,
+      "status": "removed"
+    },
+    {
+      "id": "e8ec45f3-7df0-4f6b-af78-51f5a709af99",
+      "name": "eng-social",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787533260530,
+      "status": "removed"
+    },
+    {
+      "id": "194e3d34-aece-4d94-91d0-89f04e8a48ed",
+      "name": "eng-admin",
+      "role": "engineer",
+      "provider": "opencode-go",
+      "model": "ox-alpha-free",
+      "joinedAt": 1787533260563,
+      "status": "removed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "subject": "后端补齐拼车/组队板块 + 种子数据扩展",
+      "description": "项目：E:\\校园墙（后端 api/ + 种子脚本 api/seed-demo.ts）。小程序端有 7 个话题板块，新后端只有 6 个 sections——缺「拼车」「组队」。\n\n任务：\n1. api/db.ts：initDatabase 的板块初始化段之后追加幂等补种——用 WHERE NOT EXISTS 按名称检查并 INSERT『拼车』(icon 'car', sort 7, need_audit 0) 与『组队』(icon 'users', sort 8, need_audit 0)，保证老库升级也自动获得新板块\n2. api/seed-demo.ts：为两个新板块各加 2 条演示帖（拼车：周末回家顺风车带2座 price 可放分摊费用进 content 或复用 location/time 字段；组队：组队打比赛/组队自习室），作者用现有演示用户，likesFrom 点缀；保持脚本幂等语义\n3. 重跑 npm run seed -- --force 验证两板块出现且各有数据（GET /api/posts?sectionId=7、8）\n4. 自跑 npm run check / npm run lint 零 error。卡住先交付遗留项注明并通知队长。",
+      "status": "completed",
+      "assignee": "captain",
+      "dependencies": [],
+      "attempt": 2,
+      "createdAt": 1787533290750,
+      "updatedAt": 1787533915126,
+      "reassigning": false,
+      "attemptId": "87c60899-870f-49f4-9705-2ff7faf0c5e9",
+      "output": "队长代 eng-api 补登。交付：①db.ts 幂等补种『拼车』(sort7)『组队』(sort8)，老库启动自动获得；②seed-demo.ts 新增 4 演示帖（拼车×2/组队×2）；③额外修复 cleanupDemoData 既有外键约束 bug（楼中楼父评论先删导致 --force 必挂，pragma foreign_keys 临时关闭包裹清理）。验证：seed --force 15→19 帖、sectionId=7/8 各 2 帖、幂等复跑无重复、check/lint 零 error（miniprogram/ 下 104 个既有 JS lint 问题与本任务无关，已安排 eslint ignores 处理）。"
+    },
+    {
+      "id": "t2",
+      "subject": "小程序核心适配层：请求封装/登录JWT/接口映射/上传",
+      "description": "项目：E:\\校园墙\\miniprogram（原生微信小程序骨架，已从桌面版复制）。前置依赖：队长稍后会落一份 API 契约映射报告到 docs/API-MAPPING.md，开工前先读它 + docs/ARCHITECTURE.md。\n\n任务：核心适配层改造——让小程序整体对接 E:\\校园墙\\api 新后端。\n1. utils/request 或等价封装：baseUrl 指向 http://localhost:3001/api；project.config.json 设置 urlCheck:false（开发期不校验合法域名）；响应约定改为 {code,message,data} 且 code===200 才算成功，401 统一清登录态跳登录页\n2. 登录体系：读 docs/API-MAPPING.md 确认旧登录方式，改造为新后端的学号+密码 JWT 登录（POST /api/auth/login），token 存 storage 并在所有请求带 Authorization: Bearer；注册走 /api/auth/register（studentId 6-12 位数字）\n3. utils/api 层按映射表重写各模块调用路径与字段名映射（注意新后端分页形状 data.list/data.total/data.page/data.pageSize/hasMore，帖子对象 camelCase：extraFields/author{id,nickname,avatar,creditScore}/thumbImages/matchedCount/isTop 等）\n4. 板块 id 映射表落到一个 constants 文件供页面引用（1二手 2失物 3表白 4树洞 5问答 6活动 7拼车 8组队）\n5. 上传改走 /api/upload（wx.uploadFile，字段名 file，返回 url/thumbUrl）\n6. 完成自跑一次开发者工具编译级验证（若本机无 CLI 则以代码审查+self-check 清单交付）。卡住先交付遗留项注明并通知队长。",
+      "status": "completed",
+      "assignee": "captain",
+      "dependencies": [],
+      "attempt": 5,
+      "createdAt": 1787533290900,
+      "updatedAt": 1787535224790,
+      "reassigning": false,
+      "attemptId": "eb88ea8b-11cb-4c88-ad09-d7e4a7e355bf",
+      "output": "队长代 eng-core 补登（其会话无团队工具，attempt 3 报告为准）。交付：①utils/api.js 适配层——{code,message,data}/code===200 判定、401 清态跳登录、路径方法参数响应四层映射、normalizePost 别名归一（time毫秒/category/extra/likes）、热词包装、缺失能力降级短路；②学号+密码 JWT 登录/注册表单，token 落 storage 全请求 Bearer；③utils/constants.js 板块映射(1二手2失物3表白4树洞5问答6活动7拼车8组队)；④上传走 /api/upload(file 字段,url/thumbUrl 绝对化)；⑤三条决策落地：pages 零改动原则/纯表单登录(wx.login 二期)/私信关注 feedback UI 明示即将上线。验证：改动文件语法全过、静态套件 22/23(唯一失败为桌面版遗留断言)、mock 冒烟两轮、完整性核验 11/11。遗留：follows/conversations 端点缺失(UI 已明示)、myPosts status 值域待同步、上线前恢复 urlCheck:true+HTTPS。"
+    },
+    {
+      "id": "t3",
+      "subject": "信息流四页移植：首页/话题/详情/搜索 + 热度切换 + 匹配卡片",
+      "description": "项目：E:\\校园墙\\miniprogram。依赖 t2 核心适配层完成后开工；动手前读 docs/API-MAPPING.md 与 t2 改造后的 utils 层。\n\n任务：信息流侧四页移植优化——pages/index、pages/category（话题 hub+各分类子页）、pages/detail、pages/search。\n1. index：列表对接新分页形状；顶部加「热门/最新」切换（sort=hot|new，默认 hot）；帖子卡片：作者旁信誉徽章（author.creditScore 四档配色：<60灰/≥60橙/≥80蓝/≥90金，匿名不显示）、图片九宫格用 thumbImages 预览用 images、二手帖显示价格角标\n2. detail：完整字段展示（extraFields 按板块差异化渲染：二手价格/成色/联系、失物地点/时间/物品、活动时间/地点/主办方、交易完成标记 soldAt 徽章）；「可能相关」卡片调 /api/posts/:id/matches（失物招领板块才请求）；点赞/收藏/评论楼中楼走新接口\n3. category 各子页按板块 id 过滤 + 二手支持 priceRange 筛选入口\n4. search 对接 keyword 参数\n5. 完成自验：代码层 self-check 清单（每页数据流走通的逻辑推演）+ check 无语法错误（小程序无 tsc，可用 node --check 或工具编译）；卡住先交付遗留项注明并通知队长。",
+      "status": "completed",
+      "assignee": "eng-feed",
+      "dependencies": [
+        "t2"
+      ],
+      "attempt": 3,
+      "createdAt": 1787533324151,
+      "updatedAt": 1787536743029,
+      "attemptId": "c3519cde-ceee-48db-a5fa-a7f8eb168b7d",
+      "reassigning": false,
+      "output": "t3 信息流四页移植完成。改动清单：①utils/api.js adaptQuery 补旧标签翻译：裸 subType→itemType:x（对齐 extraFields.itemType 存储）、priceRange「500以上」→「500-」、timeRange 中文标签→天数；②pages/index 热门/最新切换 sort=hot|new 默认 hot，移除无后端支撑的关注 tab 及其空态分支；③post-card 信誉徽章四档（<60灰/≥60橙/≥80蓝/≥90金，匿名 creditScore=null 不显示）、九宫格 thumbImages+binderror 单图回退原图、预览恒用 images 原图、二手 ¥价格角标（soldAt 时显示「已售」）；④detail extraFields 差异化渲染补齐：物品类型 itemType、活动时间 time、主办方 organizer、soldAt「已售出」徽章；可能相关卡仅失物板块调 GET /posts/:id/matches（formatMatch 形状直渲+点击跳转）；点赞/收藏增量返回合并、评论列表归一化、楼中楼回复走 POST /comments/:id/reply 均确认接新接口；⑤category 子页板块过滤经 adapter sectionId 实测生效；lost 删除寻物/招领假 tab（新后端单板块无对向维度，且旧垃圾 subType 值会让筛选恒空）；trade 补「最新发布」sort=new，price_asc/desc 直通后端；⑥search keyword 对接 /posts?keyword= + page/pageSize 分页 + load-more。自验：node --check 7 个改动 js 全过；adaptQuery stub 矩阵 7 用例实测全过（sectionId 1/2/3 映射、itemType:、500-、天数、空值清理）；各页数据流逻辑推演完成。风险提示：施工中 api.js 曾被外部回写回 t2 版本一次（mtime 9:39:40，疑 t2 残留进程），已重放修改并验证落盘，请确认无其他成员并发编辑 api.js。遗留说明：campus 筛选仍为装饰性（adapter 全局丢弃）、关注入口维持隐藏、私信保持「即将上线」（后端 conversations 未建）。"
+    },
+    {
+      "id": "t4",
+      "subject": "社交个人侧移植：发布/消息/我的全家桶 + 交易评价区",
+      "description": "项目：E:\\校园墙\\miniprogram。依赖 t2 完成后开工；先读 docs/API-MAPPING.md 与改造后的 utils。\n\n任务：社交与个人侧页面移植——pages/publish、pages/message(+chat)、pages/mine 全家桶。\n1. publish：按所选板块动态渲染差异化字段（二手 price/condition/contact/tradeType、失物 location/time/itemType、活动 time/location/organizer，拼车组队自由发挥但键名必须在后端白名单内）；匿名开关（树洞强制匿名不可关）；wx.uploadFile 上传带压缩（wx.compressImage quality 80 后再传）\n2. message：通知列表对接新接口 /api/messages?type=xx（响应 data.list+unreadCount），类型含 match/digest/system 等；chat 私信页若新后端无对应能力则降级为「系统通知详情页」并在 UI 上注明，不删除入口\n3. mine：用户信息卡（头像/昵称/信誉分+CreditBadge 等价 WXSS 徽章）、我的帖子/收藏/点赞列表、设置页退出登录；「交易评价」区块：GET /api/users/:id/trade-ratings 均分+列表\n4. 订阅按钮：category 子页头部加订阅/已订阅 toggle（POST /api/subscriptions/:sectionId）\n5. 完成自验同 t5 要求；卡住先交付遗留项注明并通知队长。",
+      "status": "completed",
+      "assignee": "eng-social",
+      "dependencies": [
+        "t2"
+      ],
+      "attempt": 3,
+      "createdAt": 1787533324194,
+      "updatedAt": 1787536877321,
+      "attemptId": "50ae0096-8914-49f6-82c6-9fe68e1283ce",
+      "reassigning": false,
+      "output": "t4 完成。交付：①publish——按板块动态差异化字段且键名全部落在后端白名单（二手 price/condition/tradeType/contact、失物 time/location/itemType(经subType)+contact、活动 time/location/organizer、拼车 time/location路线+price/contact、组队 time/location/organizer/contact），树洞强制匿名锁定开关，标题必填≤50/正文≥10对齐后端校验，wx.compressImage quality80 失败回退原图后再 uploadFile；移除新后端不支持的话题/校区/允许私信死控件（tags/campus 会被适配层丢弃）；草稿与编辑回填保留。②message——tab 重构为 私信(降级)/全部/匹配/摘要/系统，对接 GET /messages?type=xx（data.list+unreadCount），MESSAGE_TYPES 元数据入 constants.js，点击消息本地置灰+持久化 PUT /messages/read/:id 并跳详情；chat 页降级「即将上线」说明页保留入口。③mine——用户卡新增信誉分五级 WXSS 徽章（≥100金/≥90绿/≥80蓝/≥60橙/<60红），交易评价区接 GET /api/users/:id/trade-ratings 均分+条数+近3条互评（星级/头像/评语/来源帖可跳转）；notification 子页同步新类型域+持久化已读；settings 新增退出登录。④components/subscribe-btn 组件接入全部7个板块子页头部（sectionId 1/2/3/4/5/7/8），初态查 GET /subscriptions，点击 POST toggle。⑤tests 同步新契约：publish 白名单必填/强制匿名/压缩上传三断言替换旧 contactInfo/departureLocation 断言，chat 改降级断言，upload-auth 测试改指前端 Bearer 头（原 server/app.js 已随后端迁移不存在）。自验：node --check 全绿；静态测试 24/25 过，唯一红项『following feed 登录引导』属 t3（eng-feed 正在改 index 页）非本任务范围；全量 JSON 解析通过零 BOM。遗留：myLikes 真数据依赖 eng-core t7 在 api.js 移除 /user/likes 短路并加映射（契约已私发他）；feedback 提交同理（当前被短路成假成功）。"
+    },
+    {
+      "id": "t5",
+      "subject": "管理端移植：审核队列 + 举报处理 + 匿名曝光警示条",
+      "description": "项目：E:\\校园墙\\miniprogram。依赖 t2 完成后开工；先读 docs/API-MAPPING.md 与改造后的 utils。\n\n任务：管理端页面移植——pages/admin/moderation。\n1. 对接新管理接口：/api/admin/stats 数据卡、/api/admin/posts?status= 列表（新增 pending_review tab：人工审核队列，通过/驳回按钮走对应接口）、举报处理 /api/admin/reports（重点：条目含 revealedAuthor 时渲染橙色警示条「⚠ 匿名帖已达举报阈值(N人)，作者：昵称(学号)」，仅超管角色可见的管理页自然满足权限）\n2. 角色门槛：进入校验 user.role 为 super_admin/section_admin（登录返回的 user.role），非管理员跳转提示\n3. 完成自验：self-check 清单 + 语法检查；卡住先交付遗留项注明并通知队长。",
+      "status": "completed",
+      "assignee": "eng-admin",
+      "dependencies": [
+        "t2"
+      ],
+      "attempt": 2,
+      "createdAt": 1787533324237,
+      "updatedAt": 1787535884480,
+      "attemptId": "f68a8d4a-4906-4234-84ce-16c1dbaa43f9",
+      "reassigning": false,
+      "output": "管理端移植完成（pages/admin/moderation 四件套重写）。对接新接口：GET /admin/stats 数据卡（待审内容/待处理举报/用户/帖子/今日新增/通过率）；GET /admin/posts?status= 列表含 pending_review 人工审核队列默认 tab，通过走 PUT /admin/posts/:id/audit {action:'approve'}，驳回弹窗必填 reason；GET /admin/reports?status=（待处理/已处理/全部 chips），条目 camelCase（targetType/targetId/reportCount/revealedAuthor），revealedAuthor 存在时渲染橙色警示条「⚠ 匿名帖已达举报阈值(N人)，作者：昵称(学号)」，处理动作 delete_content/ban_user/dismiss 走 PUT /admin/reports/:id。角色门槛：user.role ∈ {super_admin, section_admin}（globalData/storage userInfo），非管理员弹窗提示并 switchTab 离开。自检：node --check JS 语法通过、moderation.json 合法且开启下拉刷新、empty-state 组件属性核对通过、无旧接口遗留（admin/hide 与 resolve 旧路径已清除）。说明两点：① 后端 admin.ts 实际挂 superAdminRequired（仅超管），前端按任务要求放行两种角色，越权由后端 403 兜底；② reports 分页因 api.js 将响应归一为数组丢失 total，用 list.length≥pageSize 近似 hasMore。"
+    },
+    {
+      "id": "t6",
+      "subject": "轻量后端补充：我的点赞端点 + 意见反馈（表+双端点）",
+      "description": "项目：E:\\校园墙\\api。承接 t1 后的轻量后端补充，为小程序两个页面提供能力：\n\n任务：\n1. 我的点赞：GET /api/users/me/likes（authRequired）——当前用户点赞过的帖子列表，likes(target_type='post') JOIN posts（status='published'），按点赞时间倒序，复用现有 formatPost 与分页形状 {list,total,page,pageSize,hasMore}；注意点赞表无 created_at 排序问题就直接用 likes.created_at\n2. 意见反馈：db.ts 幂等追加 feedback(id, user_id, content TEXT NOT NULL, contact TEXT DEFAULT '', status TEXT DEFAULT 'open', created_at)；POST /api/feedback（authRequired，content 必填≤500字，contact 选填）挂到合适路由文件（可新建 routes/feedback.ts 并在 app.ts 一行挂载）；管理端 GET /api/admin/feedbacks?status= 列表（superAdmin/admin 权限按 admin.ts 现有中间件风格）\n3. ★边界：只动 db.ts（末尾幂等）、app.ts（一行挂载）、新建 routes/feedback.ts、users.ts（加 me/likes 一条路由）；禁碰其他文件\n4. 自验：check/lint 零 error；起服务实测 登录→点赞一帖→me/likes 出现该帖→提交反馈→admin 拉到反馈。JWT_SECRET=dev-secret NODE_ENV=development npx tsx api/server.ts，验完杀进程。卡住先交付遗留项注明并通知队长。\n注意：汇报时若无法调用 agent_teams_update_task，直接把完整结果私信队长，由队长代为补登（上一次就是这样）。",
+      "status": "completed",
+      "assignee": "eng-api",
+      "dependencies": [],
+      "attempt": 1,
+      "createdAt": 1787533962716,
+      "updatedAt": 1787534409834,
+      "attemptId": "ecc4c02c-d110-43ad-b062-c278510a84fa",
+      "reassigning": false,
+      "output": "t6 完成。交付：①GET /api/users/me/likes（authRequired，likes JOIN posts INNER JOIN users，按点赞时间倒序，复用 posts.ts 导出的 formatPost 与 {list,total,page,pageSize,hasMore} 分页形状；收藏状态批量 IN 预加载避免 N+1）；②db.ts 幂等追加 feedback 表(user_id/content/contact/created_at)+created_at 索引；③新文件 api/routes/feedback.ts：POST /api/feedback（authRequired，content 必填≤500字、contact≤100字）；④admin.ts 追加 GET /api/admin/feedbacks（继承 router.use 的 authRequired+superAdminRequired，分页+keyword 搜索内容/联系方式/昵称/学号）；⑤app.ts 挂载 /api/feedback。验证：npm run check 零 error、eslint api 零 error；临时 3101 实例实测——me/likes 返回 total=5 且 liked=true 排序正确、feedback 提交 200/空内容 400、admin/feedbacks 列表字段齐全、普通用户访问 admin 端点 body code=403、未登录提交 body code=401。注意：共享 3001 服务为非 watch 进程，需重启后新端点才生效。"
+    },
+    {
+      "id": "t7",
+      "subject": "接入真实端点：我的点赞 + 意见反馈 + myPosts 值域同步",
+      "description": "项目：E:\\校园墙\\miniprogram。你写的适配层已就位，后端两个端点现已存在，把此前的「即将上线」降级项接成真实现：\n\n任务：\n1. 「我的点赞」页（pages/mine/myLikes）：对接 GET /api/users/me/likes，分页形状 {list,total,page,pageSize,hasMore}，列表项复用 normalizePost 渲染\n2. 意见反馈页（pages/mine/feedback）：表单 content(必填≤500)+contact(选填) → POST /api/feedback；提交成功 toast 并返回\n3. 同步修正 t2 遗留：myPosts 的 status 值域映射按新后端（published/pending/pending_review/rejected/deleted）\n4. 边界：只动上述三页与其引用的 utils 函数；禁碰其他页面\n5. 自验：语法检查 + self-check 清单；完成后私信队长（无团队工具则队长代登）。",
+      "status": "completed",
+      "assignee": "captain",
+      "dependencies": [],
+      "attempt": 3,
+      "createdAt": 1787535258677,
+      "updatedAt": 1787535970911,
+      "reassigning": false,
+      "attemptId": "0edeea54-98d3-479a-9885-d42466230d2c",
+      "output": "队长代 eng-core 补登（attempt_id 113aede1 交付）。①我的点赞页接通 GET /users/me/likes，适配层解锁后页面零改动；②意见反馈页真实提交 POST /feedback {content≤500,contact}，移除「即将上线」拦截与截图上传（后端无 images 字段）；③myPosts tab 值域同步新后端：全部/已发布/审核中(pending+pending_review)/未通过(rejected)，客户端过滤。边界遵守（仅 utils/api.js+两页），语法检查、静态套件连续 3 次 22/23（唯一失败为桌面版遗留 server/app.js 断言）、冒烟 v3 全过。"
+    }
+  ],
+  "taskSeq": 7
+}

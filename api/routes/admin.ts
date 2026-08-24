@@ -6,11 +6,17 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
 import { authRequired, superAdminRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
+import { cacheInvalidate } from '../utils/cache.js';
 
 const router = Router();
 
 // 所有管理后台接口都需要登录 + 超级管理员权限
 router.use(authRequired, superAdminRequired);
+
+// 匿名帖作者身份揭示阈值：对齐「3 人举报提升优先级」机制。
+// posts.ts 在插入新举报前统计 pending 数 >=2 即置 high（第 3 个举报人触发），
+// 等效于帖子累计有效举报数达 3 条，此处用同一口径判断是否向管理端揭示真实作者。
+const REPORT_REVEAL_THRESHOLD = 3;
 
 // ============ 用户管理 ============
 
@@ -59,7 +65,7 @@ router.get('/users', (req, res) => {
 
 // 封禁/解封用户
 router.put('/users/:id/ban', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { action, reason, duration } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);
@@ -88,7 +94,7 @@ router.put('/users/:id/ban', (req, res) => {
 
 // 重置密码
 router.put('/users/:id/reset-password', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) return fail(res, '密码至少6位');
   const hashed = bcrypt.hashSync(newPassword, 10);
@@ -98,7 +104,7 @@ router.put('/users/:id/reset-password', (req, res) => {
 
 // 调整信誉分
 router.put('/users/:id/credit', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { score, reason } = req.body;
   if (typeof score !== 'number') return fail(res, '请输入有效分值');
   const user = db.prepare('SELECT credit_score FROM users WHERE id = ?').get(id) as any;
@@ -169,13 +175,14 @@ router.get('/posts', (req, res) => {
 
 // 审核帖子
 router.put('/posts/:id/audit', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { action, reason } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
   if (action === 'approve') {
     db.prepare("UPDATE posts SET status = 'published' WHERE id = ?").run(id);
+    cacheInvalidate('posts');
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
       post.user_id, 'system', `您发布的帖子「${post.title}」已通过审核`, id
     );
@@ -183,6 +190,7 @@ router.put('/posts/:id/audit', (req, res) => {
   } else if (action === 'reject') {
     if (!reason) return fail(res, '请填写驳回原因');
     db.prepare("UPDATE posts SET status = 'rejected', reject_reason = ? WHERE id = ?").run(reason, id);
+    cacheInvalidate('posts');
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
       post.user_id, 'system', `您发布的帖子「${post.title}」被驳回，原因：${reason}`, id
     );
@@ -194,7 +202,7 @@ router.put('/posts/:id/audit', (req, res) => {
 
 // 设置/取消置顶
 router.put('/posts/:id/top', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { action, topType } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
@@ -206,9 +214,11 @@ router.put('/posts/:id/top', (req, res) => {
       if (globalTopCount.count >= 3) return fail(res, '全局置顶最多3条');
     }
     db.prepare('UPDATE posts SET is_top = 1, top_type = ? WHERE id = ?').run(topType || 'section', id);
+    cacheInvalidate('posts');
     success(res, null, '已设置置顶');
   } else {
     db.prepare('UPDATE posts SET is_top = 0, top_type = \'none\' WHERE id = ?').run(id);
+    cacheInvalidate('posts');
     success(res, null, '已取消置顶');
   }
 });
@@ -255,11 +265,12 @@ router.get('/comments', (req, res) => {
 
 // 删除违规评论
 router.delete('/comments/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
   db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(id);
   db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+  cacheInvalidate('posts');
   success(res, null, '评论已删除');
 });
 
@@ -291,6 +302,16 @@ router.get('/reports', (req, res) => {
   // 获取举报人数
   const list = reports.map((r) => {
     const count = db.prepare("SELECT COUNT(*) as count FROM reports WHERE target_type = ? AND target_id = ? AND status = 'pending'").get(r.target_type, r.target_id) as any;
+    // 可追溯平衡设计：匿名帖有效举报数达阈值时，仅在本管理端接口附加真实作者；
+    // 未达阈值不返回该字段，普通用户侧任何接口零改动、永不泄露
+    let revealedAuthor: { id: any; nickname: any; studentId: any } | undefined;
+    if (r.target_type === 'post' && count.count >= REPORT_REVEAL_THRESHOLD) {
+      const post = db.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?').get(r.target_id) as any;
+      if (post && post.is_anonymous) {
+        const author = db.prepare('SELECT id, nickname, student_id FROM users WHERE id = ?').get(post.user_id) as any;
+        if (author) revealedAuthor = { id: author.id, nickname: author.nickname, studentId: author.student_id };
+      }
+    }
     return {
       id: r.id,
       targetType: r.target_type,
@@ -301,6 +322,7 @@ router.get('/reports', (req, res) => {
       handleResult: r.handle_result,
       reporter: { id: r.reporter_id, nickname: r.reporter_nickname, studentId: r.reporter_student_id },
       reportCount: count.count,
+      ...(revealedAuthor ? { revealedAuthor } : {}),
       createdAt: r.created_at ? new Date(r.created_at).toISOString() : r.created_at,
     };
   });
@@ -310,7 +332,7 @@ router.get('/reports', (req, res) => {
 
 // 处理举报
 router.put('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { action, result } = req.body;
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id) as any;
   if (!report) return fail(res, '举报工单不存在', 404, 404);
@@ -322,12 +344,14 @@ router.put('/reports/:id', (req, res) => {
   if (action === 'delete_content') {
     if (report.target_type === 'post') {
       db.prepare("UPDATE posts SET status = 'deleted' WHERE id = ?").run(report.target_id);
+      cacheInvalidate('posts');
     } else if (report.target_type === 'comment') {
       // 删除评论时同步减少帖子 comment_count，与 comments.ts 删除逻辑保持一致
       const comment = db.prepare('SELECT post_id FROM comments WHERE id = ?').get(report.target_id) as any;
       db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(report.target_id);
       if (comment?.post_id) {
         db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+        cacheInvalidate('posts');
       }
     }
   } else if (action === 'ban_user') {
@@ -372,7 +396,7 @@ router.get('/stats', (_req, res) => {
   const totalComments = db.prepare("SELECT COUNT(*) as count FROM comments WHERE status = 'active'").get() as any;
   const todayComments = db.prepare("SELECT COUNT(*) as count FROM comments WHERE date(created_at) = date('now')").get() as any;
   const pendingReports = db.prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'pending'").get() as any;
-  const pendingPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status = 'pending'").get() as any;
+  const pendingPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status IN ('pending', 'pending_review')").get() as any;
   const approvedPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status = 'published'").get() as any;
   const totalAllPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status IN ('published', 'pending', 'rejected')").get() as any;
   const auditPassRate = totalAllPosts.count > 0 ? Math.round((approvedPosts.count / totalAllPosts.count) * 100) : 100;
@@ -431,7 +455,7 @@ router.post('/sections', (req, res) => {
 });
 
 router.put('/sections/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { name, icon, sort, isActive, forceAnonymous, needAudit } = req.body;
   const section = db.prepare('SELECT * FROM sections WHERE id = ?').get(id) as any;
   if (!section) return fail(res, '板块不存在', 404, 404);
@@ -446,11 +470,57 @@ router.put('/sections/:id', (req, res) => {
 });
 
 router.delete('/sections/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const postCount = db.prepare('SELECT COUNT(*) as count FROM posts WHERE section_id = ? AND status = \'published\'').get(id) as any;
   if (postCount.count > 0) return fail(res, '该板块下还有帖子，不可删除，可停用板块');
   db.prepare('DELETE FROM sections WHERE id = ?').run(id);
   success(res, null, '板块已删除');
 });
 
+// ============ 意见反馈 ============
+
+// 反馈列表（分页，status 过滤 open/closed，keyword 搜内容/联系方式/用户）
+router.get('/feedbacks', (req, res) => {
+  const { keyword, status, page = '1', pageSize = '20' } = req.query;
+  let where = `WHERE 1=1`;
+  const params: any[] = [];
+  if (status) {
+    where += ` AND f.status = ?`;
+    params.push(status);
+  }
+  if (keyword) {
+    where += ` AND (f.content LIKE ? OR f.contact LIKE ? OR u.nickname LIKE ? OR u.student_id LIKE ?)`;
+    params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+  }
+  const p = parseInt(page as string);
+  const ps = parseInt(pageSize as string);
+  const offset = (p - 1) * ps;
+
+  const base = `FROM feedback f LEFT JOIN users u ON f.user_id = u.id ${where}`;
+  const rows = db.prepare(`
+    SELECT f.id, f.content, f.contact, f.status, f.created_at, f.user_id,
+           u.nickname, u.student_id, u.avatar
+    ${base}
+    ORDER BY f.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, ps, offset) as any[];
+
+  const totalRow = db.prepare(`SELECT COUNT(*) as total ${base}`).get(...params) as any;
+
+  const list = rows.map((f) => ({
+    id: f.id,
+    content: f.content,
+    contact: f.contact,
+    status: f.status || 'open',
+    userId: f.user_id,
+    nickname: f.nickname,
+    studentId: f.student_id,
+    avatar: f.avatar,
+    createdAt: f.created_at ? new Date(f.created_at).toISOString() : f.created_at,
+  }));
+
+  success(res, { list, total: totalRow.total, page: p, pageSize: ps });
+});
+
 export default router;
+

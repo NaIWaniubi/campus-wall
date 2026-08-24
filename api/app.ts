@@ -22,6 +22,13 @@ import uploadRoutes from './routes/upload.js'
 import adminRoutes from './routes/admin.js'
 import draftRoutes from './routes/drafts.js'
 import announcementRoutes from './routes/announcements.js'
+import aiRoutes from './routes/ai.js'
+import adminAiRoutes from './routes/adminAi.js'
+import subscriptionRoutes from './routes/subscriptions.js'
+import tradeRoutes from './routes/trades.js'
+import feedbackRoutes from './routes/feedback.js'
+import conversationRoutes from './routes/conversations.js'
+import followRoutes from './routes/follows.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -48,11 +55,11 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // 受控上传文件访问：避免目录遍历/直接列举（替换原 express.static）
-// 校验规则：filename 必须为 <userId>_<timestamp>.<ext>，仅字母数字下划线点，禁止 .. 与路径分隔符，扩展名限 jpg/jpeg/png
 const uploadsDir = path.join(__dirname, '..', 'public', 'uploads')
-const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+\.(jpg|jpeg|png)$/
+// 校验规则：filename 必须为 <userId>_<timestamp>.<ext> 或其缩略图 <原名>.thumb.webp，仅字母数字下划线点，禁止 .. 与路径分隔符
+const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+\.(jpg|jpeg|png)(\.thumb\.webp)?$/
 app.get('/uploads/:file', (req: Request, res: Response) => {
-  const file = req.params.file
+  const file = String(req.params.file)
   if (!UPLOAD_NAME_RE.test(file) || file.includes('..') || file.includes('/') || file.includes('\\')) {
     return res.status(404).json({ code: 404, message: '文件不存在', data: null })
   }
@@ -84,7 +91,15 @@ app.use('/api', sectionRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/drafts', draftRoutes)
 app.use('/api/announcements', announcementRoutes)
+app.use('/api/admin/ai', adminAiRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/ai', aiRoutes)
+app.use('/api/subscriptions', subscriptionRoutes)
+app.use('/api', tradeRoutes)
+app.use('/api/feedback', feedbackRoutes)
+app.use('/api/conversations', conversationRoutes)
+// 关注路由与 users 共用前缀（均为两段以上路径，不与 users.ts 的单段 /:id 冲突）
+app.use('/api/users', followRoutes)
 
 /**
  * 健康检查
@@ -133,3 +148,4 @@ app.use((_req: Request, res: Response) => {
 })
 
 export default app
+

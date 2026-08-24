@@ -1,0 +1,1 @@
+{"id":"4296886c-97de-44a2-8e67-ee01530e2ddc","from":"captain","to":"eng-feed","content":"解锁：t1 后端已交付且队长已真机验证（follow toggle→following:true、follow-status:true、双列表分页正常）。请认领 t3 开工：detail 作者关注按钮 + mine/follows 双 tab 真数据。注意动态取 id，别硬编码。完成私信队长。","ts":1787539319323,"deliveredAt":1787539319360,"readAt":1787539319360}

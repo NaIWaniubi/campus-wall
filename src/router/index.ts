@@ -3,6 +3,7 @@
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { toast } from '@/utils/request'
 
 // 用户端页面
 import HomePage from '@/pages/HomePage.vue'
@@ -16,19 +17,23 @@ import ProfilePage from '@/pages/ProfilePage.vue'
 import MyPostsPage from '@/pages/MyPostsPage.vue'
 import MyCommentsPage from '@/pages/MyCommentsPage.vue'
 import MyFavoritesPage from '@/pages/MyFavoritesPage.vue'
+import MyLikesPage from '@/pages/MyLikesPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
 import DraftsPage from '@/pages/DraftsPage.vue'
 import SectionPage from '@/pages/SectionPage.vue'
 
 // 管理后台页面
 import AdminLoginPage from '@/pages/admin/AdminLoginPage.vue'
-import AdminDashboardPage from '@/pages/admin/AdminDashboardPage.vue'
-import AdminUsersPage from '@/pages/admin/AdminUsersPage.vue'
-import AdminPostsPage from '@/pages/admin/AdminPostsPage.vue'
-import AdminCommentsPage from '@/pages/admin/AdminCommentsPage.vue'
-import AdminReportsPage from '@/pages/admin/AdminReportsPage.vue'
-import AdminSectionsPage from '@/pages/admin/AdminSectionsPage.vue'
-import AdminAnnouncementsPage from '@/pages/admin/AdminAnnouncementsPage.vue'
+import AdminLayout from '@/pages/admin/AdminLayout.vue'
+import DashboardPage from '@/pages/admin/DashboardPage.vue'
+import UsersPage from '@/pages/admin/UsersPage.vue'
+import ContentPage from '@/pages/admin/ContentPage.vue'
+import CommentsPage from '@/pages/admin/CommentsPage.vue'
+import ReportsPage from '@/pages/admin/ReportsPage.vue'
+import SectionsPage from '@/pages/admin/SectionsPage.vue'
+import FeedbacksPage from '@/pages/admin/FeedbacksPage.vue'
+import AnnouncementsPage from '@/pages/admin/AnnouncementsPage.vue'
+import AdminAiPage from '@/pages/admin/AdminAiPage.vue'
 
 const routes = [
   // 用户端
@@ -44,18 +49,28 @@ const routes = [
   { path: '/profile/posts', name: 'myPosts', component: MyPostsPage, meta: { title: '我的帖子', requireAuth: true } },
   { path: '/profile/comments', name: 'myComments', component: MyCommentsPage, meta: { title: '我的评论', requireAuth: true } },
   { path: '/profile/favorites', name: 'myFavorites', component: MyFavoritesPage, meta: { title: '我的收藏', requireAuth: true } },
+  { path: '/my-likes', name: 'myLikes', component: MyLikesPage, meta: { title: '我的点赞', requireAuth: true } },
   { path: '/profile/settings', name: 'settings', component: SettingsPage, meta: { title: '设置', requireAuth: true } },
   { path: '/profile/drafts', name: 'drafts', component: DraftsPage, meta: { title: '草稿箱', requireAuth: true } },
 
   // 管理后台
   { path: '/admin/login', name: 'adminLogin', component: AdminLoginPage, meta: { title: '管理员登录' } },
-  { path: '/admin', name: 'adminDashboard', component: AdminDashboardPage, meta: { title: '数据看板', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/users', name: 'adminUsers', component: AdminUsersPage, meta: { title: '用户管理', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/posts', name: 'adminPosts', component: AdminPostsPage, meta: { title: '内容审核', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/comments', name: 'adminComments', component: AdminCommentsPage, meta: { title: '评论管理', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/reports', name: 'adminReports', component: AdminReportsPage, meta: { title: '举报处理', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/sections', name: 'adminSections', component: AdminSectionsPage, meta: { title: '板块管理', requireAuth: true, requireAdmin: true } },
-  { path: '/admin/announcements', name: 'adminAnnouncements', component: AdminAnnouncementsPage, meta: { title: '公告管理', requireAuth: true, requireAdmin: true } },
+  {
+    path: '/admin',
+    component: AdminLayout,
+    meta: { requireAuth: true, requireAdmin: true },
+    children: [
+      { path: '', name: 'adminDashboard', component: DashboardPage, meta: { title: '数据总览' } },
+      { path: 'posts', name: 'adminPosts', component: ContentPage, meta: { title: '帖子治理' } },
+      { path: 'comments', name: 'adminComments', component: CommentsPage, meta: { title: '评论管理' } },
+      { path: 'reports', name: 'adminReports', component: ReportsPage, meta: { title: '举报处理' } },
+      { path: 'users', name: 'adminUsers', component: UsersPage, meta: { title: '用户管理' } },
+      { path: 'sections', name: 'adminSections', component: SectionsPage, meta: { title: '板块管理' } },
+      { path: 'feedbacks', name: 'adminFeedbacks', component: FeedbacksPage, meta: { title: '意见反馈' } },
+      { path: 'announcements', name: 'adminAnnouncements', component: AnnouncementsPage, meta: { title: '公告管理' } },
+      { path: 'ai', name: 'adminAi', component: AdminAiPage, meta: { title: 'AI 设置' } },
+    ],
+  },
 
   // 403
   { path: '/403', name: 'forbidden', component: () => import('@/pages/ForbiddenPage.vue'), meta: { title: '无权限' } },
@@ -82,7 +97,9 @@ router.beforeEach((to, _from, next) => {
   }
 
   if (to.meta.requireAdmin && !userStore.isAdmin) {
-    next('/403')
+    // 非管理员（角色以登录响应 user.role 为准）访问后台：重定向首页并提示无权限
+    toast.error('无权限访问管理后台')
+    next('/')
     return
   }
 

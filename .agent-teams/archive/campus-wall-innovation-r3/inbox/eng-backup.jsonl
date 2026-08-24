@@ -1,0 +1,1 @@
+{"id":"76471d7d-642b-4d68-9770-df95b0d3c52c","from":"captain","to":"eng-backup","content":"你的任务 t3「SQLite 定时备份轮换」已创建指派给你：agent_teams_claim_task 认领后立即开工。server.ts 归你独占（只允许追加定时器块）。用 better-sqlite3 原生 db.backup() API，零新依赖。任务书含完整要点与实测清单（BACKUP_NOW=1 触发、备份文件可打开、轮换保留 7 份）。完成自跑 check/lint 零 error；卡住先交付代码遗留项注明并通知队长。","ts":1787496636681,"deliveredAt":1787496636705,"readAt":1787496636705}

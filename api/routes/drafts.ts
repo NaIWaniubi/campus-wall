@@ -67,7 +67,7 @@ router.post('/', authRequired, (req, res) => {
 
 // 删除草稿
 router.delete('/:id', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const draft = db.prepare('SELECT * FROM drafts WHERE id = ? AND user_id = ?').get(id, req.currentUser!.id) as any;
   if (!draft) return fail(res, '草稿不存在', 404, 404);
   db.prepare('DELETE FROM drafts WHERE id = ?').run(id);
@@ -81,3 +81,4 @@ router.delete('/', authRequired, (req, res) => {
 });
 
 export default router;
+

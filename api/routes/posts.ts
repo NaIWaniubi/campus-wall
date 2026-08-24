@@ -5,15 +5,18 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
-import { getRiskLevel } from '../utils/sensitive.js';
+import { assessRisk } from '../utils/sensitive.js';
 import { upsertNotification } from '../utils/notification.js';
+import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
+import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
 
 const router = Router();
 
 /**
  * 格式化帖子对象（带作者、板块、互动状态）
+ * 导出供「我的点赞」等个人列表复用（无循环依赖）
  */
-function formatPost(
+export function formatPost(
   post: any,
   currentUserId?: number,
   likedMap?: Map<number, boolean>,
@@ -21,13 +24,15 @@ function formatPost(
 ) {
   let author: any;
   if (post.is_anonymous) {
-    author = { id: 0, nickname: '匿名用户', avatar: '', college: '' };
+    // 匿名帖作者信誉分置 null（前端据此不显示徽章）
+    author = { id: 0, nickname: '匿名用户', avatar: '', college: '', creditScore: null };
   } else {
     author = {
       id: post.author_id,
       nickname: post.author_nickname,
       avatar: post.author_avatar,
       college: post.author_college,
+      creditScore: post.author_credit_score,
     };
   }
 
@@ -52,6 +57,8 @@ function formatPost(
     title: post.title,
     content: post.content,
     images: JSON.parse(post.images || '[]'),
+    // 每张图对应的服务端缩略图地址（旧图可能不存在，前端加载失败时回退原图）
+    thumbImages: (JSON.parse(post.images || '[]') as string[]).map((u) => `${u}.thumb.webp`),
     isAnonymous: !!post.is_anonymous,
     status: post.status,
     isTop: !!post.is_top,
@@ -79,7 +86,8 @@ router.get('/', authOptional, (req, res) => {
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId as string) : 0;
   const keyword = (req.query.keyword as string) || '';
-  const sort = (req.query.sort as string) || 'new';
+  // 排序：hot（默认，HN 风格热度）/ new（时间倒序）；price_* 为交易板块专用
+  const sort = (req.query.sort as string) || 'hot';
   // 交易/失物筛选项（全局执行，优于客户端二次排序）
   const priceRange = (req.query.priceRange as string) || '';   // 形如 "0-100" / "100-500" / "500-"
   const timeRange = (req.query.timeRange as string) || '';     // 形如 "1" / "7" / "30"（天）
@@ -127,33 +135,75 @@ router.get('/', authOptional, (req, res) => {
       params.push(val);
     }
   }
+  // 失物方向筛选：仅当目标板块为失物招领类时生效（lost=丢失 / found=拾到）
+  const direction = (req.query.direction as string) || '';
+  let directionApplied = '';
+  if ((direction === 'lost' || direction === 'found') && sectionId > 0) {
+    const sec = db.prepare('SELECT name FROM sections WHERE id = ?').get(sectionId) as any;
+    if (sec && isLostFoundSection(sec.name)) {
+      where += ` AND json_extract(p.extra_fields, '$.direction') = ?`;
+      params.push(direction);
+      directionApplied = direction;
+    }
+  }
 
   const offset = (page - 1) * pageSize;
 
   // top_type 排序：global(全局) 应排在 section(板块) 之前；按字母倒序会导致 section>none>global，错误
   // 使用 CASE 显式指定优先级：global=2, section=1, none=0
   const topTypeOrder = `CASE p.top_type WHEN 'global' THEN 2 WHEN 'section' THEN 1 ELSE 0 END DESC`;
+  // 热度得分（HN 公式改造）：(点赞×2 + 评论×3) / (帖子年龄小时数+2)^1.5，
+  // 发布 ≤30 分钟的帖子得分 ×1.5 冷启动加权（新内容有曝光窗口）；年龄钳制为非负
+  const hotScoreSql = `
+    (
+      (p.like_count * 2.0 + p.comment_count * 3.0)
+      / POW(MAX((julianday('now') - julianday(p.created_at)) * 24.0, 0) + 2, 1.5)
+    ) * CASE WHEN (julianday('now') - julianday(p.created_at)) * 1440.0 <= 30 THEN 1.5 ELSE 1.0 END
+  `;
   // 价格排序（交易板块）
   const orderBy =
     sort === 'price_asc' ? `ORDER BY p.is_top DESC, ${topTypeOrder}, CAST(json_extract(p.extra_fields, '$.price') AS REAL) ASC, p.created_at DESC`
     : sort === 'price_desc' ? `ORDER BY p.is_top DESC, ${topTypeOrder}, CAST(json_extract(p.extra_fields, '$.price') AS REAL) DESC, p.created_at DESC`
-    : sort === 'hot'
-      ? `ORDER BY p.is_top DESC, ${topTypeOrder}, (p.like_count + p.comment_count * 2 + p.view_count / 10) DESC, p.created_at DESC`
-      : `ORDER BY p.is_top DESC, ${topTypeOrder}, p.created_at DESC`;
+    : sort === 'new'
+      ? `ORDER BY p.is_top DESC, ${topTypeOrder}, p.created_at DESC`
+      : /* hot（默认） */ `ORDER BY p.is_top DESC, ${topTypeOrder}, (${hotScoreSql}) DESC, p.created_at DESC`;
 
-  const posts = db.prepare(`
-    SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college,
-           s.name as section_name, s.icon as section_icon
-    FROM posts p
-    INNER JOIN users u ON p.user_id = u.id
-    LEFT JOIN sections s ON p.section_id = s.id
-    ${where}
-    ${orderBy}
-    LIMIT ? OFFSET ?
-  `).all(...params, pageSize, offset) as any[];
+  // 读缓存（读写比约 100:1）：以全部查询参数为 key 缓存原始查询行。
+  // 注意只缓存 DB 行，formatPost 与 liked/favorited/isMine 等用户态在缓存后按请求现算，
+  // 避免个人数据串号；任何帖子写入路径成功后统一 cacheInvalidate('posts') 前缀失效。
+  const cacheKey = [
+    'posts',
+    `sort=${sort}`, `page=${page}`, `pageSize=${pageSize}`,
+    `sectionId=${sectionId}`, `keyword=${keyword}`,
+    `priceRange=${priceRange}`, `timeRange=${timeRange}`, `subType=${subType}`,
+    `direction=${directionApplied}`,
+  ].join(':');
 
-  // 使用 INNER JOIN 避免在 LEFT JOIN 后用 `u.status != 'banned'` 过滤时 NULL 行为不一致
-  const totalRow = db.prepare(`SELECT COUNT(*) as total FROM posts p INNER JOIN users u ON p.user_id = u.id ${where}`).get(...params) as any;
+  let posts: any[];
+  let total: number;
+  const cachedRows = cacheGet<{ rows: any[]; total: number }>(cacheKey);
+  if (cachedRows) {
+    res.setHeader('X-Cache', 'HIT');
+    posts = cachedRows.rows;
+    total = cachedRows.total;
+  } else {
+    res.setHeader('X-Cache', 'MISS');
+    posts = db.prepare(`
+      SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college, u.credit_score as author_credit_score,
+             s.name as section_name, s.icon as section_icon
+      FROM posts p
+      INNER JOIN users u ON p.user_id = u.id
+      LEFT JOIN sections s ON p.section_id = s.id
+      ${where}
+      ${orderBy}
+      LIMIT ? OFFSET ?
+    `).all(...params, pageSize, offset) as any[];
+
+    // 使用 INNER JOIN 避免在 LEFT JOIN 后用 `u.status != 'banned'` 过滤时 NULL 行为不一致
+    total = (db.prepare(`SELECT COUNT(*) as total FROM posts p INNER JOIN users u ON p.user_id = u.id ${where}`).get(...params) as any).total;
+
+    cacheSet(cacheKey, { rows: posts, total });
+  }
 
   // 批量预加载当前用户对这批帖子的点赞/收藏状态，消除 N+1（原 2N 次单查 -> 2 次 IN 查询）
   const likedMap = new Map<number, boolean>();
@@ -175,20 +225,37 @@ router.get('/', authOptional, (req, res) => {
 
   success(res, {
     list,
-    total: totalRow.total,
+    total,
     page,
     pageSize,
-    hasMore: offset + pageSize < totalRow.total,
+    hasMore: offset + pageSize < total,
   });
+});
+
+// 失物招领智能匹配：返回该帖在失物/招领类板块下的相似候选帖列表
+router.get('/:id/matches', authOptional, (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, '帖子不存在', 404, 404);
+
+  const post = db.prepare(`
+    SELECT p.id, p.user_id, p.title, p.content, s.name AS section_name
+    FROM posts p LEFT JOIN sections s ON p.section_id = s.id
+    WHERE p.id = ? AND p.status = 'published'
+  `).get(id) as any;
+  if (!post) return fail(res, '帖子不存在', 404, 404);
+  if (!isLostFoundSection(post.section_name)) return success(res, []);
+
+  const matches = findLostFoundMatches(post).map(formatMatch);
+  success(res, matches);
 });
 
 // 帖子详情
 router.get('/:id', authOptional, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   if (!id) return fail(res, '帖子不存在', 404, 404);
 
   const post = db.prepare(`
-    SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college,
+    SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college, u.credit_score as author_credit_score,
            s.name as section_name, s.icon as section_icon
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
@@ -242,18 +309,23 @@ router.post('/', authRequired, (req, res) => {
     return fail(res, `今日发帖已达上限(${limit}条)`);
   }
 
-  // 敏感词检测
-  const riskLevel = getRiskLevel(title + ' ' + content);
+  // 敏感词风险分级：review→人工审核队列(pending_review)；warn→放行但标记 risk_flag；pass→直接过
+  const risk = assessRisk(title, content);
   let status = 'published';
-  if (riskLevel === 'reject') {
-    return fail(res, '内容包含违规信息，请修改后重试');
-  }
-  if (riskLevel === 'review' || section.need_audit) {
+  if (risk.level === 'review') {
+    status = 'pending_review';
+  } else if (section.need_audit) {
     status = 'pending';
   }
 
   const imgs = Array.isArray(images) ? images.slice(0, 9) : [];
-  const extra = extraFields || {};
+  const extra = (extraFields && typeof extraFields === 'object' && !Array.isArray(extraFields))
+    ? { ...extraFields }
+    : {};
+  // 中风险标记（最小侵入：写入 extra_fields，前端 PostCard 无需改动）
+  if (risk.level === 'warn') {
+    extra.riskFlag = { level: 'warn', hits: risk.hits };
+  }
 
   const result = db.prepare(`
     INSERT INTO posts (user_id, section_id, title, content, images, is_anonymous, status, extra_fields)
@@ -270,11 +342,31 @@ router.post('/', authRequired, (req, res) => {
   );
 
   const postId = result.lastInsertRowid as number;
+  cacheInvalidate('posts');
+
+  // 失物招领智能匹配：发布成功后检索相似候选帖并双向站内通知（失败不影响发帖主流程）
+  let matchedCount = 0;
+  if (status === 'published') {
+    try {
+      const newPost = { id: postId, user_id: req.currentUser!.id, title: title.trim(), content };
+      const matches = findLostFoundMatches(newPost);
+      if (matches.length) {
+        notifyLostFoundMatch(newPost, matches);
+        matchedCount = matches.length;
+      }
+    } catch (err: any) {
+      console.error('失物招领匹配失败:', err?.message);
+    }
+  }
 
   if (status === 'published') {
     // 发送系统消息
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
       req.currentUser!.id, 'system', '您发布的帖子已通过审核并展示', postId
+    );
+  } else if (status === 'pending_review') {
+    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
+      req.currentUser!.id, 'system', '您发布的帖子内容待人工审核，请耐心等待', postId
     );
   } else {
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
@@ -282,18 +374,20 @@ router.post('/', authRequired, (req, res) => {
     );
   }
 
-  success(res, { id: postId, status }, status === 'published' ? '发布成功' : '发布成功，内容正在审核中');
+  success(res, { id: postId, status, matchedCount }, status === 'published' ? '发布成功'
+    : status === 'pending_review' ? '内容待审核，请等待管理员审核'
+    : '发布成功，内容正在审核中');
 });
 
 // 编辑帖子（24小时内可编辑1次）
 router.put('/:id', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { title, content, images, isAnonymous, extraFields } = req.body;
 
-  // extraFields 扩展键白名单（校园墙业务字段，取前端与 routes 并集）
+  // extraFields 扩展键白名单（校园墙业务字段，取前端与 routes 并集；direction=失物方向，缺失会在编辑时剥掉导致帖子从双 tab 消失）
   const EXTRA_FIELD_WHITELIST = [
     'price', 'contact', 'location', 'tradeType',
-    'condition', 'time', 'itemType', 'organizer',
+    'condition', 'time', 'itemType', 'organizer', 'direction',
   ];
   const MAX_EXTRA_VALUE_LEN = 200;
 
@@ -321,21 +415,29 @@ router.put('/:id', authRequired, (req, res) => {
   const hoursDiff = (Date.now() - new Date(post.created_at).getTime()) / (1000 * 60 * 60);
   if (hoursDiff > 24) return fail(res, '发布超过24小时，不可编辑');
 
-  const riskLevel = getRiskLevel((title || '') + ' ' + (content || ''));
-  if (riskLevel === 'reject') return fail(res, '内容包含违规信息');
+  // 风险分级与发布路由保持一致：review→人工审核队列；warn→放行但刷新标记
+  const risk = assessRisk(title || '', content || '');
 
   // status 始终由服务端规则推导，禁止客户端修改（防止越权改状态）
   const section = db.prepare('SELECT * FROM sections WHERE id = ?').get(post.section_id) as any;
   let status = post.status === 'published' ? 'published' : 'pending';
-  if (riskLevel === 'review' || (section && section.need_audit)) {
+  if (risk.level === 'review') {
+    status = 'pending_review';
+  } else if (section && section.need_audit) {
     status = 'pending';
   }
 
-  // extraFields 经白名单校验清洗后再入库；缺省时保留原值
+  // extraFields 合并语义：请求键（过白名单后）覆盖库中现有键，未传的现有键保留
+  // （否则编辑漏带 direction 等扩展键会被整体抹除，帖子从对应筛选 tab 消失）
   const sanitizedExtra = sanitizeExtraFields(extraFields);
-  const finalExtra = Object.keys(sanitizedExtra).length
-    ? sanitizedExtra
-    : JSON.parse(post.extra_fields || '{}');
+  const existingExtra = JSON.parse(post.extra_fields || '{}');
+  const finalExtra = { ...existingExtra, ...sanitizedExtra };
+  // 风险标记跟随最新内容重建（白名单会剥离旧标记）
+  if (risk.level === 'warn') {
+    finalExtra.riskFlag = { level: 'warn', hits: risk.hits };
+  } else {
+    delete finalExtra.riskFlag;
+  }
 
   db.prepare(`
     UPDATE posts SET title = ?, content = ?, images = ?, is_anonymous = ?, extra_fields = ?, status = ?, updated_at = CURRENT_TIMESTAMP
@@ -349,13 +451,14 @@ router.put('/:id', authRequired, (req, res) => {
     status,
     id
   );
+  cacheInvalidate('posts');
 
   success(res, { id, status }, '编辑成功');
 });
 
 // 删除帖子（软删除）
 router.delete('/:id', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
@@ -364,12 +467,13 @@ router.delete('/:id', authRequired, (req, res) => {
   }
 
   db.prepare("UPDATE posts SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+  cacheInvalidate('posts');
   success(res, null, '删除成功');
 });
 
 // 点赞/取消点赞
 router.post('/:id/like', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ? AND status = \'published\'').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
@@ -377,10 +481,12 @@ router.post('/:id/like', authRequired, (req, res) => {
   if (exist) {
     db.prepare('DELETE FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').run(req.currentUser!.id, 'post', id);
     db.prepare('UPDATE posts SET like_count = MAX(0, like_count - 1) WHERE id = ?').run(id);
+    cacheInvalidate('posts');
     success(res, { liked: false, likeCount: post.like_count - 1 }, '已取消点赞');
   } else {
     db.prepare('INSERT INTO likes (user_id, target_type, target_id) VALUES (?, ?, ?)').run(req.currentUser!.id, 'post', id);
     db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').run(id);
+    cacheInvalidate('posts');
     // 通知作者（去重：同人对同帖 7 天内反复点赞只更新一条）
     if (post.user_id !== req.currentUser!.id) {
       upsertNotification(
@@ -393,7 +499,7 @@ router.post('/:id/like', authRequired, (req, res) => {
 
 // 收藏/取消收藏
 router.post('/:id/favorite', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ? AND status = \'published\'').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
@@ -401,17 +507,19 @@ router.post('/:id/favorite', authRequired, (req, res) => {
   if (exist) {
     db.prepare('DELETE FROM favorites WHERE user_id = ? AND post_id = ?').run(req.currentUser!.id, id);
     db.prepare('UPDATE posts SET favorite_count = MAX(0, favorite_count - 1) WHERE id = ?').run(id);
+    cacheInvalidate('posts');
     success(res, { favorited: false, favoriteCount: post.favorite_count - 1 }, '已取消收藏');
   } else {
     db.prepare('INSERT INTO favorites (user_id, post_id) VALUES (?, ?)').run(req.currentUser!.id, id);
     db.prepare('UPDATE posts SET favorite_count = favorite_count + 1 WHERE id = ?').run(id);
+    cacheInvalidate('posts');
     success(res, { favorited: true, favoriteCount: post.favorite_count + 1 }, '收藏成功');
   }
 });
 
 // 举报帖子
 router.post('/:id/report', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { reason } = req.body;
   if (!reason) return fail(res, '请选择举报原因');
 
@@ -437,3 +545,4 @@ router.post('/:id/report', authRequired, (req, res) => {
 });
 
 export default router;
+

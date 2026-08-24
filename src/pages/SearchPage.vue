@@ -5,7 +5,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Ref } from 'vue'
-import { ArrowLeft, Search, X, Clock, Flame } from 'lucide-vue-next'
+import { ArrowLeft, Search, X, Clock, Flame } from '@lucide/vue'
 import { sectionApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
@@ -182,3 +182,4 @@ onMounted(async () => {
     </main>
   </div>
 </template>
+

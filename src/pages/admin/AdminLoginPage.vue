@@ -4,7 +4,7 @@
  */
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Shield, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { Shield, Eye, EyeOff, Loader2 } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
@@ -103,3 +103,4 @@ async function handleSubmit() {
     </div>
   </div>
 </template>
+

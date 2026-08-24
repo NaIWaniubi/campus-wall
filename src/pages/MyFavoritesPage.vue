@@ -4,7 +4,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft } from '@lucide/vue'
 import { userApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -57,3 +57,4 @@ onMounted(load)
     </main>
   </div>
 </template>
+

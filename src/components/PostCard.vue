@@ -4,8 +4,9 @@
  */
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { MessageCircle, Heart, Eye, Bookmark } from 'lucide-vue-next'
+import { MessageCircle, Heart, Eye, Bookmark } from '@lucide/vue'
 import { formatTime } from '@/utils/helpers'
+import CreditBadge from '@/components/CreditBadge.vue'
 
 const props = defineProps<{
   post: any
@@ -17,6 +18,13 @@ const router = useRouter()
 const author = computed(() => props.post.author || {})
 const section = computed(() => props.post.section || {})
 const images = computed(() => props.post.images || [])
+const thumbs = computed(() => props.post.thumbImages || [])
+
+// 缩略图加载失败（旧图未生成缩略图）时回退原图
+function onThumbError(e: Event, fallback: string) {
+  const el = e.target as HTMLImageElement
+  if (el.src.endsWith('.thumb.webp')) el.src = fallback
+}
 
 function goDetail() {
   router.push(`/post/${props.post.id}`)
@@ -50,6 +58,7 @@ function highlight(text: string): string {
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-1.5">
           <span class="text-sm font-semibold text-zinc-900 truncate">{{ author.nickname || '匿名用户' }}</span>
+          <CreditBadge v-if="!post.isAnonymous && author.creditScore != null" :score="author.creditScore" size="sm" />
           <span v-if="post.isTop" class="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-medium border border-red-100">置顶</span>
         </div>
         <div class="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5">
@@ -69,7 +78,7 @@ function highlight(text: string): string {
     <!-- 图片 -->
     <div v-if="images.length > 0" class="grid grid-cols-3 gap-1.5 mb-3">
       <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="aspect-square rounded-lg overflow-hidden bg-zinc-100 relative">
-        <img :src="img" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" alt="" />
+        <img :src="thumbs[i] || img" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" alt="" @error="onThumbError($event, img)" />
         <!-- 第三张上叠加 +N 提示还有更多图片 -->
         <div v-if="i === 2 && images.length > 3" class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-medium text-lg">
           +{{ images.length - 3 }}
@@ -103,3 +112,4 @@ function highlight(text: string): string {
     </div>
   </div>
 </template>
+

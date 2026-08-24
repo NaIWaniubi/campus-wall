@@ -4,7 +4,7 @@
  */
 import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Eye, EyeOff, Loader2, GraduationCap } from 'lucide-vue-next'
+import { ArrowLeft, Eye, EyeOff, Loader2, GraduationCap } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
@@ -153,3 +153,4 @@ async function handleSubmit() {
     </div>
   </div>
 </template>
+

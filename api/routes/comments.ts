@@ -7,6 +7,7 @@ import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
 import { upsertNotification } from '../utils/notification.js';
+import { cacheInvalidate } from '../utils/cache.js';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ function formatComment(comment: any, currentUserId?: number) {
 
 // 评论列表
 router.get('/posts/:id/comments', authOptional, (req, res) => {
-  const postId = parseInt(req.params.id);
+  const postId = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
@@ -73,7 +74,7 @@ router.get('/posts/:id/comments', authOptional, (req, res) => {
 
 // 发布评论
 router.post('/posts/:id/comments', authRequired, (req, res) => {
-  const postId = parseInt(req.params.id);
+  const postId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 
   if (!content || !content.trim()) return fail(res, '评论内容不能为空');
@@ -109,6 +110,7 @@ router.post('/posts/:id/comments', authRequired, (req, res) => {
 
   const commentId = result.lastInsertRowid as number;
   db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(postId);
+  cacheInvalidate('posts');
 
   // 通知作者（去重）
   if (post.user_id !== req.currentUser!.id) {
@@ -127,7 +129,7 @@ router.post('/posts/:id/comments', authRequired, (req, res) => {
 
 // 楼中楼回复
 router.post('/comments/:id/reply', authRequired, (req, res) => {
-  const commentId = parseInt(req.params.id);
+  const commentId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 
   if (!content || !content.trim()) return fail(res, '回复内容不能为空');
@@ -150,6 +152,7 @@ router.post('/comments/:id/reply', authRequired, (req, res) => {
   `).run(parent.post_id, req.currentUser!.id, commentId, content.trim(), anonymous);
 
   const replyId = result.lastInsertRowid as number;
+  cacheInvalidate('posts'); // 评论写路径统一失效（当前回复不改 comment_count，防御性保险）
 
   // 通知被回复者（去重）
   if (parent.user_id !== req.currentUser!.id) {
@@ -168,7 +171,7 @@ router.post('/comments/:id/reply', authRequired, (req, res) => {
 
 // 删除评论
 router.delete('/comments/:id', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
 
@@ -180,13 +183,14 @@ router.delete('/comments/:id', authRequired, (req, res) => {
 
   db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(id);
   db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+  cacheInvalidate('posts');
 
   success(res, null, '删除成功');
 });
 
 // 点赞评论
 router.post('/comments/:id/like', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
 
@@ -204,7 +208,7 @@ router.post('/comments/:id/like', authRequired, (req, res) => {
 
 // 举报评论
 router.post('/comments/:id/report', authRequired, (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const { reason } = req.body;
   if (!reason) return fail(res, '请选择举报原因');
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
@@ -227,3 +231,4 @@ router.post('/comments/:id/report', authRequired, (req, res) => {
 });
 
 export default router;
+

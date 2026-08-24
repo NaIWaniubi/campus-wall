@@ -4,7 +4,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Trash2 } from '@lucide/vue'
 import { userApi, postApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -110,3 +110,4 @@ onMounted(load)
       @confirm="confirmDelete" @cancel="showDelete = false" />
   </div>
 </template>
+

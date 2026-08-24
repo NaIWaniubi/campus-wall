@@ -5,12 +5,13 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
+import { formatPost } from './posts.js';
 
 const router = Router();
 
 // 用户公开信息
 router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
   const user = db.prepare('SELECT id, nickname, avatar, college, grade, signature, credit_score, created_at FROM users WHERE id = ? AND status != \'banned\'').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);
   success(res, { ...user, created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at });
@@ -129,4 +130,50 @@ router.get('/me/favorites', authRequired, (req, res) => {
   success(res, list);
 });
 
+// 我点赞过的帖子（likes JOIN posts，复用 formatPost 与帖子列表分页形状）
+router.get('/me/likes', authRequired, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+  const uid = req.currentUser!.id;
+  const offset = (page - 1) * pageSize;
+
+  const where = `WHERE l.user_id = ? AND l.target_type = 'post' AND p.status = 'published'`;
+  const base = `
+    FROM likes l
+    INNER JOIN posts p ON l.target_id = p.id
+    INNER JOIN users u ON p.user_id = u.id
+    LEFT JOIN sections s ON p.section_id = s.id`;
+
+  const rows = db.prepare(`
+    SELECT p.*, u.nickname as author_nickname, u.avatar as author_avatar,
+           u.college as author_college, u.credit_score as author_credit_score,
+           s.name as section_name, s.icon as section_icon
+    ${base} ${where}
+    ORDER BY l.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(uid, pageSize, offset) as any[];
+
+  const total = (db.prepare(`SELECT COUNT(*) as total ${base} ${where}`).get(uid) as any).total;
+
+  // 本列表全部为已点赞；收藏状态批量预加载避免 N+1
+  const likedMap = new Map<number, boolean>(rows.map((r) => [r.id, true]));
+  const favoritedMap = new Map<number, boolean>();
+  if (rows.length > 0) {
+    const placeholders = rows.map(() => '?').join(',');
+    const favRows = db.prepare(
+      `SELECT post_id FROM favorites WHERE user_id = ? AND post_id IN (${placeholders})`
+    ).all(uid, ...rows.map((r) => r.id)) as any[];
+    favRows.forEach((f) => favoritedMap.set(f.post_id, true));
+  }
+
+  success(res, {
+    list: rows.map((p) => formatPost(p, uid, likedMap, favoritedMap)),
+    total,
+    page,
+    pageSize,
+    hasMore: offset + pageSize < total,
+  });
+});
+
 export default router;
+

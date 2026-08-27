@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 首页：板块Tab + 帖子信息流 + 下拉刷新 + 上拉加载
+ * A-T3 虚拟滚动：默认 useVirtual=true 走 IntersectionObserver；可关退回 window scroll
  */
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -9,6 +10,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, subscriptionApi } from '@/utils/api'
 import { toast } from '@/utils/request'
+import { useVirtualList } from '@/composables/useVirtualList'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -131,6 +133,16 @@ function onScroll() {
   }
 }
 
+// A-T3 虚拟滚动（降级版：IntersectionObserver 哨兵触底自动加载）
+// 开关默认开；如出现兼容问题可临时改 false 退回 window scroll 监听
+const useVirtual = ref(true)
+const { sentinelRef } = useVirtualList({
+  isLoading: () => loadingMore.value || loading.value,
+  hasMore: () => hasMore.value,
+  onLoad: () => loadList(false),
+  rootMargin: '200px',
+})
+
 function goPublish() {
   if (!userStore.isLoggedIn) {
     router.push({ path: '/login', query: { redirect: '/publish' } })
@@ -168,7 +180,7 @@ function goMessage() {
 }
 
 onMounted(() => {
-  window.addEventListener('scroll', onScroll)
+  if (!useVirtual.value) window.addEventListener('scroll', onScroll)
   if (!appStore.sections.length) appStore.fetchSections()
   loadList(true)
   loadSubscriptions()
@@ -259,6 +271,8 @@ onUnmounted(() => {
           action-text="去发布"
           @action="goPublish"
         />
+        <!-- A-T3 虚拟滚动哨兵：进入视口 → 触发 loadList(false) -->
+        <div v-if="useVirtual && hasMore" ref="sentinelRef" class="h-1" aria-hidden="true" />
       </template>
     </main>
 

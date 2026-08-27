@@ -4,6 +4,7 @@
 import app from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';
 import { runBackup, countBackups } from './jobs/backup.js';
+import { attachWebSocket } from './ws/server.js';
 
 /**
  * start server with port
@@ -13,6 +14,11 @@ const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, () => {
   console.log(`Server ready on port ${PORT}`);
 });
+
+// 挂 WebSocket（路径 /ws）；REST 路由不受影响
+if (process.env.WS_ENABLED !== '0') {
+  attachWebSocket(server);
+}
 
 /**
  * 每日板块摘要定时触发：

@@ -5,57 +5,37 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
-// 用户端页面
+// 用户端页面（首屏相关保持静态，其余路由级懒分包）
 import HomePage from '@/pages/HomePage.vue'
 import LoginPage from '@/pages/LoginPage.vue'
 import RegisterPage from '@/pages/RegisterPage.vue'
-import SearchPage from '@/pages/SearchPage.vue'
-import PostDetailPage from '@/pages/PostDetailPage.vue'
-import PublishPage from '@/pages/PublishPage.vue'
-import MessagePage from '@/pages/MessagePage.vue'
 import ProfilePage from '@/pages/ProfilePage.vue'
-import MyPostsPage from '@/pages/MyPostsPage.vue'
-import MyCommentsPage from '@/pages/MyCommentsPage.vue'
-import MyFavoritesPage from '@/pages/MyFavoritesPage.vue'
-import MyLikesPage from '@/pages/MyLikesPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
-import DraftsPage from '@/pages/DraftsPage.vue'
 import SectionPage from '@/pages/SectionPage.vue'
-import UserProfilePage from '@/pages/UserProfilePage.vue'
-import MySubscriptionsPage from '@/pages/MySubscriptionsPage.vue'
 
-// 管理后台页面
+// 管理后台（首屏 AdminLogin + Layout 静态，子页全动态）
 import AdminLoginPage from '@/pages/admin/AdminLoginPage.vue'
 import AdminLayout from '@/pages/admin/AdminLayout.vue'
-import DashboardPage from '@/pages/admin/DashboardPage.vue'
-import UsersPage from '@/pages/admin/UsersPage.vue'
-import ContentPage from '@/pages/admin/ContentPage.vue'
-import CommentsPage from '@/pages/admin/CommentsPage.vue'
-import ReportsPage from '@/pages/admin/ReportsPage.vue'
-import SectionsPage from '@/pages/admin/SectionsPage.vue'
-import FeedbacksPage from '@/pages/admin/FeedbacksPage.vue'
-import AnnouncementsPage from '@/pages/admin/AnnouncementsPage.vue'
-import AdminAiPage from '@/pages/admin/AdminAiPage.vue'
 
 const routes = [
   // 用户端
   { path: '/', name: 'home', component: HomePage, meta: { title: '校园墙' } },
   { path: '/login', name: 'login', component: LoginPage, meta: { title: '登录' } },
   { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册' } },
-  { path: '/search', name: 'search', component: SearchPage, meta: { title: '搜索' } },
-  { path: '/post/:id', name: 'postDetail', component: PostDetailPage, meta: { title: '帖子详情' } },
-  { path: '/user/:id', name: 'userProfile', component: UserProfilePage, meta: { title: '个人主页' } },
+  { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue'), meta: { title: '搜索' } },
+  { path: '/post/:id', name: 'postDetail', component: () => import('@/pages/PostDetailPage.vue'), meta: { title: '帖子详情' } },
+  { path: '/user/:id', name: 'userProfile', component: () => import('@/pages/UserProfilePage.vue'), meta: { title: '个人主页' } },
   { path: '/section/:id', name: 'section', component: SectionPage, meta: { title: '板块' } },
-  { path: '/publish', name: 'publish', component: PublishPage, meta: { title: '发布', requireAuth: true } },
-  { path: '/message', name: 'message', component: MessagePage, meta: { title: '消息', requireAuth: true } },
+  { path: '/publish', name: 'publish', component: () => import('@/pages/PublishPage.vue'), meta: { title: '发布', requireAuth: true } },
+  { path: '/message', name: 'message', component: () => import('@/pages/MessagePage.vue'), meta: { title: '消息', requireAuth: true } },
   { path: '/profile', name: 'profile', component: ProfilePage, meta: { title: '我的', requireAuth: true } },
-  { path: '/profile/posts', name: 'myPosts', component: MyPostsPage, meta: { title: '我的帖子', requireAuth: true } },
-  { path: '/profile/comments', name: 'myComments', component: MyCommentsPage, meta: { title: '我的评论', requireAuth: true } },
-  { path: '/profile/favorites', name: 'myFavorites', component: MyFavoritesPage, meta: { title: '我的收藏', requireAuth: true } },
-  { path: '/my-likes', name: 'myLikes', component: MyLikesPage, meta: { title: '我的点赞', requireAuth: true } },
+  { path: '/profile/posts', name: 'myPosts', component: () => import('@/pages/MyPostsPage.vue'), meta: { title: '我的帖子', requireAuth: true } },
+  { path: '/profile/comments', name: 'myComments', component: () => import('@/pages/MyCommentsPage.vue'), meta: { title: '我的评论', requireAuth: true } },
+  { path: '/profile/favorites', name: 'myFavorites', component: () => import('@/pages/MyFavoritesPage.vue'), meta: { title: '我的收藏', requireAuth: true } },
+  { path: '/my-likes', name: 'myLikes', component: () => import('@/pages/MyLikesPage.vue'), meta: { title: '我的点赞', requireAuth: true } },
   { path: '/profile/settings', name: 'settings', component: SettingsPage, meta: { title: '设置', requireAuth: true } },
-  { path: '/profile/drafts', name: 'drafts', component: DraftsPage, meta: { title: '草稿箱', requireAuth: true } },
-  { path: '/profile/subscriptions', name: 'mySubscriptions', component: MySubscriptionsPage, meta: { title: '我的订阅', requireAuth: true } },
+  { path: '/profile/drafts', name: 'drafts', component: () => import('@/pages/DraftsPage.vue'), meta: { title: '草稿箱', requireAuth: true } },
+  { path: '/profile/subscriptions', name: 'mySubscriptions', component: () => import('@/pages/MySubscriptionsPage.vue'), meta: { title: '我的订阅', requireAuth: true } },
 
   // 管理后台
   { path: '/admin/login', name: 'adminLogin', component: AdminLoginPage, meta: { title: '管理员登录' } },
@@ -64,15 +44,15 @@ const routes = [
     component: AdminLayout,
     meta: { requireAuth: true, requireAdmin: true },
     children: [
-      { path: '', name: 'adminDashboard', component: DashboardPage, meta: { title: '数据总览', superOnly: true } },
-      { path: 'posts', name: 'adminPosts', component: ContentPage, meta: { title: '帖子治理' } },
-      { path: 'comments', name: 'adminComments', component: CommentsPage, meta: { title: '评论管理' } },
-      { path: 'reports', name: 'adminReports', component: ReportsPage, meta: { title: '举报处理' } },
-      { path: 'users', name: 'adminUsers', component: UsersPage, meta: { title: '用户管理', superOnly: true } },
-      { path: 'sections', name: 'adminSections', component: SectionsPage, meta: { title: '板块管理', superOnly: true } },
-      { path: 'feedbacks', name: 'adminFeedbacks', component: FeedbacksPage, meta: { title: '意见反馈', superOnly: true } },
-      { path: 'announcements', name: 'adminAnnouncements', component: AnnouncementsPage, meta: { title: '公告管理', superOnly: true } },
-      { path: 'ai', name: 'adminAi', component: AdminAiPage, meta: { title: 'AI 设置', superOnly: true } },
+      { path: '', name: 'adminDashboard', component: () => import('@/pages/admin/DashboardPage.vue'), meta: { title: '数据总览', superOnly: true } },
+      { path: 'posts', name: 'adminPosts', component: () => import('@/pages/admin/ContentPage.vue'), meta: { title: '帖子治理' } },
+      { path: 'comments', name: 'adminComments', component: () => import('@/pages/admin/CommentsPage.vue'), meta: { title: '评论管理' } },
+      { path: 'reports', name: 'adminReports', component: () => import('@/pages/admin/ReportsPage.vue'), meta: { title: '举报处理' } },
+      { path: 'users', name: 'adminUsers', component: () => import('@/pages/admin/UsersPage.vue'), meta: { title: '用户管理', superOnly: true } },
+      { path: 'sections', name: 'adminSections', component: () => import('@/pages/admin/SectionsPage.vue'), meta: { title: '板块管理', superOnly: true } },
+      { path: 'feedbacks', name: 'adminFeedbacks', component: () => import('@/pages/admin/FeedbacksPage.vue'), meta: { title: '意见反馈', superOnly: true } },
+      { path: 'announcements', name: 'adminAnnouncements', component: () => import('@/pages/admin/AnnouncementsPage.vue'), meta: { title: '公告管理', superOnly: true } },
+      { path: 'ai', name: 'adminAi', component: () => import('@/pages/admin/AdminAiPage.vue'), meta: { title: 'AI 设置', superOnly: true } },
     ],
   },
 

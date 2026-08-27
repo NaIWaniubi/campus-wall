@@ -4,10 +4,10 @@
  */
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Bell, Plus, RefreshCw } from '@lucide/vue'
+import { Search, Bell, Plus, RefreshCw, BellRing } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { postApi } from '@/utils/api'
+import { postApi, subscriptionApi } from '@/utils/api'
 import { toast } from '@/utils/request'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
@@ -31,6 +31,19 @@ const hasMore = ref(true)
 const loading = ref(false)
 const loadingMore = ref(false)
 const refreshing = ref(false)
+// 已订阅板块 id 集合（首页 Tab 铃铛角标）
+const subscribedSectionIds = ref<Set<number>>(new Set())
+
+async function loadSubscriptions() {
+  if (!userStore.isLoggedIn) return
+  try {
+    const res: any = await subscriptionApi.list()
+    const items = res?.data || res || []
+    subscribedSectionIds.value = new Set(items.map((s: any) => s.sectionId ?? s.id))
+  } catch {
+    // 静默失败：未登录/网络问题都不影响首页
+  }
+}
 
 // 下拉刷新相关
 const pullDistance = ref(0)
@@ -158,6 +171,7 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll)
   if (!appStore.sections.length) appStore.fetchSections()
   loadList(true)
+  loadSubscriptions()
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
@@ -197,6 +211,7 @@ onUnmounted(() => {
             @click="selectSection(sec.id)"
           >
             {{ sec.name }}
+            <BellRing v-if="sec.id > 0 && subscribedSectionIds.has(sec.id)" class="inline-block w-3 h-3 ml-0.5 text-brand-500" />
             <span v-if="activeSection === sec.id" class="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-5 h-0.5 bg-brand-500 rounded-full"></span>
           </button>
         </div>

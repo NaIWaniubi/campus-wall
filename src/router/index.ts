@@ -22,6 +22,7 @@ import SettingsPage from '@/pages/SettingsPage.vue'
 import DraftsPage from '@/pages/DraftsPage.vue'
 import SectionPage from '@/pages/SectionPage.vue'
 import UserProfilePage from '@/pages/UserProfilePage.vue'
+import MySubscriptionsPage from '@/pages/MySubscriptionsPage.vue'
 
 // 管理后台页面
 import AdminLoginPage from '@/pages/admin/AdminLoginPage.vue'
@@ -54,6 +55,7 @@ const routes = [
   { path: '/my-likes', name: 'myLikes', component: MyLikesPage, meta: { title: '我的点赞', requireAuth: true } },
   { path: '/profile/settings', name: 'settings', component: SettingsPage, meta: { title: '设置', requireAuth: true } },
   { path: '/profile/drafts', name: 'drafts', component: DraftsPage, meta: { title: '草稿箱', requireAuth: true } },
+  { path: '/profile/subscriptions', name: 'mySubscriptions', component: MySubscriptionsPage, meta: { title: '我的订阅', requireAuth: true } },
 
   // 管理后台
   { path: '/admin/login', name: 'adminLogin', component: AdminLoginPage, meta: { title: '管理员登录' } },

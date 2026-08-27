@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import {
   FileText, MessageCircle, Bookmark, Bell, Settings, Shield,
   LogOut, Camera, Loader2, ChevronRight, Edit3, Star, Users,
-  ThumbsUp, MessageSquarePlus,
+  ThumbsUp, MessageSquarePlus, BellRing,
 } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -111,6 +111,7 @@ const menuItems = computed(() => {
     { label: '我的评论', icon: MessageCircle, path: '/profile/comments' },
     { label: '我的收藏', icon: Bookmark, path: '/profile/favorites' },
     { label: '我的点赞', icon: ThumbsUp, path: '/my-likes' },
+    { label: '我的订阅', icon: BellRing, path: '/profile/subscriptions' },
     { label: '草稿箱', icon: Edit3, path: '/profile/drafts' },
     { label: '消息通知', icon: Bell, path: '/message', badge: appStore.unreadCount || 0 },
     { label: '账号设置', icon: Settings, path: '/profile/settings' },

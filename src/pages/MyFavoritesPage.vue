@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * 我的收藏：收藏帖子列表
+ * 我的收藏：收藏帖子列表（滚动分页骨架）
+ * 注：后端 /users/me/favorites 当前一次性返回全部；前端按 MyLikesPage 范式预留
+ *     page/hasMore/total 接口形状，后续后端分页时无需改页面。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft } from '@lucide/vue'
+import { ArrowLeft, Loader2 } from '@lucide/vue'
 import { userApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,21 +14,52 @@ import SkeletonList from '@/components/SkeletonList.vue'
 
 const router = useRouter()
 const list = ref<any[]>([])
-const loading = ref(true)
+const total = ref(0)
+const page = ref(0)
+const hasMore = ref(true)
+const loading = ref(false)
 
-async function load() {
+async function loadMore() {
+  if (loading.value || !hasMore.value) return
   loading.value = true
   try {
-    const res: any = await userApi.myFavorites()
-    list.value = res.data || []
+    const res: any = await userApi.myFavorites({ page: page.value + 1 })
+    const d = res.data
+    // 兼容两种后端形态：{ list, total, hasMore } 或 数组直返
+    if (Array.isArray(d)) {
+      if (page.value === 0) list.value = d
+      else list.value.push(...d)
+      total.value = d.length
+      hasMore.value = false // 非分页后端，一页到底
+    } else {
+      const items = d?.list || []
+      if (page.value === 0) list.value = items
+      else list.value.push(...items)
+      total.value = d?.total || items.length
+      hasMore.value = !!d?.hasMore
+    }
+    page.value++
   } catch {
-    list.value = []
+    hasMore.value = false
   } finally {
     loading.value = false
   }
 }
 
-onMounted(load)
+function onScroll() {
+  if (loading.value || !hasMore.value) return
+  const nearBottom =
+    window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200
+  if (nearBottom) loadMore()
+}
+
+onMounted(() => {
+  loadMore()
+  window.addEventListener('scroll', onScroll)
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+})
 </script>
 
 <template>
@@ -37,19 +70,23 @@ onMounted(load)
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-medium text-zinc-900">我的收藏</span>
-        <span class="ml-2 text-xs text-zinc-400">共 {{ list.length }} 条</span>
+        <span class="ml-2 text-xs text-zinc-400">共 {{ total }} 条</span>
       </div>
     </header>
 
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-3">
-      <!-- 加载骨架 -->
-      <SkeletonList v-if="loading" :count="3" :show-media="false" />
+      <!-- 首屏骨架 -->
+      <SkeletonList v-if="!page && loading" :count="3" :show-media="false" />
 
       <template v-else>
         <PostCard v-for="post in list" :key="post.id" :post="post" />
         <EmptyState v-if="!list.length" text="还没有收藏内容" action-text="去逛逛" @action="router.push('/')" />
+        <!-- 加载更多 -->
+        <div v-if="list.length && loading" class="flex items-center justify-center gap-2 py-3 text-sm text-zinc-400">
+          <Loader2 class="w-4 h-4 animate-spin" /> 加载中...
+        </div>
+        <p v-else-if="list.length && !hasMore" class="text-center text-xs text-zinc-300 py-3">没有更多了</p>
       </template>
     </main>
   </div>
 </template>
-

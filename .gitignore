@@ -47,3 +47,8 @@ public/uploads/
 
 # Build artifacts
 .tsbuildinfo
+
+# Test artifacts (E2E / 一次性验证图片与脚本，跑完即清)
+tmp-test-*.jpg
+tmp-test-*.png
+.e2e-reveal.mjs

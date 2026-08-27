@@ -251,6 +251,12 @@ view, text, image, scroll-view, swiper {
 .tag:active {
   transform: scale(0.985);
   opacity: 0.92;
+  box-shadow: var(--shadow-sm, 0 2rpx 8rpx rgba(15, 23, 42, 0.04));
+}
+
+.btn-primary:active {
+  opacity: 0.94;
+  box-shadow: 0 8rpx 18rpx rgba(22, 160, 133, 0.18);
 }
 
 .surface-blur {
@@ -285,4 +291,5 @@ view, text, image, scroll-view, swiper {
 .perf-low .btn-outline:active,
 .perf-low .tag:active {
   transform: none !important;
+  opacity: 0.95 !important;
 }

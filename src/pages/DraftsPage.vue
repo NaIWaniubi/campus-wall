@@ -10,6 +10,7 @@ import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import EmptyState from '@/components/EmptyState.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 
 const router = useRouter()
 const drafts = ref<any[]>([])
@@ -71,9 +72,16 @@ onMounted(load)
     <main class="max-w-[960px] mx-auto px-4 py-3">
       <!-- 云端草稿上限：后端 LIMIT 10、FIFO 驱逐最早一条 -->
       <p v-if="!loading" class="text-xs text-zinc-400 px-1 pb-2">云端最多保存 10 条草稿，已存 {{ drafts.length }}/10 条，超出后自动删除最早的一条</p>
-      <div v-if="loading" class="space-y-3">
-        <div v-for="i in 3" :key="i" class="bg-white rounded-xl p-4 skeleton h-20"></div>
-      </div>
+      <SkeletonList v-if="loading" :count="3" :show-media="false">
+        <template #item>
+          <div
+            v-for="i in 3"
+            :key="i"
+            class="rounded-xl p-4 h-20 skeleton"
+            style="background-color: var(--color-surface); border: 1px solid var(--color-border);"
+          />
+        </template>
+      </SkeletonList>
       <EmptyState v-else-if="!drafts.length" text="草稿箱空空如也" />
       <div v-else class="space-y-2">
         <div

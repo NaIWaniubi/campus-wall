@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from '@lucide/vue'
 import { userApi } from '@/utils/api'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 
 const router = useRouter()
 const list = ref<any[]>([])
@@ -63,13 +64,7 @@ onUnmounted(() => {
 
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-3">
       <!-- 首屏骨架 -->
-      <div v-if="!page && loading" class="space-y-3">
-        <div v-for="i in 3" :key="i" class="bg-white rounded-xl p-4">
-          <div class="h-4 w-3/4 skeleton rounded mb-2"></div>
-          <div class="h-3 w-full skeleton rounded mb-1"></div>
-          <div class="h-3 w-2/3 skeleton rounded"></div>
-        </div>
-      </div>
+      <SkeletonList v-if="!page && loading" :count="3" :show-media="false" />
 
       <template v-else>
         <PostCard v-for="post in list" :key="post.id" :post="post" />

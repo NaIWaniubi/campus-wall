@@ -8,6 +8,7 @@ import { ArrowLeft, MessageCircle, ChevronRight } from '@lucide/vue'
 import { userApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import EmptyState from '@/components/EmptyState.vue'
+import SkeletonList from '@/components/SkeletonList.vue'
 
 const router = useRouter()
 const list = ref<any[]>([])
@@ -46,13 +47,7 @@ onMounted(load)
 
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-2">
       <!-- 加载骨架 -->
-      <div v-if="loading" class="space-y-2">
-        <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-4">
-          <div class="h-3 w-1/3 skeleton rounded mb-2"></div>
-          <div class="h-3 w-full skeleton rounded mb-1"></div>
-          <div class="h-3 w-2/3 skeleton rounded"></div>
-        </div>
-      </div>
+      <SkeletonList v-if="loading" :count="4" :show-media="false" />
 
       <template v-else>
         <button v-for="c in list" :key="c.id"

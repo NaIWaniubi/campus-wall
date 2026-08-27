@@ -1,0 +1,57 @@
+<view class="page-profile {{perfLowClass}}">
+  <view class="profile-form">
+    <view class="form-item card flex-between" bindtap="onChangeAvatar">
+      <text class="form-label">头像</text>
+      <view class="flex-row">
+        <image class="form-avatar" src="{{userInfo.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+        <text class="form-arrow gray-color">></text>
+      </view>
+    </view>
+
+    <view class="form-item card flex-between" bindtap="onEditNickname">
+      <text class="form-label">昵称</text>
+      <view class="flex-row">
+        <text class="form-value">{{userInfo.nickname || '未设置'}}</text>
+        <text class="form-arrow gray-color">></text>
+      </view>
+    </view>
+
+    <view class="form-item card flex-between" bindtap="onEditSignature">
+      <text class="form-label">个性签名</text>
+      <view class="flex-row">
+        <text class="form-value text-ellipsis">{{userInfo.signature || '未设置'}}</text>
+        <text class="form-arrow gray-color">></text>
+      </view>
+    </view>
+
+    <view class="form-item card flex-between">
+      <text class="form-label">校区</text>
+      <picker range="{{campusList}}" value="{{campusIndex}}" bindchange="onCampusChange">
+        <view class="flex-row">
+          <text class="form-value">{{campusList[campusIndex]}}</text>
+          <text class="form-arrow gray-color">></text>
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="login-section" wx:if="{{!isLoggedIn}}">
+    <view class="auth-tabs">
+      <text class="auth-tab {{authMode === 'login' ? 'auth-tab--active' : ''}}" bindtap="onSwitchAuthMode" data-mode="login">登录</text>
+      <text class="auth-tab {{authMode === 'register' ? 'auth-tab--active' : ''}}" bindtap="onSwitchAuthMode" data-mode="register">注册</text>
+    </view>
+    <input class="auth-input" placeholder="学号（6-12位数字）" type="number" value="{{studentId}}" bindinput="onAuthInput" data-field="studentId" />
+    <input class="auth-input" placeholder="密码（至少6位）" password value="{{password}}" bindinput="onAuthInput" data-field="password" />
+    <block wx:if="{{authMode === 'register'}}">
+      <input class="auth-input" placeholder="昵称" value="{{nickname}}" bindinput="onAuthInput" data-field="nickname" />
+      <input class="auth-input" placeholder="学院（选填）" value="{{college}}" bindinput="onAuthInput" data-field="college" />
+    </block>
+    <button class="btn-primary login-btn" loading="{{authLoading}}" bindtap="onAuthSubmit">
+      {{authMode === 'login' ? '登录' : '注册并登录'}}
+    </button>
+  </view>
+
+  <view class="logout-section" wx:if="{{isLoggedIn}}">
+    <button class="logout-btn" bindtap="onLogout">退出登录</button>
+  </view>
+</view>

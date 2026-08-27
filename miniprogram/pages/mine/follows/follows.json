@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "关注与粉丝",
+  "usingComponents": {
+    "empty-state": "/components/empty-state/empty-state",
+    "user-row": "/components/user-row/user-row"
+  }
+}

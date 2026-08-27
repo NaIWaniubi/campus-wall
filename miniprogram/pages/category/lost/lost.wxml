@@ -1,0 +1,37 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">失物招领</text><subscribe-btn section-id="2" /></view>
+  <view class="tab-bar card flex-row">
+    <view class="tab-item {{activeTab === 'found' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="found"><text>失物招领</text></view>
+    <view class="tab-item {{activeTab === 'lost' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="lost"><text>寻物启事</text></view>
+  </view>
+  <view class="filter-bar card">
+    <picker class="filter-item" range="{{itemTypeList}}" bindchange="onTypeFilter">
+      <view class="filter-picker flex-between">
+        <text>{{selectedType || '物品类型'}}</text>
+        <text class="gray-color">▼</text>
+      </view>
+    </picker>
+    <picker class="filter-item" range="{{campusList}}" bindchange="onCampusFilter">
+      <view class="filter-picker flex-between">
+        <text>{{selectedCampus || '校区'}}</text>
+        <text class="gray-color">▼</text>
+      </view>
+    </picker>
+    <picker class="filter-item" range="{{timeList}}" bindchange="onTimeFilter">
+      <view class="filter-picker flex-between">
+        <text>{{selectedTime || '时间'}}</text>
+        <text class="gray-color">▼</text>
+      </view>
+    </picker>
+  </view>
+
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="{{emptyText}}" customIcon="🔍"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+
+  <view class="fab-btn" bindtap="onGoPublish">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

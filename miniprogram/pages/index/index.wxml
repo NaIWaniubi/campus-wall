@@ -1,0 +1,41 @@
+<view class="page-index {{perfLowClass}}">
+  <view class="color-ribbon"><view class="ribbon-cyan"></view><view class="ribbon-violet"></view><view class="ribbon-coral"></view><view class="ribbon-yellow"></view></view>
+
+  <view class="header">
+    <view class="brand-row">
+      <view>
+        <view class="brand-line"><text class="brand-title">校园墙</text><view class="brand-spark">✦</view></view>
+        <text class="brand-subtitle">今天也有新鲜事正在发生</text>
+      </view>
+      <view class="campus-signal" bindtap="onSwitchCampus"><text class="signal-dot"></text><text>{{currentCampus}}</text></view>
+    </view>
+
+    <view class="campus-canvas">
+      <view class="canvas-band canvas-cyan"></view><view class="canvas-band canvas-violet"></view><view class="canvas-band canvas-coral"></view><view class="canvas-band canvas-yellow"></view>
+      <view class="canvas-content"><text class="canvas-eyebrow">CAMPUS LIVE</text><text class="canvas-title">把今天的校园，调成喜欢的颜色</text><view class="canvas-meta"><text>主校区</text><text class="canvas-meta-dot">·</text><text>新动态持续涌入</text></view></view>
+      <view class="canvas-meter"><view></view><view></view><view></view><view></view></view>
+    </view>
+
+    <view class="header-tools">
+      <view class="search-bar" bindtap="onGoSearch"><text class="search-symbol">⌕</text><text>搜索内容、话题、同学</text></view>
+      <view class="daily-pulse"><text>NOW</text></view>
+    </view>
+
+    <scroll-view class="topic-rail" scroll-x enable-flex>
+      <view class="topic-item {{currentCategory === '' ? 'active' : ''}}" bindtap="onSelectCategory" data-id=""><view class="topic-orbit all-orbit"><text>ALL</text></view><text>全部</text></view>
+      <view class="topic-item {{currentCategory === item.id ? 'active' : ''}}" wx:for="{{categoryList}}" wx:key="id" bindtap="onSelectCategory" data-id="{{item.id}}"><view class="topic-orbit" style="border-color: {{item.color}}; color: {{item.color}}; background-color: {{item.color}}18"><text>{{item.icon}}</text></view><text>{{item.name}}</text></view>
+    </scroll-view>
+
+    <view class="sort-tabs">
+      <view wx:for="{{sortTabs}}" wx:key="id" class="sort-tab {{activeSort === item.id ? 'active' : ''}}" bindtap="onSwitchSort" data-id="{{item.id}}"><text>{{item.name}}</text><view class="active-mark" wx:if="{{activeSort === item.id}}"></view></view>
+    </view>
+  </view>
+
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" current-user-id="{{currentUserId}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost" bind:follow="onFollowAuthor" bind:share="onSharePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0 && !isLoading}}" text="{{emptyStateText}}" subText="{{emptyStateSubText}}" customIcon="{{emptyStateIcon}}" btnText="{{emptyStateBtnText}}" bind:btntap="onEmptyStateAction"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+
+  <announce-dialog show="{{!!announcement}}" title="{{announcement.title}}" content="{{announcement.content}}" bind:ack="onAnnouncementAck"></announce-dialog>
+</view>

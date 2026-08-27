@@ -1,0 +1,22 @@
+<view class="page-notification {{perfLowClass}}">
+  <view class="notification-tabs flex-row">
+    <view wx:for="{{tabs}}" wx:key="id" class="tab-item {{activeTab === item.id ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="{{item.id}}">
+      <text>{{item.name}}</text>
+    </view>
+  </view>
+  <view class="notification-list">
+    <view class="notification-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}">
+      <view class="notification-icon-wrap">
+        <text class="notification-icon">{{item.iconText}}</text>
+      </view>
+      <view class="notification-body flex-1">
+        <view class="notification-header flex-between">
+          <text class="notification-title">{{item.title}}</text>
+          <text class="notification-time gray-color">{{item.timeAgoText}}</text>
+        </view>
+        <text class="notification-content text-ellipsis-2">{{item.content}}</text>
+      </view>
+    </view>
+    <empty-state wx:if="{{notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
+  </view>
+</view>

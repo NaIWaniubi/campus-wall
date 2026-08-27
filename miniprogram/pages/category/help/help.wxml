@@ -1,0 +1,15 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">互助问答</text><subscribe-btn section-id="5" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'study' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="study"><text>学习求助</text></view>
+    <view class="tab-item {{activeTab === 'life' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="life"><text>生活求助</text></view>
+    <view class="tab-item {{activeTab === 'other' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="other"><text>其他</text></view>
+  </view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="暂无求助信息" customIcon="🆘"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

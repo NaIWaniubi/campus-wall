@@ -1,0 +1,28 @@
+<view class="page-my-posts {{perfLowClass}}">
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'published' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="published"><text>已发布</text></view>
+    <view class="tab-item {{activeTab === 'pending' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="pending"><text>审核中</text></view>
+    <view class="tab-item {{activeTab === 'rejected' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="rejected"><text>未通过</text></view>
+  </view>
+  <view class="post-list">
+    <view class="post-item-wrap" wx:for="{{posts}}" wx:key="id">
+      <post-card post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+      <view class="reject-reason" wx:if="{{item.status === 'rejected' && item.rejectReason}}">
+        <text>驳回原因：{{item.rejectReason}}</text>
+      </view>
+      <view class="post-actions flex-row">
+        <view class="action-btn resubmit-btn" wx:if="{{item.status === 'rejected'}}" bindtap="onEditPost" data-id="{{item.id}}">
+          <text>修改重发</text>
+        </view>
+        <view class="action-btn edit-btn" wx:if="{{item.canEdit}}" bindtap="onEditPost" data-id="{{item.id}}">
+          <text>编辑</text>
+        </view>
+        <view class="action-btn delete-btn" bindtap="onDeletePost" data-id="{{item.id}}">
+          <text>删除</text>
+        </view>
+      </view>
+    </view>
+    <empty-state wx:if="{{posts.length === 0}}" text="还没有发布内容" customIcon="📝" btnText="去发布" bind:btntap="onGoPublish"></empty-state>
+  </view>
+</view>

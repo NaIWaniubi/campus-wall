@@ -1,0 +1,47 @@
+<view class="comment-item">
+  <view class="comment-main flex-row">
+    <image class="avatar-small" src="{{comment.author.isAnonymous ? '/images/default_avatar.png' : comment.author.avatar}}" mode="aspectFill" lazy-load></image>
+    <view class="comment-body flex-1">
+      <view class="comment-header flex-between">
+        <text class="comment-author">{{comment.author.isAnonymous ? '匿名用户' : comment.author.nickname}}</text>
+        <text class="comment-time gray-color">{{timeAgoText}}</text>
+      </view>
+      <view class="comment-content">
+        <text>{{comment.content}}</text>
+      </view>
+      <view class="comment-actions flex-row">
+        <view class="comment-action" bindtap="onLikeComment">
+          <image class="action-icon" src="{{comment.isLiked ? '/images/icon_liked.png' : '/images/icon_like.png'}}" mode="aspectFit"></image>
+          <text class="{{comment.isLiked ? 'primary-color' : 'gray-color'}}">{{comment.likes || ''}}</text>
+        </view>
+        <view class="comment-action" bindtap="onReply">
+          <text class="gray-color">回复</text>
+        </view>
+      </view>
+
+      <view class="replies" wx:if="{{comment.replies && comment.replies.length > 0}}">
+        <view class="reply-item" wx:for="{{comment.replies}}" wx:key="id">
+          <view class="reply-main flex-row">
+            <image class="avatar-small reply-avatar" src="{{item.author.isAnonymous ? '/images/default_avatar.png' : item.author.avatar}}" mode="aspectFill" lazy-load></image>
+            <view class="reply-body flex-1">
+              <text class="reply-author">{{item.author.isAnonymous ? '匿名用户' : item.author.nickname}}</text>
+              <text class="reply-text" wx:if="{{item.replyTo}}"> 回复 </text>
+              <text class="reply-to" wx:if="{{item.replyTo}}">{{item.replyTo.nickname}}</text>
+              <text class="reply-text">：{{item.content}}</text>
+            </view>
+          </view>
+          <view class="reply-actions flex-row">
+            <text class="reply-time gray-color">{{item.timeAgoText || ''}}</text>
+            <view class="comment-action reply-action" bindtap="onLikeReply" data-index="{{index}}">
+              <image class="action-icon-small" src="{{item.isLiked ? '/images/icon_liked.png' : '/images/icon_like.png'}}" mode="aspectFit"></image>
+              <text class="gray-color">{{item.likes || ''}}</text>
+            </view>
+            <view class="comment-action reply-action" bindtap="onReplyReply" data-index="{{index}}">
+              <text class="gray-color">回复</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

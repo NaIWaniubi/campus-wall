@@ -1,0 +1,166 @@
+<view class="page-publish {{perfLowClass}}">
+  <view class="publish-form">
+    <view class="category-select card">
+      <text class="label">选择分类</text>
+      <view class="category-grid">
+        <view class="category-option {{selectedCategory === item.id ? 'active' : ''}}"
+              wx:for="{{categoryList}}" wx:key="id"
+              bindtap="onSelectCategory" data-id="{{item.id}}">
+          <text class="category-icon">{{item.icon}}</text>
+          <text class="category-name">{{item.name}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="subtype-select card" wx:if="{{subTypeList.length > 0}}">
+      <text class="label">选择类型</text>
+      <view class="subtype-list flex-wrap">
+        <view class="subtype-option {{selectedSubType === item.id ? 'active' : ''}}"
+              wx:for="{{subTypeList}}" wx:key="id"
+              bindtap="onSelectSubType" data-id="{{item.id}}">
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="identity-toggle card">
+      <view class="flex-between">
+        <view class="flex-row">
+          <text class="label" style="margin-bottom:0">发布身份</text>
+          <text class="identity-hint gray-color" wx:if="{{forcedAnonymous}}">树洞板块强制匿名</text>
+          <text class="identity-hint gray-color" wx:elif="{{isAnonymous}}">匿名发布</text>
+          <text class="identity-hint gray-color" wx:else>实名发布</text>
+        </view>
+        <switch checked="{{isAnonymous}}" disabled="{{forcedAnonymous}}" bindchange="onToggleAnonymous" color="#16A085" />
+      </view>
+      <text class="anon-note gray-color">信誉分满 90 才可匿名发布，匿名帖子由管理端留存实名溯源</text>
+    </view>
+
+    <view class="title-input card">
+      <text class="label">标题</text>
+      <input class="title-field" placeholder="请输入标题（必填）" maxlength="50" value="{{title}}" bindinput="onTitleInput" />
+      <text class="char-count gray-color">{{title.length}}/50</text>
+    </view>
+
+    <view class="content-input card">
+      <text class="label">内容</text>
+      <textarea class="content-field" placeholder="分享你的校园生活...（至少10个字）" maxlength="500" value="{{content}}" bindinput="onContentInput" auto-height />
+      <view class="content-footer flex-between">
+        <text class="char-count gray-color">{{content.length}}/500</text>
+      </view>
+    </view>
+
+    <!-- 失物招领：direction(我捡到了/我丢失了) + time/location/itemType(类型选择) + contact 选填 -->
+    <view class="extra-fields card" wx:if="{{selectedCategory === 'lost'}}">
+      <text class="label">补充信息</text>
+      <view class="field-item">
+        <text class="field-label">类型</text>
+        <view class="subtype-list flex-wrap">
+          <view class="subtype-option {{extraData.direction === 'found' ? 'active' : ''}}" bindtap="onDirectionSelect" data-dir="found"><text>我捡到了</text></view>
+          <view class="subtype-option {{extraData.direction === 'lost' ? 'active' : ''}}" bindtap="onDirectionSelect" data-dir="lost"><text>我丢失了</text></view>
+        </view>
+      </view>
+      <view class="field-item">
+        <text class="field-label">捡到/丢失时间</text>
+        <input placeholder="如：今天中午 / 3月2日晚上" value="{{extraData.time}}" bindinput="onExtraInput" data-field="time" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">捡到/丢失地点</text>
+        <input placeholder="请输入地点" value="{{extraData.location}}" bindinput="onExtraInput" data-field="location" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">联系方式（选填）</text>
+        <input placeholder="留空则通过站内评论联系" value="{{extraData.contact}}" bindinput="onExtraInput" data-field="contact" />
+      </view>
+    </view>
+
+    <!-- 二手交易：price/condition/tradeType + contact 选填 -->
+    <view class="extra-fields card" wx:if="{{selectedCategory === 'trade'}}">
+      <text class="label">商品信息</text>
+      <view class="field-item">
+        <text class="field-label">价格（元）</text>
+        <input type="digit" placeholder="请输入价格" value="{{extraData.price}}" bindinput="onExtraInput" data-field="price" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">新旧程度</text>
+        <picker range="{{conditionList}}" value="{{conditionIndex}}" bindchange="onConditionChange">
+          <text class="{{extraData.condition ? '' : 'gray-color'}}">{{extraData.condition || '请选择'}}</text>
+        </picker>
+      </view>
+      <view class="field-item">
+        <text class="field-label">交易类型</text>
+        <picker range="{{tradeTypeList}}" value="{{tradeTypeIndex}}" bindchange="onTradeTypeChange">
+          <text class="{{extraData.tradeType ? '' : 'gray-color'}}">{{extraData.tradeType || '请选择'}}</text>
+        </picker>
+      </view>
+      <view class="field-item">
+        <text class="field-label">联系方式（选填）</text>
+        <input placeholder="如 wx / qq，留空则站内联系" value="{{extraData.contact}}" bindinput="onExtraInput" data-field="contact" />
+      </view>
+    </view>
+
+    <!-- 校园活动：time/location/organizer -->
+    <view class="extra-fields card" wx:if="{{selectedCategory === 'activity'}}">
+      <text class="label">活动信息</text>
+      <view class="field-item">
+        <text class="field-label">活动时间</text>
+        <input placeholder="如：下周五 19:00" value="{{extraData.time}}" bindinput="onExtraInput" data-field="time" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">活动地点</text>
+        <input placeholder="请输入地点" value="{{extraData.location}}" bindinput="onExtraInput" data-field="location" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">主办方（选填）</text>
+        <input placeholder="如：校学生会" value="{{extraData.organizer}}" bindinput="onExtraInput" data-field="organizer" />
+      </view>
+    </view>
+
+    <!-- 拼车：time/location/price/contact（键名均在后端白名单内） -->
+    <view class="extra-fields card" wx:if="{{selectedCategory === 'carshare'}}">
+      <text class="label">拼车信息</text>
+      <view class="field-item">
+        <text class="field-label">出发时间</text>
+        <input placeholder="如：周五下午 4:00" value="{{extraData.time}}" bindinput="onExtraInput" data-field="time" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">路线</text>
+        <input placeholder="出发地 → 目的地，如 东区→高铁站" value="{{extraData.location}}" bindinput="onExtraInput" data-field="location" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">人均费用（选填）</text>
+        <input type="digit" placeholder="如 20" value="{{extraData.price}}" bindinput="onExtraInput" data-field="price" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">联系方式（选填）</text>
+        <input placeholder="如 wx / qq" value="{{extraData.contact}}" bindinput="onExtraInput" data-field="contact" />
+      </view>
+    </view>
+
+    <!-- 组队：time/location/organizer/contact -->
+    <view class="extra-fields card" wx:if="{{selectedCategory === 'team'}}">
+      <text class="label">组队信息</text>
+      <view class="field-item">
+        <text class="field-label">集合/截止时间（选填）</text>
+        <input placeholder="如：报名截止本周日" value="{{extraData.time}}" bindinput="onExtraInput" data-field="time" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">活动地点（选填）</text>
+        <input placeholder="如：图书馆研讨室" value="{{extraData.location}}" bindinput="onExtraInput" data-field="location" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">负责人/组织方（选填）</text>
+        <input placeholder="如：计算机协会" value="{{extraData.organizer}}" bindinput="onExtraInput" data-field="organizer" />
+      </view>
+      <view class="field-item">
+        <text class="field-label">联系方式（选填）</text>
+        <input placeholder="如 wx / qq" value="{{extraData.contact}}" bindinput="onExtraInput" data-field="contact" />
+      </view>
+    </view>
+  </view>
+
+  <view class="publish-bar safe-bottom">
+    <text class="publish-tip {{canPublish ? 'ready' : ''}}">{{publishTip}}</text>
+    <button class="btn-primary publish-btn" bindtap="onPublish" disabled="{{!canPublish}}">发布</button>
+  </view>
+</view>

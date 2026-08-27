@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "详情",
+  "usingComponents": {
+    "comment-item": "/components/comment-item/comment-item",
+    "empty-state": "/components/empty-state/empty-state",
+    "load-more": "/components/load-more/load-more"
+  }
+}

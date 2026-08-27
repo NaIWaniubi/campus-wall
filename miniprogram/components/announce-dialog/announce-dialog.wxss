@@ -1,0 +1,61 @@
+.ad-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.ad-sheet {
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 40rpx 40rpx calc(40rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.ad-badge {
+  align-self: flex-start;
+  font-size: 22rpx;
+  font-weight: 800;
+  color: #0E7C67;
+  background: rgba(22, 160, 133, 0.1);
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  margin-bottom: 20rpx;
+}
+
+.ad-title {
+  font-size: 34rpx;
+  font-weight: 900;
+  color: #1F2937;
+  line-height: 1.4;
+  margin-bottom: 16rpx;
+}
+
+.ad-content {
+  flex: 1;
+  min-height: 120rpx;
+  max-height: 44vh;
+  font-size: 28rpx;
+  color: #4B5563;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.ad-btn {
+  margin-top: 32rpx;
+  background: #16A085;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 800;
+  border-radius: 999rpx;
+  line-height: 2.8;
+}
+
+.ad-btn::after {
+  border: none;
+}

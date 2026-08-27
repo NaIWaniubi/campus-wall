@@ -1,0 +1,28 @@
+<view class="page-feedback {{perfLowClass}}">
+  <view class="feedback-form">
+    <view class="form-item card">
+      <text class="label">反馈类型</text>
+      <picker range="{{typeList}}" value="{{typeList.indexOf(selectedType)}}" bindchange="onSelectType">
+        <view class="type-picker flex-between">
+          <text>{{selectedType}}</text>
+          <text class="gray-color">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-item card">
+      <text class="label">反馈内容</text>
+      <textarea class="content-field" placeholder="请详细描述您的问题或建议..." maxlength="500" value="{{content}}" bindinput="onInputContent" auto-height />
+      <text class="char-count gray-color">{{content.length}}/500</text>
+    </view>
+
+    <view class="form-item card">
+      <text class="label">联系方式（选填）</text>
+      <input placeholder="手机号/微信号/QQ" value="{{contact}}" bindinput="onInputContact" />
+    </view>
+  </view>
+
+  <view class="submit-bar safe-bottom">
+    <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{isSubmitting || !content}}">{{isSubmitting ? '提交中' : '提交反馈'}}</button>
+  </view>
+</view>

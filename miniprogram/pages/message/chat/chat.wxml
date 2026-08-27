@@ -1,0 +1,35 @@
+<view class="chat-page {{perfLowClass}}">
+  <view class="message-list" wx:if="{{needLogin}}">
+    <empty-state text="登录后开始私信" subText="登录后即可与同学实时沟通" customIcon="💬" btnText="去登录" bind:btntap="onGoLogin"></empty-state>
+  </view>
+
+  <view class="message-list" wx:elif="{{loadError}}">
+    <empty-state text="{{loadError}}" subText="请从消息列表或帖子详情重新进入" customIcon="💬"></empty-state>
+  </view>
+
+  <block wx:else>
+    <scroll-view class="message-scroll" scroll-y scroll-into-view="{{scrollInto}}" scroll-with-animation>
+      <view wx:if="{{loading}}" class="chat-loading">加载中...</view>
+
+      <block wx:if="{{!loading}}">
+        <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg-row {{item.isMine ? 'mine' : ''}}">
+          <image wx:if="{{!item.isMine}}" class="msg-avatar" src="{{peerAvatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+          <view class="msg-main {{item.isMine ? 'mine' : ''}}">
+            <text wx:if="{{!item.isMine}}" class="msg-name">{{peerName}}</text>
+            <view class="bubble {{item.isMine ? 'mine' : ''}} {{item.pending ? 'pending' : ''}} {{item.failed ? 'failed' : ''}}">{{item.content}}</view>
+            <text wx:if="{{item.failed}}" class="msg-failed">发送失败，请重试</text>
+          </view>
+          <image wx:if="{{item.isMine}}" class="msg-avatar" src="{{myAvatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+        </view>
+
+        <empty-state wx:if="{{messages.length === 0}}" text="还没有消息" subText="打个招呼吧～" customIcon="👋"></empty-state>
+      </block>
+    </scroll-view>
+
+    <view class="input-bar">
+      <input class="chat-input" value="{{inputText}}" placeholder="发消息…" confirm-type="send" maxlength="500"
+        bindinput="onInputChange" bindconfirm="onSendMessage" />
+      <button class="send-btn" bindtap="onSendMessage" disabled="{{sending || !inputText}}">发送</button>
+    </view>
+  </block>
+</view>

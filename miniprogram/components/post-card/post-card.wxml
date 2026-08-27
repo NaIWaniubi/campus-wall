@@ -1,0 +1,72 @@
+<view class="post-card card" bindtap="onTapCard">
+  <view class="post-header">
+    <view class="post-author">
+      <image class="avatar" src="{{post.author.isAnonymous ? '/images/default_avatar.png' : (post.author.avatar || '/images/default_avatar.png')}}" mode="aspectFill" lazy-load></image>
+      <view class="author-info">
+        <view class="author-name-row">
+          <text class="author-name">{{post.author.nickname || '校园同学'}}</text>
+          <text class="credit-badge credit-{{creditTier}}" wx:if="{{showCredit}}">信誉{{post.author.creditScore}}</text>
+        </view>
+        <view class="post-meta-row">
+          <text>{{timeAgoText}}</text>
+          <text class="post-dot">·</text>
+          <text class="post-campus">{{post.campus}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="post-author-actions">
+      <!-- 关注能力待新后端接入（follows 表缺失），入口暂时隐藏 -->
+    </view>
+  </view>
+
+  <view class="post-category-row">
+    <view class="category-tag" style="background-color: {{categoryColor}}18; color: {{categoryColor}}">
+      {{categoryName}}
+    </view>
+  </view>
+
+  <view class="post-title" wx:if="{{post.title}}">{{post.title}}</view>
+
+  <view class="post-content">
+    <text class="content-text {{post.title ? 'text-ellipsis-2' : ''}}">{{post.content}}</text>
+  </view>
+
+  <view class="price-badge {{isSold ? 'sold' : ''}}" wx:if="{{showPriceBadge}}">{{isSold ? '已售' : '¥' + post.extra.price}}</view>
+
+  <view class="post-images" wx:if="{{gridImages.length > 0}}">
+    <view class="image-grid {{gridImages.length === 1 ? 'single' : ''}}">
+      <view class="image-item" wx:for="{{gridImages}}" wx:key="*this" bindtap="onPreviewImage" data-index="{{index}}">
+        <image src="{{item}}" mode="{{gridImages.length === 1 ? 'widthFix' : 'aspectFill'}}" lazy-load binderror="onErrorImage" data-index="{{index}}"></image>
+      </view>
+    </view>
+  </view>
+
+  <view class="post-tags" wx:if="{{post.tags.length > 0}}">
+    <text class="tag tag-primary" wx:for="{{post.tags}}" wx:key="*this">#{{item}}</text>
+  </view>
+
+  <view class="post-extra" wx:if="{{post.extra.price || post.extra.condition || post.extra.tradeMethod || post.extra.reward || post.extra.deadline}}">
+    <view class="extra-item" wx:if="{{post.extra.price}}"><text class="price">¥{{post.extra.price}}</text></view>
+    <view class="extra-item" wx:if="{{post.extra.condition}}"><text class="tag tag-success">{{post.extra.condition}}</text></view>
+    <view class="extra-item" wx:if="{{post.extra.tradeMethod}}"><text class="tag tag-warning">{{post.extra.tradeMethod}}</text></view>
+    <view class="extra-item" wx:if="{{post.extra.reward}}"><text class="tag tag-danger">悬赏 ¥{{post.extra.reward}}</text></view>
+    <view class="extra-item" wx:if="{{post.extra.deadline}}"><text class="tag tag-warning">截止 {{post.extra.deadline}}</text></view>
+  </view>
+
+  <view class="post-location" wx:if="{{post.location}}"><text>地点 {{post.location}}</text></view>
+
+  <view class="post-footer">
+    <view class="action-btn {{post.isLiked ? 'active like-active' : ''}}" bindtap="onLike" data-id="{{post.id}}">
+      <text class="action-symbol">{{post.isLiked ? '♥' : '♡'}}</text><text>{{post.likes}}</text>
+    </view>
+    <view class="action-btn" bindtap="onComment" data-id="{{post.id}}">
+      <text class="action-symbol">◌</text><text>{{post.comments}}</text>
+    </view>
+    <view class="action-btn {{post.isFavorited ? 'active favorite-active' : ''}}" bindtap="onFavorite" data-id="{{post.id}}">
+      <text class="action-symbol">{{post.isFavorited ? '★' : '☆'}}</text><text>{{post.favorites}}</text>
+    </view>
+    <button class="action-btn share-button" open-type="share" data-id="{{post.id}}" catchtap="onShare">
+      <text class="action-symbol">↗</text><text>分享</text>
+    </button>
+  </view>
+</view>

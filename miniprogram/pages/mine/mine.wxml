@@ -1,0 +1,126 @@
+<view class="page-mine {{perfLowClass}}">
+  <view class="profile-header">
+    <view class="profile-bg"></view>
+    <view class="profile-info card">
+      <view class="profile-main flex-row">
+        <image class="profile-avatar" src="{{userInfo.avatar || '/images/default_avatar.png'}}" mode="aspectFill" bindtap="onGoProfile"></image>
+        <view class="profile-detail flex-1">
+          <view class="profile-name-row flex-row">
+            <text class="profile-name">{{userInfo.nickname || '未登录'}}</text>
+            <view class="credit-badge {{creditBadge.cls}}" wx:if="{{creditBadge}}">{{creditBadge.score}} · {{creditBadge.label}}</view>
+          </view>
+          <text class="profile-signature gray-color">{{userInfo.signature || '点击登录/设置个人信息'}}</text>
+        </view>
+        <view class="profile-edit" bindtap="onGoProfile">
+          <text class="primary-color">编辑 ></text>
+        </view>
+      </view>
+
+      <view class="profile-stats flex-row">
+        <view class="stat-item" bindtap="onGoMyPosts">
+          <text class="stat-number">{{userInfo.postCount || 0}}</text>
+          <text class="stat-label gray-color">发布</text>
+        </view>
+        <view class="stat-item" bindtap="onGoMyFavorites">
+          <text class="stat-number">{{userInfo.favoriteCount || 0}}</text>
+          <text class="stat-label gray-color">收藏</text>
+        </view>
+        <view class="stat-item" bindtap="onGoMyLikes">
+          <text class="stat-number">{{userInfo.likeCount || 0}}</text>
+          <text class="stat-label gray-color">点赞</text>
+        </view>
+        <view class="stat-item" bindtap="onGoFollows" data-type="following">
+          <text class="stat-number">{{userInfo.followingCount || 0}}</text>
+          <text class="stat-label gray-color">关注</text>
+        </view>
+        <view class="stat-item" bindtap="onGoFollows" data-type="followers">
+          <text class="stat-number">{{userInfo.followerCount || 0}}</text>
+          <text class="stat-label gray-color">粉丝</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="trade-ratings card" wx:if="{{tradeRatings}}">
+    <view class="tr-head flex-between">
+      <text class="tr-title">交易评价</text>
+      <view class="flex-row">
+        <text class="tr-avg" wx:if="{{tradeRatings.avg != null}}">{{tradeRatings.avg}} 分</text>
+        <text class="tr-count gray-color">{{tradeRatings.total}} 条互评</text>
+      </view>
+    </view>
+    <view class="tr-item" wx:for="{{tradeRatings.list}}" wx:key="id" bindtap="onTapRatingPost" data-postid="{{item.postId}}">
+      <image class="tr-avatar" src="{{item.rater.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+      <view class="tr-body flex-1">
+        <view class="tr-row flex-between">
+          <text class="tr-name">{{item.rater.nickname || '匿名同学'}}</text>
+          <text class="tr-stars">{{item.starsText}}</text>
+        </view>
+        <text class="tr-comment text-ellipsis" wx:if="{{item.comment}}">{{item.comment}}</text>
+        <text class="tr-meta gray-color">来自交易「{{item.postTitle || '已删除帖子'}}」 · {{item.timeAgoText}}</text>
+      </view>
+    </view>
+    <text class="tr-hint gray-color">交易完成后双方互评，好评加分、差评扣分，共同维护交易信誉</text>
+  </view>
+
+  <view class="menu-section card">
+    <view class="menu-item flex-between" bindtap="onGoMyPosts">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">📝</text>
+        <text class="menu-text">我的发布</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+    <view class="menu-item flex-between" bindtap="onGoMyFavorites">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">⭐</text>
+        <text class="menu-text">我的收藏</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+    <view class="menu-item flex-between" bindtap="onGoMyLikes">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">👍</text>
+        <text class="menu-text">我的点赞</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+  </view>
+
+  <view class="menu-section card">
+    <view class="menu-item flex-between" bindtap="onGoNotification">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">🔔</text>
+        <text class="menu-text">消息通知</text>
+      </view>
+      <view class="flex-row">
+        <view class="unread-badge" wx:if="{{unreadCount > 0}}">{{unreadCount}}</view>
+        <text class="menu-arrow gray-color">></text>
+      </view>
+    </view>
+    <view class="menu-item flex-between" bindtap="onGoSettings">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">⚙️</text>
+        <text class="menu-text">设置</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+  </view>
+
+  <view class="menu-section card">
+    <view class="menu-item flex-between" bindtap="onAbout">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">ℹ️</text>
+        <text class="menu-text">关于我们</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+    <view class="menu-item flex-between" bindtap="onFeedback">
+      <view class="menu-left flex-row">
+        <text class="menu-icon">📮</text>
+        <text class="menu-text">意见反馈</text>
+      </view>
+      <text class="menu-arrow gray-color">></text>
+    </view>
+  </view>
+</view>

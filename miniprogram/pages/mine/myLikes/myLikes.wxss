@@ -1,0 +1,8 @@
+.page-my-likes {
+  background: #F5F6F8;
+  min-height: 100vh;
+}
+
+.post-list {
+  padding: 24rpx 22rpx;
+}

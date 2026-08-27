@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "内容治理台",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "empty-state": "/components/empty-state/empty-state"
+  }
+}

@@ -1,0 +1,16 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">组队</text><subscribe-btn section-id="8" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'club' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="club"><text>社团招新</text></view>
+    <view class="tab-item {{activeTab === 'competition' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="competition"><text>比赛组队</text></view>
+    <view class="tab-item {{activeTab === 'study_partner' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="study_partner"><text>学习搭子</text></view>
+    <view class="tab-item {{activeTab === 'hobby' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="hobby"><text>兴趣小组</text></view>
+  </view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="暂无组队信息" customIcon="👥"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

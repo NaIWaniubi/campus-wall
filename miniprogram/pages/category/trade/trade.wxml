@@ -1,0 +1,20 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">二手交易</text><subscribe-btn section-id="1" /></view>
+  <view class="filter-bar card">
+    <picker class="filter-item" range="{{typeList}}" bindchange="onTypeFilter">
+      <view class="filter-picker flex-between"><text>{{selectedType || '商品类型'}}</text><text class="gray-color">▼</text></view>
+    </picker>
+    <picker class="filter-item" range="{{priceList}}" bindchange="onPriceFilter">
+      <view class="filter-picker flex-between"><text>{{selectedPrice || '价格区间'}}</text><text class="gray-color">▼</text></view>
+    </picker>
+    <picker class="filter-item" range="{{sortList}}" bindchange="onSortFilter">
+      <view class="filter-picker flex-between"><text>{{selectedSort || '排序'}}</text><text class="gray-color">▼</text></view>
+    </picker>
+  </view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="暂无闲置商品" customIcon="📦"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

@@ -1,0 +1,17 @@
+server/node_modules/
+node_modules/
+
+server/uploads/
+server/data/
+server/logs/
+server/*.db
+server/*.sqlite
+server/*.sqlite3
+
+server/dev-server.*.log
+*.log
+
+.superpowers/
+
+.DS_Store
+Thumbs.db

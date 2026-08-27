@@ -1,0 +1,21 @@
+<view class="page-category {{perfLowClass}}">
+  <view class="topic-header">
+    <text class="topic-title">校园话题</text>
+    <text class="topic-subtitle">找到同频的聊天和互助频道</text>
+  </view>
+  <view class="category-grid">
+    <view class="category-card" wx:for="{{categoryList}}" wx:key="id" bindtap="onGoCategory" data-id="{{item.id}}" style="border-left: 6rpx solid {{item.color}}">
+      <view class="category-card-header flex-row">
+        <text class="category-icon">{{item.icon}}</text>
+        <text class="category-card-name">{{item.name}}</text>
+      </view>
+      <view class="category-subtypes">
+        <text class="subtype-text" wx:for="{{item.subTypes}}" wx:for-item="sub" wx:key="id">{{sub.name}}</text>
+      </view>
+      <view class="category-card-footer flex-between">
+        <text class="post-count gray-color">{{item.postCount || 0}} 条动态</text>
+        <text class="primary-color">查看 →</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,8 @@
+<view class="ad-mask" wx:if="{{show}}" catchtouchmove="noop">
+  <view class="ad-sheet" catchtap="noop">
+    <view class="ad-badge">📢 官方公告</view>
+    <view class="ad-title">{{title}}</view>
+    <scroll-view class="ad-content" scroll-y>{{content}}</scroll-view>
+    <button class="ad-btn" bindtap="onAck">我知道了</button>
+  </view>
+</view>

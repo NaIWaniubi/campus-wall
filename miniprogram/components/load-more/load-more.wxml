@@ -1,0 +1,15 @@
+<view class="load-more" bindtap="onTapLoadMore">
+  <view class="loading" wx:if="{{status === 'loading'}}">
+    <view class="loading-spinner"></view>
+    <text>加载中...</text>
+  </view>
+  <view class="load-text" wx:elif="{{status === 'more'}}">
+    <text>点击加载更多</text>
+  </view>
+  <view class="load-text" wx:elif="{{status === 'nomore'}}">
+    <text>— 没有更多了 —</text>
+  </view>
+  <view class="load-text" wx:elif="{{status === 'error'}}">
+    <text>加载失败，点击重试</text>
+  </view>
+</view>

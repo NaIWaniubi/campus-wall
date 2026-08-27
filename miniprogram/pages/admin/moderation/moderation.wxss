@@ -1,0 +1,378 @@
+.moderation-page {
+  min-height: 100vh;
+  padding: 28rpx 24rpx 44rpx;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(32, 196, 164, 0.14), transparent 34%),
+    #F5F6F8;
+}
+
+.header {
+  position: relative;
+  padding: 8rpx 4rpx 26rpx;
+}
+
+.title {
+  display: block;
+  color: #17202A;
+  font-size: 44rpx;
+  font-weight: 900;
+  letter-spacing: -0.8rpx;
+}
+
+.subtitle {
+  display: block;
+  margin-top: 10rpx;
+  color: #65717D;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.role-chip {
+  position: absolute;
+  top: 10rpx;
+  right: 4rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(22, 160, 133, 0.12);
+  color: #0E7C67;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+/* ---- 数据卡 ---- */
+.stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 26rpx;
+}
+
+.stat-card {
+  width: calc((100% - 32rpx) / 3);
+  box-sizing: border-box;
+  padding: 22rpx 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14rpx 34rpx rgba(31, 41, 51, 0.06);
+}
+
+.stat-card.accent .stat-value {
+  color: #E67E22;
+}
+
+.stat-value {
+  display: block;
+  color: #17202A;
+  font-size: 38rpx;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 6rpx;
+  color: #65717D;
+  font-size: 22rpx;
+}
+
+/* ---- 主 Tab ---- */
+.seg {
+  display: flex;
+  gap: 8rpx;
+  padding: 8rpx;
+  margin-bottom: 22rpx;
+  border-radius: 999rpx;
+  background: #EBEEF1;
+}
+
+.seg-item {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 999rpx;
+  color: #65717D;
+  font-size: 27rpx;
+  font-weight: 800;
+  transition: all 160ms ease;
+}
+
+.seg-item.active {
+  background: #FFFFFF;
+  color: #0E7C67;
+  box-shadow: 0 8rpx 20rpx rgba(31, 41, 51, 0.08);
+}
+
+/* ---- 状态筛选 chips ---- */
+.chips {
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+}
+
+.chip {
+  display: inline-block;
+  padding: 12rpx 28rpx;
+  margin-right: 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(23, 32, 42, 0.08);
+  color: #65717D;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.chip.active {
+  background: #16A085;
+  border-color: #16A085;
+  color: #FFFFFF;
+}
+
+/* ---- 通用卡片 ---- */
+.card {
+  padding: 28rpx;
+  margin-bottom: 22rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
+  border-radius: 30rpx;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18rpx 46rpx rgba(31, 41, 51, 0.08);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.card:active {
+  transform: scale(0.985);
+  box-shadow: 0 10rpx 28rpx rgba(31, 41, 51, 0.07);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18rpx;
+  margin-bottom: 12rpx;
+}
+
+.post-title,
+.target {
+  color: #17202A;
+  font-size: 30rpx;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.post-content {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: #4A555F;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6rpx;
+  margin-top: 12rpx;
+  color: #65717D;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.meta .dot {
+  margin: 0 4rpx;
+}
+
+.meta .count {
+  color: #E67E22;
+  font-weight: 700;
+}
+
+.reason {
+  display: block;
+  margin-top: 10rpx;
+  color: #26323D;
+  font-size: 25rpx;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.reject-reason,
+.handle-result {
+  display: block;
+  margin-top: 8rpx;
+  color: #B03A2E;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.handle-result {
+  color: #0E7C67;
+}
+
+/* ---- 状态徽标 ---- */
+.badge {
+  flex-shrink: 0;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(22, 160, 133, 0.10);
+  color: #0E7C67;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.badge.s-pending_review {
+  background: rgba(230, 126, 34, 0.12);
+  color: #CA6F1E;
+}
+
+.badge.s-pending {
+  background: rgba(241, 196, 15, 0.16);
+  color: #B7950B;
+}
+
+.badge.s-rejected {
+  background: rgba(192, 57, 43, 0.10);
+  color: #B03A2E;
+}
+
+.badge.high {
+  background: rgba(192, 57, 43, 0.12);
+  color: #C0392B;
+}
+
+.badge.pending-badge {
+  background: rgba(230, 126, 34, 0.12);
+  color: #CA6F1E;
+}
+
+.badge.handled {
+  background: rgba(22, 160, 133, 0.10);
+  color: #0E7C67;
+}
+
+/* ---- 匿名帖举报阈值警示条（橙色） ---- */
+.warn-bar {
+  margin: 14rpx 0 4rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid rgba(255, 152, 0, 0.45);
+  background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+  color: #E65100;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+/* ---- 操作按钮 ---- */
+.actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.actions button {
+  flex: 1;
+  min-height: 72rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  font-weight: 800;
+  line-height: 72rpx;
+  padding: 0 10rpx;
+}
+
+.actions button::after {
+  border: none;
+}
+
+.actions button:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: #16A085;
+  color: #FFFFFF;
+}
+
+.btn-danger {
+  background: rgba(192, 57, 43, 0.10);
+  color: #C0392B;
+}
+
+.btn-warn {
+  background: rgba(230, 126, 34, 0.12);
+  color: #CA6F1E;
+}
+
+.btn-ghost {
+  background: #F1F4F3;
+  color: #26323D;
+}
+
+/* ---- 加载态 ---- */
+.load-more {
+  text-align: center;
+  padding: 20rpx;
+  color: #0E7C67;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.loading-tip {
+  text-align: center;
+  padding: 16rpx 0 4rpx;
+  color: #98A3AE;
+  font-size: 24rpx;
+}
+
+/* ---- 用户管理（精简版） ---- */
+.hint-bar {
+  padding: 18rpx 20rpx;
+  margin-bottom: 20rpx;
+  border-radius: 18rpx;
+  background: rgba(23, 32, 42, 0.05);
+  color: #65717D;
+  font-size: 23rpx;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 22rpx;
+}
+
+.search-input {
+  flex: 1;
+  min-height: 76rpx;
+  box-sizing: border-box;
+  padding: 0 26rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid rgba(23, 32, 42, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  color: #17202A;
+  font-size: 26rpx;
+}
+
+.search-btn {
+  flex-shrink: 0;
+  width: 132rpx;
+  min-height: 76rpx;
+  border-radius: 999rpx;
+  font-size: 25rpx;
+  font-weight: 800;
+  line-height: 76rpx;
+  padding: 0;
+}
+
+.search-btn::after {
+  border: none;
+}
+
+.badge.banned {
+  background: rgba(192, 57, 43, 0.12);
+  color: #C0392B;
+}

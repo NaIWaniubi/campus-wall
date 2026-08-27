@@ -1,0 +1,42 @@
+<view class="page-message {{perfLowClass}}">
+  <view class="message-tabs flex-row">
+    <view wx:for="{{tabs}}" wx:key="id" class="tab-item {{activeTab === item.id ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="{{item.id}}">
+      <text>{{item.name}}</text>
+      <view class="badge" wx:if="{{item.id === 'all' && unreadCount > 0}}">{{unreadCount}}</view>
+      <view class="badge" wx:elif="{{item.id === 'chat' && chatUnread > 0}}">{{chatUnread}}</view>
+    </view>
+  </view>
+
+  <view class="message-list" wx:if="{{!isLoggedIn}}">
+    <empty-state text="登录后查看消息" subText="失物匹配、每日摘要和系统通知都会放在这里" customIcon="🔔" btnText="去登录" bind:btntap="onGoLogin"></empty-state>
+  </view>
+
+  <view class="message-list" wx:elif="{{activeTab === 'chat'}}">
+    <block wx:if="{{isLoggedIn}}">
+      <conversation-item wx:for="{{conversations}}" wx:key="id" item="{{item}}" bind:tap="onOpenConversation"></conversation-item>
+      <empty-state wx:if="{{conversations.length === 0}}" text="暂无私信" subText="在帖子详情点「联系TA」即可发起私信" customIcon="💬"></empty-state>
+    </block>
+  </view>
+
+  <view class="message-list" wx:else>
+    <view class="message-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}">
+      <view class="message-icon-wrap">
+        <text class="message-icon">{{item.iconText}}</text>
+        <view class="unread-dot" wx:if="{{!item.isRead}}"></view>
+      </view>
+      <view class="message-body flex-1">
+        <view class="message-header flex-between">
+          <text class="message-title">{{item.title}}</text>
+          <text class="message-time gray-color">{{item.timeAgoText}}</text>
+        </view>
+        <text class="message-content text-ellipsis-2">{{item.content}}</text>
+      </view>
+    </view>
+
+    <empty-state wx:if="{{notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
+  </view>
+
+  <view class="read-all" wx:if="{{isLoggedIn && activeTab !== 'chat' && notifications.length > 0}}" bindtap="onMarkAllRead">
+    <text class="primary-color">全部标记为已读</text>
+  </view>
+</view>

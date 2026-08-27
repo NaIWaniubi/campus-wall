@@ -1,0 +1,32 @@
+<view class="page-settings {{perfLowClass}}">
+  <view class="settings-section card">
+    <text class="section-title">通用</text>
+    <view class="setting-item flex-between" bindtap="onClearNonAuthCache">
+      <text class="setting-label">清理图片和页面缓存</text>
+      <view class="flex-row">
+        <text class="setting-value gray-color">{{cacheSize}}</text>
+        <text class="gray-color">></text>
+      </view>
+    </view>
+  </view>
+
+  <view class="settings-section card">
+    <text class="section-title">其他</text>
+    <view class="setting-item flex-between" bindtap="onUserAgreement">
+      <text class="setting-label">用户协议</text>
+      <text class="gray-color">></text>
+    </view>
+    <view class="setting-item flex-between" bindtap="onPrivacyPolicy">
+      <text class="setting-label">隐私政策</text>
+      <text class="gray-color">></text>
+    </view>
+    <view class="setting-item flex-between" bindtap="onFeedback">
+      <text class="setting-label">意见反馈</text>
+      <text class="gray-color">></text>
+    </view>
+  </view>
+
+  <view class="settings-section card" wx:if="{{isLoggedIn}}">
+    <button class="logout-btn" bindtap="onLogout">退出登录</button>
+  </view>
+</view>

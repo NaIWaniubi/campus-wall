@@ -1,0 +1,11 @@
+<view class="conversation" bindtap="onTap">
+  <image class="avatar" src="{{item.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+  <view class="main">
+    <view class="top">
+      <text class="name">{{item.displayName || '匿名同学'}}</text>
+      <text class="time">{{item.timeText}}</text>
+    </view>
+    <text class="last">{{item.last_content || '还没有消息'}}</text>
+  </view>
+  <view wx:if="{{item.unread_count > 0}}" class="badge">{{item.unread_count}}</view>
+</view>

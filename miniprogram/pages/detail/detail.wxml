@@ -1,0 +1,196 @@
+<view class="page-detail {{perfLowClass}}">
+  <scroll-view class="detail-scroll" scroll-y scroll-into-view="{{scrollIntoView}}">
+    <view class="post-detail card">
+      <view class="post-header">
+        <view class="post-author">
+          <image class="avatar" src="{{post.author.isAnonymous ? '/images/default_avatar.png' : (post.author.avatar || '/images/default_avatar.png')}}" mode="aspectFill" lazy-load></image>
+          <view class="author-info">
+            <text class="author-name">{{post.author.nickname || '匿名用户'}}</text>
+            <view class="post-meta-row">
+              <text class="post-time">{{timeAgoText}}</text>
+              <text class="post-meta-dot">·</text>
+              <text class="post-campus">{{post.campus}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="post-header-actions">
+          <button wx:if="{{canFollowAuthor}}" class="detail-follow-btn {{post.author.isFollowing ? 'is-followed' : ''}}" bindtap="onFollowAuthor">{{post.author.isFollowing ? '已关注' : '关注'}}</button>
+          <view class="report-btn" bindtap="onReport">
+            <text class="gray-color" style="font-size: 24rpx;">···</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="post-context-row">
+        <view class="category-tag" style="background-color: {{categoryColor}}20; color: {{categoryColor}}">
+          {{categoryName}}
+        </view>
+        <view class="sold-badge" wx:if="{{post.extra.soldAt}}">✓ 已售出</view>
+      </view>
+
+      <view class="post-title" wx:if="{{post.title}}">{{post.title}}</view>
+
+      <view class="post-content">
+        <text>{{post.content}}</text>
+      </view>
+
+      <view class="post-images" wx:if="{{post.images.length > 0}}">
+        <view class="image-grid {{post.images.length === 1 ? 'single' : ''}}">
+          <view class="image-item" wx:for="{{post.images}}" wx:key="*this" bindtap="onPreviewImage" data-index="{{index}}">
+            <image src="{{item}}" mode="{{post.images.length === 1 ? 'widthFix' : 'aspectFill'}}" lazy-load></image>
+          </view>
+        </view>
+      </view>
+
+      <view class="post-tags" wx:if="{{post.tags.length > 0}}">
+        <text class="tag tag-primary" wx:for="{{post.tags}}" wx:key="*this">#{{item}}</text>
+      </view>
+
+      <view class="post-extra-info" wx:if="{{post.extra.price || post.extra.condition || post.extra.tradeMethod || post.extra.tradeLocation || post.extra.foundTime || post.extra.foundLocation || post.extra.contactInfo || post.extra.reward || post.extra.departureTime || post.extra.departureLocation || post.extra.destination || post.extra.maxPeople || post.extra.costPerPerson || post.extra.teamName || post.extra.recruitCount || post.extra.deadline || post.extra.requirements || post.extra.itemType || post.extra.time || post.extra.organizer}}">
+        <view class="info-row" wx:if="{{post.extra.price}}">
+          <text class="info-label">价格</text>
+          <text class="info-value price-text">¥{{post.extra.price}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.condition}}">
+          <text class="info-label">新旧程度</text>
+          <text class="info-value">{{post.extra.condition}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.tradeMethod}}">
+          <text class="info-label">交易方式</text>
+          <text class="info-value">{{post.extra.tradeMethod}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.tradeLocation}}">
+          <text class="info-label">自提点</text>
+          <text class="info-value">{{post.extra.tradeLocation}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.itemType}}">
+          <text class="info-label">物品类型</text>
+          <text class="info-value">{{post.extra.itemType}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.foundTime}}">
+          <text class="info-label">时间</text>
+          <text class="info-value">{{post.extra.foundTime}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.foundLocation}}">
+          <text class="info-label">地点</text>
+          <text class="info-value">{{post.extra.foundLocation}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.contactInfo}}">
+          <text class="info-label">联系方式</text>
+          <text class="info-value">{{post.extra.contactInfo}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.reward}}">
+          <text class="info-label">悬赏金额</text>
+          <text class="info-value price-text">¥{{post.extra.reward}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.departureTime}}">
+          <text class="info-label">出发时间</text>
+          <text class="info-value">{{post.extra.departureTime}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.departureLocation}}">
+          <text class="info-label">出发地点</text>
+          <text class="info-value">{{post.extra.departureLocation}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.destination}}">
+          <text class="info-label">目的地</text>
+          <text class="info-value">{{post.extra.destination}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.maxPeople}}">
+          <text class="info-label">人数限制</text>
+          <text class="info-value">{{post.extra.maxPeople}}人</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.costPerPerson}}">
+          <text class="info-label">费用</text>
+          <text class="info-value">{{post.extra.costPerPerson}}元/人</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.teamName}}">
+          <text class="info-label">队伍名称</text>
+          <text class="info-value">{{post.extra.teamName}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.recruitCount}}">
+          <text class="info-label">招募人数</text>
+          <text class="info-value">{{post.extra.recruitCount}}人</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.deadline}}">
+          <text class="info-label">截止日期</text>
+          <text class="info-value">{{post.extra.deadline}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.requirements}}">
+          <text class="info-label">相关要求</text>
+          <text class="info-value">{{post.extra.requirements}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.time}}">
+          <text class="info-label">活动时间</text>
+          <text class="info-value">{{post.extra.time}}</text>
+        </view>
+        <view class="info-row" wx:if="{{post.extra.organizer}}">
+          <text class="info-label">主办方</text>
+          <text class="info-value">{{post.extra.organizer}}</text>
+        </view>
+      </view>
+
+      <view class="post-location" wx:if="{{post.location}}">
+        <text class="location-text">📍 {{post.location}}</text>
+      </view>
+
+      <view class="post-stats flex-row">
+        <text class="stat-item gray-color">{{post.likes}} 赞</text>
+        <text class="stat-item gray-color">{{post.comments}} 评论</text>
+        <text class="stat-item gray-color">{{post.favorites}} 收藏</text>
+      </view>
+
+      <view class="contact-disabled">私信功能即将上线</view>
+    </view>
+
+    <view class="match-section card" wx:if="{{matches.length > 0}}">
+      <view class="section-header flex-between">
+        <text class="section-title">可能相关</text>
+        <text class="match-hint gray-color">相似内容自动匹配</text>
+      </view>
+      <view class="match-item" wx:for="{{matches}}" wx:key="id" bindtap="onTapMatch" data-id="{{item.id}}">
+        <view class="match-title-row flex-between">
+          <text class="match-title">{{item.title}}</text>
+          <text class="match-section-tag">{{item.section}}</text>
+        </view>
+        <text class="match-excerpt">{{item.excerpt}}</text>
+        <text class="match-author gray-color">{{item.author}} 发布</text>
+      </view>
+    </view>
+
+    <view class="comment-section card" id="comment-section">
+      <view class="section-header flex-between">
+        <text class="section-title">评论 ({{comments.length}})</text>
+      </view>
+
+      <view class="comment-list" wx:if="{{comments.length > 0}}">
+        <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" 
+          bind:likecomment="onLikeComment" 
+          bind:reply="onReplyComment"
+          bind:likereply="onLikeReply"
+          bind:replyreply="onReplyReply">
+        </comment-item>
+      </view>
+
+      <empty-state wx:if="{{comments.length === 0}}" text="暂无评论，快来抢沙发" customIcon="💬"></empty-state>
+    </view>
+  </scroll-view>
+
+  <view class="comment-bar safe-bottom">
+    <view class="comment-input-wrap flex-row">
+      <input class="comment-input" placeholder="{{replyPlaceholder}}" value="{{commentText}}" bindinput="onCommentInput" bindconfirm="onSendComment" confirm-type="send" focus="{{inputFocus}}" bindblur="onInputBlur" />
+      <view class="bar-actions flex-row">
+        <view class="bar-action" bindtap="onToggleLike">
+          <image class="bar-icon" src="{{post.isLiked ? '/images/icon_liked.png' : '/images/icon_like.png'}}" mode="aspectFit"></image>
+          <text class="{{post.isLiked ? 'primary-color' : 'gray-color'}}">{{post.likes}}</text>
+        </view>
+        <view class="bar-action" bindtap="onToggleFavorite">
+          <image class="bar-icon" src="{{post.isFavorited ? '/images/icon_favorited.png' : '/images/icon_favorite.png'}}" mode="aspectFit"></image>
+          <text class="{{post.isFavorited ? 'warning-color' : 'gray-color'}}">{{post.favorites}}</text>
+        </view>
+        <button class="bar-action share-btn" open-type="share">
+          <image class="bar-icon" src="/images/icon_share.png" mode="aspectFit"></image>
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

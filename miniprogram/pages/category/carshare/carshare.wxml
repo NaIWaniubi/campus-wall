@@ -1,0 +1,14 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">拼车</text><subscribe-btn section-id="7" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'car' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="car"><text>拼车</text></view>
+    <view class="tab-item {{activeTab === 'group' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="group"><text>拼单</text></view>
+  </view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="暂无拼车/拼单信息" customIcon="🚗"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

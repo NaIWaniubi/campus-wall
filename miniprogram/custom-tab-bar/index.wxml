@@ -1,0 +1,8 @@
+<view class="tabbar safe-bottom">
+  <view wx:for="{{list}}" wx:key="pagePath" class="tab-item {{selected === index ? 'is-active' : ''}} {{index === 2 ? 'tab-publish' : ''}}" bindtap="onSwitchTab" data-index="{{index}}">
+    <view class="tab-icon-wrap">
+      <image class="tab-icon" src="{{selected === index ? item.activeIcon : item.icon}}" mode="aspectFit"></image>
+    </view>
+    <text class="tab-label">{{item.text}}</text>
+  </view>
+</view>

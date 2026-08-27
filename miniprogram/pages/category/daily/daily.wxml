@@ -1,0 +1,16 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">吐槽树洞</text><subscribe-btn section-id="4" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'share' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="share"><text>生活分享</text></view>
+    <view class="tab-item {{activeTab === 'positive' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="positive"><text>正能量</text></view>
+    <view class="tab-item {{activeTab === 'fun' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="fun"><text>校园趣事</text></view>
+    <view class="tab-item {{activeTab === 'rant' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="rant"><text>匿名吐槽</text></view>
+  </view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="暂无动态" customIcon="🌟"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

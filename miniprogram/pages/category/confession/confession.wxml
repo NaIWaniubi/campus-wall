@@ -1,0 +1,27 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">表白墙</text><subscribe-btn section-id="3" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all">
+      <text>全部</text>
+    </view>
+    <view class="tab-item {{activeTab === 'confession' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="confession">
+      <text>表白</text>
+    </view>
+    <view class="tab-item {{activeTab === 'birthday' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="birthday">
+      <text>祝福</text>
+    </view>
+    <view class="tab-item {{activeTab === 'mention' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="mention">
+      <text>@同学</text>
+    </view>
+  </view>
+
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{posts.length === 0}}" text="还没有表白内容，快来表白吧" customIcon="💕" btnText="去表白" bind:btntap="onGoPublish"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+
+  <view class="fab-btn" bindtap="onGoPublish">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

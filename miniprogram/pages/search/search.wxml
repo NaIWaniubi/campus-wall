@@ -1,0 +1,52 @@
+<view class="page-search {{perfLowClass}}">
+  <view class="search-header">
+    <view class="search-input-wrap flex-row">
+      <image class="search-icon" src="/images/icon_search.png" mode="aspectFit"></image>
+      <input class="search-input" placeholder="搜索内容、话题、用户" value="{{keyword}}" bindinput="onInput" bindconfirm="onSearch" confirm-type="search" focus="{{true}}" />
+      <text class="clear-btn" wx:if="{{keyword}}" bindtap="onClear">✕</text>
+    </view>
+    <text class="cancel-btn" bindtap="onCancel">取消</text>
+  </view>
+
+  <view class="search-content" wx:if="{{!hasSearched}}">
+    <view class="hot-search" wx:if="{{hotTopics.length > 0}}">
+      <view class="section-header flex-between">
+        <text class="section-title">热门话题</text>
+      </view>
+      <view class="hot-list">
+        <view class="hot-item flex-row" wx:for="{{hotTopics}}" wx:key="id" bindtap="onSearchTopic" data-name="{{item.name}}">
+          <text class="hot-index {{index < 3 ? 'top' : ''}}">{{index + 1}}</text>
+          <text class="hot-name">{{item.name}}</text>
+          <text class="hot-count gray-color">{{item.count}}讨论</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="history-search" wx:if="{{searchHistory.length > 0}}">
+      <view class="section-header flex-between">
+        <text class="section-title">搜索历史</text>
+        <text class="clear-history" bindtap="onClearHistory">清空</text>
+      </view>
+      <view class="history-list flex-wrap">
+        <view class="history-tag" wx:for="{{searchHistory}}" wx:key="*this" bindtap="onSearchHistory" data-keyword="{{item}}">
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="search-results" wx:if="{{hasSearched}}">
+    <view class="filter-tabs flex-row">
+      <view class="filter-tab {{activeFilter === 'all' ? 'active' : ''}}" bindtap="onFilterResult" data-filter="all"><text>全部</text></view>
+      <view class="filter-tab {{activeFilter === item.id ? 'active' : ''}}" wx:for="{{categoryList}}" wx:key="id" bindtap="onFilterResult" data-filter="{{item.id}}">
+        <text>{{item.name}}</text>
+      </view>
+    </view>
+
+    <view class="result-list">
+      <post-card wx:for="{{results}}" wx:key="id" post="{{item}}" current-user-id="{{currentUserId}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost" bind:follow="onFollowAuthor"></post-card>
+      <empty-state wx:if="{{results.length === 0 && loadMoreStatus !== 'loading'}}" text="未找到相关内容" customIcon="🔍"></empty-state>
+      <load-more wx:if="{{results.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+    </view>
+  </view>
+</view>

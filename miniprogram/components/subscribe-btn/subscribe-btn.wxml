@@ -1,0 +1,3 @@
+<view class="sub-toggle {{subscribed ? 'on' : ''}} {{busy ? 'busy' : ''}}" bindtap="onToggle">
+  <text>{{subscribed ? '已订阅' : '+ 订阅'}}</text>
+</view>

@@ -1,0 +1,19 @@
+<view class="empty-state {{size === 'small' ? 'empty-state--small' : ''}} {{animated ? 'empty-state--animated' : ''}}" wx:if="{{show}}">
+  <view class="empty-state__icon-wrap">
+    <image class="empty-state__image" src="{{image}}" mode="aspectFit" wx:if="{{image}}"></image>
+    <image class="empty-state__image" src="/images/empty.png" mode="aspectFit" wx:elif="{{!customIcon && !displayIcon}}"></image>
+    <text class="empty-state__icon-text" wx:elif="{{displayIcon}}">{{displayIcon}}</text>
+  </view>
+  <text class="empty-state__text">{{displayText}}</text>
+  <text class="empty-state__sub-text" wx:if="{{subText}}">{{subText}}</text>
+  <view class="empty-state__btn" hover-class="empty-state__btn--hover" wx:if="{{btnText}}" bindtap="onTapBtn">
+    <text>{{btnText}}</text>
+  </view>
+  <view class="empty-state__btn" hover-class="empty-state__btn--hover" wx:if="{{actionText}}" bindtap="onAction">
+    <text>{{actionText}}</text>
+  </view>
+  <view class="empty-state__btn empty-state__btn--outline" hover-class="empty-state__btn--hover" wx:if="{{type === 'network' || type === 'error'}}" bindtap="onRetry">
+    <text>点击重试</text>
+  </view>
+  <slot></slot>
+</view>

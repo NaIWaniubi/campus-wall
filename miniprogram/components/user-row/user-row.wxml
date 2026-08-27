@@ -1,0 +1,10 @@
+<view class="user-row">
+  <image class="avatar" src="{{user.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+  <view class="user-main">
+    <view class="nickname-row">
+      <text class="nickname">{{user.nickname}}</text>
+      <text wx:if="{{user.badge}}" class="credit-chip {{user.badge.cls}}">信誉{{user.badge.score}}</text>
+    </view>
+    <text class="signature">{{user.signature || '这个同学还没写签名'}}</text>
+  </view>
+</view>

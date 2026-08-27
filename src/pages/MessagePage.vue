@@ -241,7 +241,7 @@ onUnmounted(() => {
           <span v-if="!msg.isRead" class="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
         </button>
 
-        <EmptyState v-if="!list.length" text="暂无消息" />
+        <EmptyState v-if="!list.length" text="暂无消息" action-text="去逛逛" @action="router.push('/')" />
       </template>
     </main>
 
@@ -279,7 +279,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </button>
-            <EmptyState v-if="!convs.length" text="暂无会话，去帖子详情找作者聊聊吧" />
+            <EmptyState v-if="!convs.length" text="暂无会话，去帖子详情找作者聊聊吧" action-text="去逛逛" @action="router.push('/')" />
           </template>
         </aside>
 

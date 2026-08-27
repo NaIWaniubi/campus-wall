@@ -418,3 +418,24 @@ if (!userCols.some((c) => c.name === 'openid')) {
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_openid ON users (openid);
 `);
+
+/**
+ * 管理操作审计日志表（admin-security P2-12）
+ * - 字段对齐 kysely types.ts 的 AuditLogTable（DB 抽象层用）
+ * - 同步建在 kysely migration 0002_admin_logs.ts，供 PG 路径使用
+ * - detail 存 JSON 字符串（action 相关上下文：reason / duration / score 等）
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id INTEGER,
+    detail TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_id) REFERENCES users(id)
+  );
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_admin_logs_actor_created ON admin_logs (actor_id, created_at);`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_admin_logs_target ON admin_logs (target_type, target_id);`);

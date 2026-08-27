@@ -102,10 +102,18 @@ router.put('/users/:id/ban', superOnly, (req, res) => {
     db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
       id, 'system', `您的账号已被封禁，原因：${reason || '违规'}${banUntil ? `，解封时间：${new Date(banUntil).toLocaleString('zh-CN')}` : '，永久封禁'}`
     );
+    // 审计
+    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+      req.currentUser!.id, 'ban_user', 'user', id, JSON.stringify({ reason: reason || '违规', duration: duration || 'forever', banUntil })
+    );
     success(res, null, '已封禁用户');
   } else {
     db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ? WHERE id = ?').run('active', '', '', id);
     db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(id, 'system', '您的账号已解封');
+    // 审计
+    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+      req.currentUser!.id, 'unban_user', 'user', id, JSON.stringify({ reason: reason || '' })
+    );
     success(res, null, '已解封用户');
   }
   // 封禁/解封影响列表可见性，失效帖子缓存（审计 quality P2-7）
@@ -119,6 +127,10 @@ router.put('/users/:id/reset-password', superOnly, (req, res) => {
   if (!newPassword || newPassword.length < 6) return fail(res, '密码至少6位');
   const hashed = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, id);
+  // 审计（不存明文密码，仅记长度作为行为证据）
+  db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+    req.currentUser!.id, 'reset_password', 'user', id, JSON.stringify({ newLength: newPassword.length })
+  );
   success(res, null, '密码已重置');
 });
 
@@ -133,6 +145,10 @@ router.put('/users/:id/credit', superOnly, (req, res) => {
   db.prepare('UPDATE users SET credit_score = ? WHERE id = ?').run(newScore, id);
   db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
     id, 'system', `您的信誉分${score >= 0 ? '增加' : '减少'}${Math.abs(score)}分，当前信誉分：${newScore}${reason ? `，原因：${reason}` : ''}`
+  );
+  // 审计
+  db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+    req.currentUser!.id, 'adjust_credit', 'user', id, JSON.stringify({ delta: score, newScore, reason: reason || '' })
   );
   // 信誉分变化影响列表排序/可见性，失效帖子缓存（审计 quality P2-7）
   cacheInvalidate('posts');

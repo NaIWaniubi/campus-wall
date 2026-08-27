@@ -129,15 +129,29 @@ if (process.env.NODE_ENV === 'production') {
 
 /**
  * 错误处理中间件
+ * - MulterError：文件大小/类型错误，原属 4xx 客户端错误，必须用真 HTTP 400
+ *   之前误用 res.status(200).json({code:400})，会让 axios/前端拦截器把 4xx 业务错当成功处理（guest-newbie P2-15 + admin-security P3-15 同根）
+ * - 其他错误：生产环境统一返回「服务异常，请稍后重试」避免泄露堆栈/SQL/路径，细节仅进日志
  */
-app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Server Error:', error.message)
+app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
+  // 完整 stack 进日志，便于排查；响应只暴露安全的客户端错
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} Server Error:`, error)
+
   // multer 文件大小/类型错误
   if (error.name === 'MulterError') {
     const msg = (error as any).code === 'LIMIT_FILE_SIZE' ? '文件大小超过 5MB 限制' : error.message
-    return res.status(200).json({ code: 400, message: msg, data: null })
+    return res.status(400).json({ code: 400, message: msg, data: null })
   }
-  res.status(500).json({ code: 500, message: error.message || '服务器内部错误', data: null })
+
+  // Express body-parser 解析错误（如 JSON 语法错）也属 4xx
+  if ((error as any).type === 'entity.parse.failed' || (error as any).statusCode === 400) {
+    return res.status(400).json({ code: 400, message: '请求体格式错误', data: null })
+  }
+
+  // 其余一律 5xx：生产环境隐藏细节，开发环境保留 message 便于调试
+  const isProd = process.env.NODE_ENV === 'production'
+  const safeMessage = isProd ? '服务异常，请稍后重试' : (error.message || '服务器内部错误')
+  res.status(500).json({ code: 500, message: safeMessage, data: null })
 })
 
 /**

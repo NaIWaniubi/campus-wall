@@ -1,3 +1,6 @@
+@import './styles/tokens.css';
+@import './styles/themes.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,8 +9,8 @@
   font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   line-height: 1.6;
   font-weight: 400;
-  color: #18181b;
-  background-color: #fafafa;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -22,9 +25,11 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-text);
 }
 
-/* 自定义滚动条 */
+/* 自定义滚动条：使用 token 颜色，跟随主题 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -33,11 +38,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
+  background: var(--color-border-2);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+  background: var(--color-text-mute);
 }
 
 /* 隐藏横向滚动条但保留滚动 */
@@ -55,9 +60,14 @@ body {
   word-break: break-word;
 }
 
-/* 骨架屏动画 */
+/* 骨架屏动画：兼容旧 PostSkeleton 使用 .skeleton 类 */
 .skeleton {
-  background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 37%, #f4f4f5 63%);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 37%,
+    var(--color-surface-2) 63%
+  );
   background-size: 400% 100%;
   animation: skeleton-loading 1.4s ease infinite;
 }
@@ -65,9 +75,38 @@ body {
   0% { background-position: 100% 50%; }
   100% { background-position: 0 50%; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
 
 /* 关键词高亮 */
 .highlight {
-  color: #f59e0b;
+  color: var(--color-accent-500);
   font-weight: 600;
+}
+
+/* 三档响应式布局工具类（App.vue 容器） */
+.app-shell {
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+.app-container {
+  width: 100%;
+  margin: 0 auto;
+  max-width: 100%;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+@media (min-width: 640px) {
+  .app-container {
+    max-width: var(--container-max);
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
+@media (min-width: 960px) {
+  .app-container {
+    max-width: var(--container-max);
+  }
 }

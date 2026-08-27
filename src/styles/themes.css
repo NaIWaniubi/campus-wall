@@ -1,0 +1,38 @@
+/**
+ * 主题层：通过 [data-theme] 覆盖 tokens.css 的同名变量。
+ * App.vue 启动时根据 useThemeStore 写到 <html data-theme="...">。
+ */
+
+[data-theme='dark'] {
+  /* === 表面 / 文字 / 边框（dark 覆盖） === */
+  --color-surface:    #18181B;
+  --color-surface-2:  #27272A;
+  --color-surface-3:  #3F3F46;
+  --color-border:     #3F3F46;
+  --color-border-2:   #52525B;
+  --color-text:       #FAFAFA;
+  --color-text-soft:  #D4D4D8;
+  --color-text-mute:  #71717A;
+  --color-bg:         #09090B;
+
+  /* 暗色阴影更深 */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+}
+
+/* 主题切换平滑过渡（仅色彩/背景，避免所有属性都动画） */
+html {
+  color-scheme: light;
+  background-color: var(--color-bg);
+}
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color var(--motion-normal) var(--ease-standard),
+              color var(--motion-normal) var(--ease-standard);
+}

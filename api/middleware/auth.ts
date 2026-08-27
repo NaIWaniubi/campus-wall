@@ -5,6 +5,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.js';
 import { db } from '../db.js';
 import { unauthorized, forbidden } from '../utils/response.js';
+import { shouldLiftBan } from '../utils/auth-helpers.js';
 
 // 扩展 Request 类型，携带当前用户
 declare global {
@@ -38,8 +39,7 @@ function extractToken(req: Request): string | null {
  * @returns true 表示本次已解封
  */
 export function liftExpiredBan(user: { id: number; status: string; ban_until?: string | null }): boolean {
-  if (user.status !== 'banned') return false;
-  if (!user.ban_until || new Date(user.ban_until).getTime() > Date.now()) return false;
+  if (!shouldLiftBan(user)) return false;
   db.prepare("UPDATE users SET status = 'active', ban_until = NULL WHERE id = ?").run(user.id);
   return true;
 }

@@ -8,6 +8,8 @@ import { success, fail, forbidden } from '../utils/response.js';
 import { assessRisk } from '../utils/sensitive.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
+import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
+import { applyDirectionFilter } from '../utils/direction-filter.js';
 import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
 
 const router = Router();
@@ -142,14 +144,15 @@ router.get('/', authOptional, (req, res) => {
     }
   }
   // 失物方向筛选：仅当目标板块为失物招领类时生效（lost=丢失 / found=拾到）
-  const direction = (req.query.direction as string) || '';
+  const directionRaw = (req.query.direction as string) || '';
   let directionApplied = '';
-  if ((direction === 'lost' || direction === 'found') && sectionId > 0) {
+  if (sectionId > 0) {
     const sec = db.prepare('SELECT name FROM sections WHERE id = ?').get(sectionId) as any;
-    if (sec && isLostFoundSection(sec.name)) {
+    const { applied } = applyDirectionFilter(directionRaw, sectionId, sec?.name);
+    if (applied) {
       where += ` AND json_extract(p.extra_fields, '$.direction') = ?`;
-      params.push(direction);
-      directionApplied = direction;
+      params.push(applied);
+      directionApplied = applied;
     }
   }
 
@@ -390,29 +393,8 @@ router.put('/:id', authRequired, (req, res) => {
   const id = Number(req.params.id);
   const { title, content, images, isAnonymous, extraFields } = req.body;
 
-  // extraFields 扩展键白名单（校园墙业务字段，取前端与 routes 并集；direction=失物方向，缺失会在编辑时剥掉导致帖子从双 tab 消失）
-  const EXTRA_FIELD_WHITELIST = [
-    'price', 'contact', 'location', 'tradeType',
-    'condition', 'time', 'itemType', 'organizer', 'direction',
-  ];
-  const MAX_EXTRA_VALUE_LEN = 200;
-
-  // 校验并清洗 extraFields：仅允许白名单键，限制值长度与嵌套深度（防存储膨胀/注入）
-  function sanitizeExtraFields(input: any): Record<string, any> {
-    const cleaned: Record<string, any> = {};
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return cleaned;
-    for (const key of Object.keys(input)) {
-      if (!EXTRA_FIELD_WHITELIST.includes(key)) continue;
-      const val = input[key];
-      if (val === null || val === undefined) continue;
-      // 仅允许字符串/数字，拒绝对象/数组嵌套
-      if (typeof val === 'object') continue;
-      const str = String(val);
-      if (str.length > MAX_EXTRA_VALUE_LEN) continue;
-      cleaned[key] = str;
-    }
-    return cleaned;
-  }
+  // extraFields 合并语义：请求键（过白名单后）覆盖库中现有键，未传的现有键保留
+  // （否则编辑漏带 direction 等扩展键会被整体抹除，帖子从对应筛选 tab 消失）
 
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
@@ -437,7 +419,7 @@ router.put('/:id', authRequired, (req, res) => {
   // （否则编辑漏带 direction 等扩展键会被整体抹除，帖子从对应筛选 tab 消失）
   const sanitizedExtra = sanitizeExtraFields(extraFields);
   const existingExtra = JSON.parse(post.extra_fields || '{}');
-  const finalExtra = { ...existingExtra, ...sanitizedExtra };
+  const finalExtra = mergeExtraFields(existingExtra, sanitizedExtra);
   // 风险标记跟随最新内容重建（白名单会剥离旧标记）
   if (risk.level === 'warn') {
     finalExtra.riskFlag = { level: 'warn', hits: risk.hits };

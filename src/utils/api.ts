@@ -41,7 +41,7 @@ export const userApi = {
   updateProfile: (data: { nickname?: string; avatar?: string; signature?: string }) => request.put('/users/profile', data),
   myPosts: () => request.get('/users/me/posts'),
   myComments: () => request.get('/users/me/comments'),
-  myFavorites: () => request.get('/users/me/favorites'),
+  myFavorites: (params?: { page?: number; pageSize?: number }) => request.get('/users/me/favorites', { params }),
   myLikes: (params: { page?: number; pageSize?: number }) => request.get('/users/me/likes', { params }),
 }
 
@@ -80,7 +80,8 @@ export const messageApi = {
 export const sectionApi = {
   list: (all?: boolean) => request.get('/sections', { params: all ? { all: 1 } : {} }),
   hotSearch: () => request.get('/search/hot'),
-  search: (keyword: string, page?: number) => request.get('/search', { params: { keyword, page } }),
+  search: (keyword: string, params: { page?: number; sectionId?: number; sort?: 'new' | 'hot' } = {}) =>
+    request.get('/search', { params: { keyword, ...params } }),
 }
 
 // 草稿

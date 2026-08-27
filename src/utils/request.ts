@@ -33,7 +33,8 @@ request.interceptors.response.use(
     // 401：未登录或Token过期
     if (res.code === 401) {
       const userStore = useUserStore()
-      const currentPath = router.currentRoute.value.path
+      // 用 fullPath 而非 path：保留 query（如 /search?keyword=考研），避免回跳丢参
+      const currentPath = router.currentRoute.value.fullPath
       const wasAdmin = userStore.isAdmin
       // 清空登录状态
       userStore.logout()

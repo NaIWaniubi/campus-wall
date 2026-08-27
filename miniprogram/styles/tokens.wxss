@@ -1,0 +1,91 @@
+/* tokens.wxss —— 全局设计变量（方向 B 复用 2026-07-31 spec）
+ * 用法：page 作用域变量 + var(--xxx) 引用。
+ * 注意：WXSS 中 var() 不可 fallback 时回退到原 hex，规避老基础库兼容风险。
+ */
+
+page {
+  /* 颜色：中性 */
+  --color-bg: #ffffff;
+  --color-bg-soft: #fafafa;
+  --color-bg-muted: #f4f4f5;
+  --color-bg-elevated: #ffffff;
+  --color-bg-page: #F5F6F8;
+  --color-bg-overlay: rgba(0, 0, 0, 0.45);
+  --color-divider: #ececee;
+  --color-text-primary: #17202A;
+  --color-text-secondary: #4e5969;
+  --color-text-tertiary: #86909c;
+  --color-text-placeholder: #c9cdd4;
+  --color-text-inverse: #ffffff;
+
+  /* 颜色：品牌（沿用现有校园墙绿，避免破坏业务识别） */
+  --color-brand: #16A085;
+  --color-brand-soft: #20C4A4;
+  --color-brand-strong: #0E7C67;
+  --color-brand-tint: rgba(22, 160, 133, 0.1);
+  --color-accent: #FF6B6B;
+  --color-warning: #F59E0B;
+  --color-danger: #FF6B6B;
+  --color-success: #10B981;
+  --color-info: #2CC9DD;
+
+  /* 间距（4 倍数） */
+  --space-1: 4rpx;
+  --space-2: 8rpx;
+  --space-3: 12rpx;
+  --space-4: 16rpx;
+  --space-5: 20rpx;
+  --space-6: 24rpx;
+  --space-8: 32rpx;
+  --space-10: 40rpx;
+  --space-12: 48rpx;
+  --space-16: 64rpx;
+
+  /* 圆角 */
+  --radius-xs: 4rpx;
+  --radius-sm: 8rpx;
+  --radius-md: 12rpx;
+  --radius-lg: 16rpx;
+  --radius-xl: 24rpx;
+  --radius-pill: 999rpx;
+
+  /* 字号 */
+  --font-size-caption: 22rpx;
+  --font-size-body-s: 26rpx;
+  --font-size-body: 28rpx;
+  --font-size-body-l: 30rpx;
+  --font-size-title-s: 32rpx;
+  --font-size-title: 36rpx;
+  --font-size-title-l: 40rpx;
+  --font-size-display: 48rpx;
+
+  /* 字重 */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extra: 800;
+  --font-weight-black: 900;
+
+  /* 行高 */
+  --line-height-tight: 1.3;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  /* 阴影 */
+  --shadow-sm: 0 2rpx 8rpx rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4rpx 16rpx rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 8rpx 24rpx rgba(15, 23, 42, 0.08);
+
+  /* 动效 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+
+  /* 布局 */
+  --tabbar-height: 100rpx;
+  --navbar-height: 88rpx;
+  --safe-bottom: env(safe-area-inset-bottom);
+}

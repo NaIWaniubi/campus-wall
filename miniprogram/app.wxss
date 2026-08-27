@@ -1,0 +1,288 @@
+@import './styles/tokens.wxss';
+
+page {
+  background-color: var(--color-bg-page, #F5F6F8);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--font-size-body, 28rpx);
+  color: var(--color-text-primary, #17202A);
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+view, text, image, scroll-view, swiper {
+  box-sizing: border-box;
+}
+
+.container {
+  padding: 24rpx;
+  padding-bottom: 184rpx;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-ellipsis-2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.primary-color {
+  color: #16A085;
+}
+
+.danger-color {
+  color: #FF6B6B;
+}
+
+.warning-color {
+  color: #F59E0B;
+}
+
+.success-color {
+  color: #10B981;
+}
+
+.gray-color {
+  color: #7B8794;
+}
+
+.bg-white {
+  background-color: #ffffff;
+}
+
+.card {
+  background: var(--color-bg-elevated, #ffffff);
+  border-radius: var(--radius-xl, 28rpx);
+  padding: var(--space-6, 28rpx);
+  margin-bottom: var(--space-6, 24rpx);
+  box-shadow: var(--shadow-md, 0 18rpx 48rpx rgba(15, 23, 42, 0.06));
+  border: 1rpx solid var(--color-divider, #ececee);
+  transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-brand, #16A085), var(--color-brand-soft, #20C4A4));
+  color: var(--color-text-inverse, #ffffff);
+  border: none;
+  border-radius: var(--radius-xl, 24rpx);
+  padding: var(--space-5, 22rpx) var(--space-8, 44rpx);
+  font-size: var(--font-size-body-l, 30rpx);
+  font-weight: var(--font-weight-bold, 700);
+  text-align: center;
+  letter-spacing: 0;
+  box-shadow: 0 16rpx 34rpx rgba(22, 160, 133, 0.22);
+  transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.btn-outline {
+  background-color: var(--color-brand-tint, rgba(22, 160, 133, 0.06));
+  color: var(--color-brand, #16A085);
+  border: 1rpx solid rgba(22, 160, 133, 0.18);
+  border-radius: var(--radius-xl, 24rpx);
+  padding: 18rpx 38rpx;
+  font-size: var(--font-size-body-l, 30rpx);
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.btn-outline::after {
+  border: none;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2, 8rpx) var(--space-4, 18rpx);
+  border-radius: var(--radius-pill, 999rpx);
+  font-size: var(--font-size-caption, 22rpx);
+  margin-right: var(--space-3, 12rpx);
+  margin-bottom: var(--space-2, 8rpx);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.tag-primary {
+  background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
+  color: var(--color-brand-strong, #0E7C67);
+}
+
+.tag-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #B45309;
+}
+
+.tag-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #DC2626;
+}
+
+.tag-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+}
+
+.divider {
+  height: 1rpx;
+  background: rgba(15, 23, 42, 0.08);
+  margin: 24rpx 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+}
+
+.empty-state image {
+  width: 240rpx;
+  height: 240rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-state text {
+  color: #A4B0BE;
+  font-size: 28rpx;
+}
+
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #EEF3F2, #DDE7E4);
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.08);
+}
+
+.avatar-small {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #EEF3F2, #DDE7E4);
+  border: 2rpx solid rgba(255, 255, 255, 0.95);
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #17202A;
+  margin-bottom: 20rpx;
+  letter-spacing: 0;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.card:active,
+.btn-primary:active,
+.btn-outline:active,
+.tag:active {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+.surface-blur {
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(24rpx);
+  -webkit-backdrop-filter: blur(24rpx);
+  border: 1rpx solid rgba(15, 23, 42, 0.06);
+}
+
+/* 低端机性能降级：在 Page 根容器加 .perf-low 后，关闭动画/过渡/模糊，减少合成层 */
+.perf-low .card,
+.perf-low .btn-primary,
+.perf-low .btn-outline,
+.perf-low .tag,
+.perf-low .avatar,
+.perf-low .avatar-small {
+  transition: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+.perf-low .surface-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #ffffff !important;
+}
+.perf-low .fade-in,
+.perf-low .fade-in-up {
+  animation: none !important;
+}
+.perf-low .card:active,
+.perf-low .btn-primary:active,
+.perf-low .btn-outline:active,
+.perf-low .tag:active {
+  transform: none !important;
+}

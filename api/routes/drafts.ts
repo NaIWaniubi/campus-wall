@@ -65,6 +65,33 @@ router.post('/', authRequired, (req, res) => {
   success(res, { id: result.lastInsertRowid }, '已保存至草稿箱');
 });
 
+// 更新草稿（编辑已有草稿走 PUT，不走 POST 重建——后者会撑爆 10 条上限并丢 created_at 顺序）
+// 路径：PUT /api/drafts?id=123
+router.put('/', authRequired, (req, res) => {
+  const id = Number(req.query.id);
+  if (!Number.isFinite(id) || id <= 0) return fail(res, '缺少有效 id（query ?id=）', 400, 400);
+  const existing = db.prepare('SELECT id FROM drafts WHERE id = ? AND user_id = ?').get(id, req.currentUser!.id) as any;
+  if (!existing) return fail(res, '草稿不存在或无权限', 404, 404);
+
+  const { sectionId, title, content, images, isAnonymous, extraFields } = req.body;
+  const imgs = Array.isArray(images) ? images : [];
+  db.prepare(`
+    UPDATE drafts
+    SET section_id = ?, title = ?, content = ?, images = ?, is_anonymous = ?, extra_fields = ?
+    WHERE id = ? AND user_id = ?
+  `).run(
+    sectionId || null,
+    (title || '').trim(),
+    content || '',
+    JSON.stringify(imgs),
+    isAnonymous ? 1 : 0,
+    JSON.stringify(extraFields || {}),
+    id,
+    req.currentUser!.id
+  );
+  success(res, { id }, '草稿已更新');
+});
+
 // 删除草稿
 router.delete('/:id', authRequired, (req, res) => {
   const id = Number(req.params.id);

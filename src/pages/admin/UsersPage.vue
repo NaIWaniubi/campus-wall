@@ -17,12 +17,16 @@ const page = ref(1)
 const pageSize = 20
 const loading = ref(false)
 const keyword = ref('')
+const statusFilter = ref('') // '' = 全部
+const roleFilter = ref('')   // '' = 全部
 
 async function load() {
   loading.value = true
   try {
     const res: any = await adminApi.users({
       keyword: keyword.value || undefined,
+      status: statusFilter.value || undefined,
+      role: roleFilter.value || undefined,
       page: page.value,
       pageSize,
     })
@@ -126,8 +130,8 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <!-- 搜索栏 -->
-    <div class="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm flex items-center gap-2">
-      <div class="relative flex-1 max-w-md">
+    <div class="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm flex items-center gap-2 flex-wrap">
+      <div class="relative flex-1 max-w-md min-w-[200px]">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
         <input
           v-model="keyword"
@@ -136,6 +140,17 @@ onMounted(load)
           @keyup.enter="onSearch"
         />
       </div>
+      <select v-model="statusFilter" class="px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" @change="onSearch">
+        <option value="">全部状态</option>
+        <option value="active">正常</option>
+        <option value="banned">封禁</option>
+      </select>
+      <select v-model="roleFilter" class="px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" @change="onSearch">
+        <option value="">全部角色</option>
+        <option value="user">普通用户</option>
+        <option value="section_admin">板块管理员</option>
+        <option value="super_admin">超级管理员</option>
+      </select>
       <button class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium" @click="onSearch">搜索</button>
     </div>
 

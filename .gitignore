@@ -52,3 +52,6 @@ public/uploads/
 tmp-test-*.jpg
 tmp-test-*.png
 .e2e-reveal.mjs
+
+# Temporary npm cache (NOT in node_modules, npm writes to this when --cache is redirected)
+.npm-tmp-cache/

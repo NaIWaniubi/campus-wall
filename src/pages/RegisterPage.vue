@@ -39,10 +39,20 @@ const canSubmit = computed(() =>
   form.agreement
 )
 
+function showAgreement() {
+  toast.info('用户协议与隐私政策正在完善中')
+}
+
 async function handleSubmit() {
   if (!canSubmit.value) {
-    if (!form.agreement) toast.error('请先同意用户协议')
-    else toast.error('请检查表单填写')
+    // 逐项指出不满足的字段（先必填校验，再选填 + 协议）
+    const missing: string[] = []
+    if (!/^\d{6,12}$/.test(form.studentId)) missing.push('学号格式（6-12位数字）')
+    if (form.password.length < 6) missing.push('密码（至少6位）')
+    if (form.confirmPassword !== form.password) missing.push('两次密码不一致')
+    if (form.nickname.trim().length < 1) missing.push('昵称')
+    if (!form.agreement) missing.push('同意用户协议')
+    toast.error(missing.length ? `请检查：${missing.join('、')}` : '请检查表单填写')
     return
   }
   if (loading.value) return
@@ -137,10 +147,10 @@ async function handleSubmit() {
 
         <label class="flex items-start gap-2 text-sm text-zinc-600 cursor-pointer">
           <input v-model="form.agreement" type="checkbox" class="mt-0.5 w-4 h-4 rounded accent-brand-500" />
-          <span>我已阅读并同意 <a class="text-brand-600">《用户协议》</a> 和 <a class="text-brand-600">《隐私政策》</a></span>
+          <span>我已阅读并同意 <a class="text-brand-600 cursor-pointer hover:underline" @click.prevent="showAgreement">《用户协议》</a> 和 <a class="text-brand-600 cursor-pointer hover:underline" @click.prevent="showAgreement">《隐私政策》</a></span>
         </label>
 
-        <button type="button" :disabled="loading || !canSubmit"
+        <button type="button" :disabled="loading"
           class="w-full py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
           @click="handleSubmit">
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />

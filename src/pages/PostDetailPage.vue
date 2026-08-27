@@ -46,9 +46,27 @@ const commentPosting = ref(false)
 // 后端返回 isMine 字段，匿名帖子也能正确判断作者身份，用于显示删除按钮
 const isAuthor = computed(() => !!post.value?.isMine)
 const isPending = computed(() => post.value?.status === 'pending')
+const isRejected = computed(() => post.value?.status === 'rejected')
+const isOffline = computed(() => post.value?.status === 'offline')
 const canInteract = computed(() => !isPending.value)
 // 未登录时也禁用评论输入，提示登录
 const canComment = computed(() => userStore.isLoggedIn && !isPending.value)
+
+// 作者 + (已发布或被驳回) + 24h 内 → 可去修改
+function isWithin24h(t?: string | number) {
+  const v = t ? new Date(t).getTime() : 0
+  return v > 0 && Date.now() - v < 24 * 60 * 60 * 1000
+}
+const canEdit = computed(() => {
+  if (!isAuthor.value) return false
+  if (!post.value) return false
+  if (!isWithin24h(post.value.createdAt)) return false
+  // published 可正常编辑；rejected 走"修改重发"路径（同样 24h 限制，与 MyPostsPage 对齐）
+  return post.value.status === 'published' || post.value.status === 'rejected'
+})
+function goEdit() {
+  router.push(`/publish?edit=${postId.value}`)
+}
 
 // ---------- 作者互动：私信 / 关注 ----------
 // 非匿名且非本人时才展示（匿名作者不可私信/关注，避免暴露身份）
@@ -203,16 +221,40 @@ async function submitRate() {
   }
 }
 
+// 加载失败类型：404 → 真不存在（强制回首页并明确提示）；网络/超时 → 留在原页给重试按钮
+type FetchPostErrorKind = 'not-found' | 'network' | 'timeout' | 'other'
+function classifyError(e: any): FetchPostErrorKind {
+  if (e?.response?.status === 404) return 'not-found'
+  // 后端约定 res.code === 404 也代表资源不存在（response 拦截器会 reject）
+  if (e?.code === 404) return 'not-found'
+  if (e?.code === 'ECONNABORTED' || /timeout/i.test(String(e?.message || ''))) return 'timeout'
+  if (!e?.response) return 'network'
+  return 'other'
+}
+const loadError = ref<FetchPostErrorKind | null>(null)
+
 async function fetchPost() {
   loading.value = true
+  loadError.value = null
   try {
     const res: any = await postApi.detail(postId.value)
     post.value = res.data
     loadFollowStatus()
     loadTradeState()
-  } catch {
-    toast.error('帖子不存在或已删除')
-    router.replace('/')
+  } catch (e: any) {
+    const kind = classifyError(e)
+    loadError.value = kind
+    if (kind === 'not-found') {
+      // 仅真不存在才提示并强制回首页
+      toast.error('帖子不存在或已删除')
+      router.replace('/')
+    } else if (kind === 'timeout') {
+      toast.error('请求超时，请重试')
+    } else if (kind === 'network') {
+      toast.error('网络异常，请检查网络连接')
+    } else {
+      toast.error(e?.message || '加载失败')
+    }
   } finally {
     loading.value = false
   }
@@ -360,6 +402,13 @@ async function deletePost() {
   } catch {}
 }
 
+// 游客举报 → 引导登录
+function openReport() {
+  if (!userStore.isLoggedIn) return goLogin()
+  showMoreMenu.value = false
+  showReportSheet.value = true
+}
+
 async function submitReport(reason: string) {
   showReportSheet.value = false
   showMoreMenu.value = false
@@ -423,7 +472,7 @@ function closeMoreMenu(e: MouseEvent) {
           <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" @click="share">
             <Share2 class="w-4 h-4" /> 分享
           </button>
-          <button v-if="!isAuthor" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" @click="showReportSheet = true; showMoreMenu = false">
+          <button v-if="!isAuthor" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" @click="openReport">
             <Flag class="w-4 h-4" /> 举报
           </button>
           <button v-if="isAuthor" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50" @click="showDeleteDialog = true; showMoreMenu = false">
@@ -449,6 +498,24 @@ function closeMoreMenu(e: MouseEvent) {
       <div class="flex justify-center py-8">
         <Loader2 class="w-6 h-6 text-brand-400 animate-spin" />
       </div>
+    </main>
+
+    <!-- 加载失败（非 404 留在原页给重试按钮；404 已在 fetchPost 内强制回首页） -->
+    <main v-else-if="loadError" class="max-w-[960px] mx-auto px-4 py-16 text-center">
+      <div class="w-14 h-14 mx-auto rounded-full bg-zinc-100 flex items-center justify-center mb-3">
+        <Loader2 class="w-7 h-7 text-zinc-400" />
+      </div>
+      <p class="text-sm text-zinc-600 mb-1">
+        {{ loadError === 'timeout' ? '请求超时，请检查网络后重试' : '网络异常，请检查网络后重试' }}
+      </p>
+      <p class="text-xs text-zinc-400 mb-4">该帖子可能仍存在，只是当前无法加载</p>
+      <button
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 active:scale-95 transition"
+        @click="fetchPost"
+      >
+        <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
+        重新加载
+      </button>
     </main>
 
     <main v-if="post" class="max-w-[960px] mx-auto px-4 py-4">
@@ -497,6 +564,36 @@ function closeMoreMenu(e: MouseEvent) {
       <div v-if="isPending" class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-3 text-sm text-amber-700 flex items-center gap-2">
         <span class="font-medium">审核中</span>
         <span class="text-amber-600/80">帖子正在审核，审核通过后方可互动</span>
+      </div>
+
+      <!-- 被驳回状态条：仅作者可见，附驳回原因 + 去修改入口（衔接 24h 编辑窗口） -->
+      <div v-if="isRejected && isAuthor" class="bg-red-50 border border-red-100 rounded-xl p-3 mb-3 text-sm text-red-600">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="font-medium">已驳回</span>
+          <span class="text-red-500/80">该帖子未通过审核</span>
+        </div>
+        <p v-if="post.rejectReason || post.reason" class="text-xs text-red-500/90 leading-relaxed">
+          驳回原因：{{ post.rejectReason || post.reason }}
+        </p>
+        <div class="mt-2.5 flex items-center gap-2">
+          <button
+            v-if="canEdit"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-red-200 text-red-600 text-xs font-medium hover:bg-red-100 active:scale-95 transition"
+            @click="goEdit"
+          >
+            去修改
+          </button>
+          <span v-else class="text-xs text-red-500/70">已超过 24 小时修改窗口，请删除后重新发布</span>
+        </div>
+      </div>
+
+      <!-- 已下架状态条（兜底） -->
+      <div v-else-if="isOffline && isAuthor" class="bg-zinc-100 border border-zinc-200 rounded-xl p-3 mb-3 text-sm text-zinc-600">
+        <div class="flex items-center gap-2">
+          <span class="font-medium">已下架</span>
+          <span class="text-zinc-500/80">该帖子已被管理员下架</span>
+        </div>
+        <p v-if="post.rejectReason || post.reason" class="text-xs text-zinc-500 mt-1">原因：{{ post.rejectReason || post.reason }}</p>
       </div>
 
       <!-- 标题与正文 -->
@@ -600,7 +697,7 @@ function closeMoreMenu(e: MouseEvent) {
         <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.favorited ? 'text-brand-500 bg-brand-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleFavorite">
           <Bookmark class="w-5 h-5" :fill="post.favorited ? 'currentColor' : 'none'" /> {{ post.favoriteCount }}
         </button>
-        <button v-if="!isAuthor" class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95" @click="showReportSheet = true">
+        <button v-if="!isAuthor" class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95" @click="openReport">
           <Flag class="w-5 h-5" /> 举报
         </button>
       </div>

@@ -52,7 +52,7 @@ function highlight(text: string): string {
     <!-- 作者信息 -->
     <div class="flex items-center gap-3 mb-3">
       <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
-        <img v-if="author.avatar" :src="author.avatar" class="w-full h-full object-cover" alt="头像" />
+        <img v-if="author.avatar" :src="author.avatar" class="w-full h-full object-cover" loading="lazy" decoding="async" alt="头像" />
         <span v-else class="text-sm font-bold text-brand-700">{{ author.nickname?.charAt(0) || '匿' }}</span>
       </div>
       <div class="flex-1 min-w-0">

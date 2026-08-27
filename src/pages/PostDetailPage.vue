@@ -402,9 +402,9 @@ async function deletePost() {
   } catch {}
 }
 
-// 游客举报 → 引导登录
+// 游客举报 → 引导登录（带 redirect 回跳）
 function openReport() {
-  if (!userStore.isLoggedIn) return goLogin()
+  if (!userStore.isLoggedIn) return router.push({ path: '/login', query: { redirect: route.fullPath } })
   showMoreMenu.value = false
   showReportSheet.value = true
 }

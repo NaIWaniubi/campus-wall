@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
-import { success, fail } from '../utils/response.js';
+import { success, fail, toCamel } from '../utils/response.js';
 import { formatPost } from './posts.js';
 
 const router = Router();
@@ -23,7 +23,7 @@ router.get('/:id', (req, res) => {
   const id = Number(req.params.id);
   const user = db.prepare('SELECT id, nickname, avatar, college, grade, signature, credit_score, created_at FROM users WHERE id = ? AND status != \'banned\'').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);
-  success(res, { ...user, created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at });
+  success(res, toCamel(user));
 });
 
 // 更新个人资料
@@ -53,7 +53,7 @@ router.put('/profile', authRequired, (req, res) => {
   db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
   const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(req.currentUser!.id) as any;
-  success(res, { ...user, created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at }, '资料更新成功');
+  success(res, toCamel(user), '资料更新成功');
 });
 
 // 我的帖子

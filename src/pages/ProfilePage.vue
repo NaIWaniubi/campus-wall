@@ -98,7 +98,7 @@ function gotoFollow(t: FollowTab) {
 }
 
 const user = computed(() => userStore.user)
-const credit = computed(() => user.value?.credit_score || 0)
+const credit = computed(() => user.value?.creditScore || 0)
 const permissionText = computed(() => {
   if (!userStore.canPost) return '信誉分低于60，暂不可发帖/评论'
   if (userStore.canAnonymous) return `可发帖、可匿名 · 每日上限 ${userStore.postLimit} 条`
@@ -200,7 +200,7 @@ onMounted(() => {
               </span>
             </div>
             <div class="text-xs text-white/80 space-y-0.5">
-              <p>学号：{{ user?.student_id || '-' }}</p>
+              <p>学号：{{ user?.studentId || '-' }}</p>
               <p>{{ user?.college || '未设置学院' }} · {{ user?.grade || '未设置年级' }}</p>
             </div>
           </div>

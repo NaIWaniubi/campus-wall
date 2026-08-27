@@ -2,11 +2,13 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
+import { useUserStore } from '@/stores/user'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AiAssistant from '@/components/AiAssistant.vue'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
+const userStore = useUserStore()
 
 // 未读红点激活：30s 低频轮询 + focus/回前台边沿即时刷新；后台标签页暂停轮询
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -43,6 +45,9 @@ function onWake() {
 onMounted(async () => {
   // 启动时应用主题（设置 data-theme / theme-color）
   themeStore.init()
+  // 把持久化里可能存在的旧版 snake_case 字段（student_id/credit_score/created_at）
+  // 迁到新字段名（studentId/creditScore/createdAt），避免刷新后页面访问 user.creditScore 变 undefined
+  userStore.migrateLegacyUser()
   await appStore.fetchSections()
   refreshUnread()
   startPoll()

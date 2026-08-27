@@ -17,7 +17,7 @@ const userId = computed(() => Number(route.params.id))
 const user = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
-const credit = computed(() => user.value?.credit_score || 0)
+const credit = computed(() => user.value?.creditScore || 0)
 
 // ---------- 交易互评 ----------
 const ratings = ref<any[]>([])
@@ -115,7 +115,7 @@ onMounted(() => {
           </div>
         </div>
         <p v-if="user.signature" class="mt-3 text-sm text-white/90 italic line-clamp-2">"{{ user.signature }}"</p>
-        <p class="mt-2 text-[11px] text-white/60">校园墙第 {{ user.id }} 位同学 · 加入于 {{ formatTime(user.created_at) }}</p>
+        <p class="mt-2 text-[11px] text-white/60">校园墙第 {{ user.id }} 位同学 · 加入于 {{ formatTime(user.createdAt) }}</p>
       </div>
 
       <!-- 信誉分 -->

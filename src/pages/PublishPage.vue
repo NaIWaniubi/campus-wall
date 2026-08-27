@@ -43,7 +43,7 @@ const SECTION_KIND_MAP: Record<number, string> = {
   8: 'teamup',
 }
 const sectionKind = computed(() => SECTION_KIND_MAP[form.sectionId] || '')
-const creditScore = computed(() => userStore.user?.credit_score ?? 0)
+const creditScore = computed(() => userStore.user?.creditScore ?? 0)
 
 // 所有信誉门槛拒绝统一文案：讲清门槛、现状与恢复路径
 function creditDenyToast(need: number) {

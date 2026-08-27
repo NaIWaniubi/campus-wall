@@ -9,7 +9,7 @@ import { db } from '../db.js';
 import { generateToken } from '../utils/jwt.js';
 import { authRequired, liftExpiredBan } from '../middleware/auth.js';
 import { authRateLimit, recordAuthFailure, clearAuthFailures } from '../middleware/rateLimit.js';
-import { success, fail } from '../utils/response.js';
+import { success, fail, toCamel } from '../utils/response.js';
 
 const router = Router();
 
@@ -82,22 +82,7 @@ router.post('/wx-login', async (req, res) => {
   }
 
   const token = generateToken({ id: user.id, studentId: user.student_id, role: user.role });
-  success(res, {
-    token,
-    user: {
-      id: user.id,
-      student_id: user.student_id,
-      nickname: user.nickname,
-      avatar: user.avatar,
-      college: user.college,
-      grade: user.grade,
-      signature: user.signature,
-      credit_score: user.credit_score,
-      role: user.role,
-      status: user.status,
-      created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at,
-    },
-  }, '登录成功');
+  success(res, { token, user: toCamel(user) }, '登录成功');
 });
 
 // 学号格式校验：纯数字，6-12位
@@ -139,7 +124,7 @@ router.post('/register', authRateLimit, (req, res) => {
 
   const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(userId) as any;
 
-  success(res, { token, user: { ...user, created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at } }, '注册成功');
+  success(res, { token, user: toCamel(user) }, '注册成功');
 });
 
 // 登录
@@ -172,21 +157,7 @@ router.post('/login', authRateLimit, (req, res) => {
   clearAuthFailures(req);
 
   const token = generateToken({ id: user.id, studentId: user.student_id, role: user.role });
-  const userData = {
-    id: user.id,
-    student_id: user.student_id,
-    nickname: user.nickname,
-    avatar: user.avatar,
-    college: user.college,
-    grade: user.grade,
-    signature: user.signature,
-    credit_score: user.credit_score,
-    role: user.role,
-    status: user.status,
-    created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at,
-  };
-
-  success(res, { token, user: userData }, '登录成功');
+  success(res, { token, user: toCamel(user) }, '登录成功');
 });
 
 // 获取当前用户信息
@@ -195,7 +166,7 @@ router.get('/me', authRequired, (req, res) => {
   if (!user) {
     return fail(res, '用户不存在', 404, 404);
   }
-  success(res, { ...user, created_at: user.created_at ? new Date(user.created_at).toISOString() : user.created_at });
+  success(res, toCamel(user));
 });
 
 // 修改密码

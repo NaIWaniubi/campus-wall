@@ -9,7 +9,7 @@ import type { Server } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { ClientMsg, type TClientMsg } from './protocol.js';
 import { authJwt } from './auth.js';
-import { attach, detach, subscribeTopic, unsubscribeTopic, subscribeConv } from './hub.js';
+import { attach, detach, subscribeTopic, unsubscribeTopic } from './hub.js';
 import { handleMessage } from './handlers/message.js';
 
 const HELLO_TIMEOUT_MS = 10_000;

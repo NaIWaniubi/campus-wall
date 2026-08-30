@@ -55,3 +55,7 @@ tmp-test-*.png
 
 # Temporary npm cache (NOT in node_modules, npm writes to this when --cache is redirected)
 .npm-tmp-cache/
+
+# vitest 本地重定向日志
+vitest-out.txt
+vitest-err.txt

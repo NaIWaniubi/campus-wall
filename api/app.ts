@@ -16,6 +16,7 @@ import './db.js'
 import { db } from './db.js'
 import { getStorage } from './storage/index.js'
 import { stats as wsStats } from './ws/hub.js'
+import { buildOpenApiDocument, swaggerHtml } from './openapi/document.js'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
 import commentRoutes from './routes/comments.js'
@@ -115,6 +116,18 @@ app.use('/api/feedback', feedbackRoutes)
 app.use('/api/conversations', conversationRoutes)
 // 关注路由与 users 共用前缀（均为两段以上路径，不与 users.ts 的单段 /:id 冲突）
 app.use('/api/users', followRoutes)
+
+/**
+ * OpenAPI 契约（spec-C T7 裁剪版）：zod schema 为唯一契约源
+ * - /api/openapi.json：机器可读 spec（3.1），CI/前端联调可直接消费
+ * - /api/docs：Swagger UI（CDN 静态页，零依赖挂载）
+ */
+app.get('/api/openapi.json', (_req: Request, res: Response) => {
+  res.json(buildOpenApiDocument())
+})
+app.get('/api/docs', (_req: Request, res: Response) => {
+  res.type('html').send(swaggerHtml())
+})
 
 /**
  * 健康检查（升级版）：db / storage / ws 三路探测 + uptime/version + 5xx 计数

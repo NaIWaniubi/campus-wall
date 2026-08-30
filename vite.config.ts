@@ -42,6 +42,12 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // WS 实时连接（私信/通知）走同源 /ws，代理到后端并启用 ws 协议转发
+      '/ws': {
+        target: 'http://localhost:3001',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 })

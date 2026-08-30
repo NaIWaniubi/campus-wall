@@ -21,5 +21,12 @@ app.use(router)
 // 登录态下启动 WS 实时连接（私信 + 通知；token 变化自动跟随，登出断开）
 if (useUserStore().isLoggedIn) useWebSocket().start()
 
+// PWA：仅生产环境注册 Service Worker（开发环境不注册，避免缓存干扰 HMR）
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 // 挂载应用
 app.mount('#app')

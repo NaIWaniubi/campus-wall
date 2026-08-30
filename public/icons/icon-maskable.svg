@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- maskable 版：全出血背景 + 内容缩至中央安全区（约 80%），适配 Android 自适应图标裁切 -->
+  <rect width="512" height="512" fill="#10B981"/>
+  <g fill="#ffffff" transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <rect x="96" y="150" width="146" height="56" rx="12"/>
+    <rect x="270" y="150" width="146" height="56" rx="12"/>
+    <rect x="183" y="228" width="146" height="56" rx="12"/>
+    <rect x="96" y="306" width="146" height="56" rx="12"/>
+    <rect x="270" y="306" width="146" height="56" rx="12"/>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- 校园墙应用图标：品牌绿底 + 白色错缝砖墙（几何构图，不依赖字体渲染） -->
+  <rect width="512" height="512" rx="112" fill="#10B981"/>
+  <g fill="#ffffff">
+    <rect x="96" y="150" width="146" height="56" rx="12"/>
+    <rect x="270" y="150" width="146" height="56" rx="12"/>
+    <rect x="183" y="228" width="146" height="56" rx="12"/>
+    <rect x="96" y="306" width="146" height="56" rx="12"/>
+    <rect x="270" y="306" width="146" height="56" rx="12"/>
+  </g>
+</svg>

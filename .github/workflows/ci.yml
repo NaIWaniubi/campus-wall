@@ -51,3 +51,24 @@ jobs:
 
       - name: Run E2E（5 条核心流，隔离库自动重建）
         run: npx playwright test
+
+  # LHCI 性能预算（非阻塞：Lighthouse 分数天然波动，先观察基线再收紧/移除 continue-on-error）
+  lighthouse:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Build
+        run: npm run build
+
+      - name: LHCI autorun
+        run: npx --yes @lhci/cli@0.14.x autorun

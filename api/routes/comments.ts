@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
+import { commentLimiter } from '../middleware/rateLimit.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
 import { upsertNotification } from '../utils/notification.js';
@@ -73,7 +74,7 @@ router.get('/posts/:id/comments', authOptional, (req, res) => {
 });
 
 // 发布评论
-router.post('/posts/:id/comments', authRequired, (req, res) => {
+router.post('/posts/:id/comments', authRequired, commentLimiter, (req, res) => {
   const postId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 
@@ -128,7 +129,7 @@ router.post('/posts/:id/comments', authRequired, (req, res) => {
 });
 
 // 楼中楼回复
-router.post('/comments/:id/reply', authRequired, (req, res) => {
+router.post('/comments/:id/reply', authRequired, commentLimiter, (req, res) => {
   const commentId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 

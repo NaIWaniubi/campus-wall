@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { authRequired } from '../middleware/auth.js';
+import { uploadLimiter } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 import sharp from 'sharp';
 import { getStorage } from '../storage/factory.js';
@@ -110,7 +111,7 @@ async function compressImage(filePath: string, ext: string): Promise<void> {
 
 const router = Router();
 
-router.post('/', authRequired, upload.single('file'), async (req, res) => {
+router.post('/', authRequired, uploadLimiter, upload.single('file'), async (req, res) => {
   if (!req.file) return fail(res, '请上传图片文件');
   const ext = path.extname(req.file.filename).toLowerCase();
 

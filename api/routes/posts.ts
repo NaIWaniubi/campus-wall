@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { assessRisk } from '../utils/sensitive.js';
+import { postLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
@@ -291,7 +292,7 @@ router.get('/:id', authOptional, (req, res) => {
 });
 
 // 发布帖子
-router.post('/', authRequired, (req, res) => {
+router.post('/', authRequired, postLimiter, (req, res) => {
   const { sectionId, title, content, images, isAnonymous, extraFields } = req.body;
 
   if (!sectionId) return fail(res, '请选择板块');

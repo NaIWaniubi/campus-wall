@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, getSetting } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
 import {
@@ -242,7 +243,7 @@ function currentModels(): string[] {
 }
 
 // ---------- 非流式对话 ----------
-router.post('/chat', authRequired, async (req: Request, res: Response) => {
+router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response) => {
   const message = String(req.body?.message || '').trim();
   const history: AiMessage[] = Array.isArray(req.body?.history) ? req.body.history : [];
 
@@ -280,7 +281,7 @@ router.post('/chat', authRequired, async (req: Request, res: Response) => {
 });
 
 // ---------- 流式对话（SSE） ----------
-router.post('/chat/stream', authRequired, async (req: Request, res: Response) => {
+router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: Response) => {
   const message = String(req.body?.message || '').trim();
   const history: AiMessage[] = Array.isArray(req.body?.history) ? req.body.history : [];
 

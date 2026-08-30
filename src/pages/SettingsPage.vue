@@ -4,14 +4,23 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Camera, Loader2, Lock, LogOut, UserX } from '@lucide/vue'
+import { ArrowLeft, Camera, Loader2, Lock, LogOut, Monitor, Moon, Sun, UserX } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { uploadApi, authApi } from '@/utils/api'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
+
+// 外观三态：亮色 / 暗色 / 跟随系统
+const themeOptions: { mode: ThemeMode; label: string; icon: any }[] = [
+  { mode: 'light', label: '亮色', icon: Sun },
+  { mode: 'dark', label: '暗色', icon: Moon },
+  { mode: 'system', label: '跟随系统', icon: Monitor },
+]
 
 const profileForm = reactive({
   nickname: '',
@@ -213,6 +222,22 @@ onMounted(() => {
           <Loader2 v-if="savingPassword" class="w-4 h-4 animate-spin" />
           {{ savingPassword ? '提交中...' : '修改密码' }}
         </button>
+      </section>
+
+      <!-- 外观设置 -->
+      <section class="bg-white rounded-xl p-4 space-y-3">
+        <h3 class="text-sm font-medium text-zinc-700">外观</h3>
+        <div class="grid grid-cols-3 gap-2">
+          <button v-for="opt in themeOptions" :key="opt.mode"
+            class="flex flex-col items-center gap-1.5 py-3 rounded-lg border text-xs transition"
+            :class="themeStore.mode === opt.mode
+              ? 'border-brand-500 bg-brand-50 text-brand-600 font-medium'
+              : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'"
+            @click="themeStore.setMode(opt.mode)">
+            <component :is="opt.icon" class="w-5 h-5" />
+            {{ opt.label }}
+          </button>
+        </div>
       </section>
 
       <!-- 危险操作 -->

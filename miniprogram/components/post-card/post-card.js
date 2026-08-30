@@ -43,6 +43,9 @@ Component({
       const images = post.images || []
       const thumbs = post.thumbImages || []
       next.gridImages = thumbs.length > 0 && thumbs.length === images.length ? thumbs : images
+      // 小红书式封面：有任何图就取首图做 cover（多图时其余进九宫格）
+      next.hasCover = next.gridImages.length > 0
+      next.coverImage = next.gridImages[0] || ''
       // 二手帖价格角标：已标记交易完成则显示「已售」
       next.showPriceBadge = post.category === 'trade' && !!(post.extra && post.extra.price)
       next.isSold = !!(post.extra && post.extra.soldAt)
@@ -57,8 +60,18 @@ Component({
     showCredit: false,
     creditTier: 'gray',
     gridImages: [],
+    hasCover: false,
+    coverImage: '',
     showPriceBadge: false,
-    isSold: false
+    isSold: false,
+    perfLow: false
+  },
+
+  lifetimes: {
+    attached() {
+      // 低端机降级：app.js 启动时探测，本组件关闭 transform/shadow 动画
+      this.setData({ perfLow: !!(getApp().globalData && getApp().globalData.perfLow) })
+    }
   },
 
   methods: {

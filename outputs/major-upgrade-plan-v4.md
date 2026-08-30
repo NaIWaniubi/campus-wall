@@ -139,6 +139,10 @@ D 方向 vitest/happy-dom 已入 package.json 但未 commit；A T3 虚拟滚动�
 - ✅ C-T12 备份加密 → `838eea1`（BACKUP_ENCRYPTION_KEY AES-256-GCM + 解密脚本，回路已验证）
 - ✅ A-T10 文档收尾 → README 能力清单更新 + 本追记
 
+### 第五批（2026-08-30 已完成，2 commit）
+- ✅ Q4 小程序草稿云同步 → `738e5c8`（publish.js 云优先/本地兜底 + 云端 upsert + 发布成功清理；新增草稿箱页 + mine 入口；33 个 mini 静态断言固守）
+- ✅ eslint 历史警告归零 → `b129235`（s3.ts / shadow-write.ts 6 个失效 disable 指令）
+
 ### 仍未做（后续批次候选）
 - C-T7 OpenAPI + zod（大工程，建议单独批）
 - C-T9 推送抽象 / Web Push（需外部服务与 env）
@@ -146,5 +150,3 @@ D 方向 vitest/happy-dom 已入 package.json 但未 commit；A T3 虚拟滚动�
 - D-T8 Sentry / D-T9 LHCI（外部服务 / Chrome 环境）
 - D-T10 VitePress 文档站（需新依赖；文档暂由 README 承接）
 - B-T4/T5 视觉任务（2026-07-31 spec，主观大改）
-- ⚠️ 新发现：小程序草稿仍为本地单槽（publish.js:57 wx.setStorageSync），Q4 的「草稿云同步」只做了后端 upsert 与 Web 端，小程序侧切 /drafts 未做
-- ⚠️ 新发现：6 个 eslint warning（s3.ts/shadow-write.ts 失效 eslint-disable 指令），历史遗留非阻塞

@@ -149,9 +149,15 @@ D 方向 vitest/happy-dom 已入 package.json 但未 commit；A T3 虚拟滚动�
 - ✅ B-T6 发布 Apple 风 → `a09beb1`（补回丢失的图片选择 UI——处理器在而 UI 缺；分类横滑胶囊）
 - 备注：视觉任务按「视觉照 spec、数据/事件契约保持现状」适配，未照抄 spec 里不存在的资产/字段
 
+### 第七批（2026-08-30 已完成，5 commit）——外部依赖全部预埋
+- ✅ Sentry → `f28fb20`（SENTRY_DSN 门控，后端 5xx 捕获 + 前端 init）
+- ✅ Web Push → `47e730c`（VAPID 门控：订阅表/接口/通知钩子/SW 接收器/设置页入口）
+- ✅ 小程序订阅消息 → `28c00e1`（模板 ID 门控：access_token 缓存 + chat/system 钩子 + /api/wx/push-config + 端上授权）
+- ✅ LHCI → `a7d1dc2`（非阻塞 CI job + 预算配置）+ deps `e0a1...`（sentry/web-push 依赖）
+- 验证：无凭据冒烟（public-key/config 返回 null、无 Sentry 日志、health/docs 200）+ 12/12 E2E + build 全绿
+- 凭据获取指引已写入 .env.example；到货后仅填 env 即点亮，无需改代码
+
 ### 仍未做（后续批次候选）
 - C-T7 OpenAPI + zod（大工程，建议单独批）
-- C-T9 推送抽象 / Web Push（需外部服务与 env）
 - D-T4/D-T5 Playwright E2E（需装包 + 浏览器下载）
-- D-T8 Sentry / D-T9 LHCI（外部服务 / Chrome 环境）
 - D-T10 VitePress 文档站（需新依赖；文档暂由 README 承接）

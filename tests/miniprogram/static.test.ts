@@ -196,6 +196,26 @@ describe('补充断言：高频页组件注册与关键契约', () => {
     }
   });
 
+  it('endpoints 覆盖云草稿契约（Q4：GET/POST/PUT ?id=/DELETE）', () => {
+    const ep = read('utils/endpoints.js');
+    expect(ep).toContain('/drafts');
+    expect(ep).toMatch(/const drafts = \{/);
+    expect(ep).toMatch(/update: \(id, data\) => put\('\/drafts\?id='/);
+  });
+
+  it('发布页云端同步：云优先恢复 + 发布前上云 + 成功清理（Q4 固守）', () => {
+    const publish = read('pages/publish/publish.js');
+    expect(publish).toContain('hydrateCloudDraft');
+    expect(publish).toContain('saveDraftToCloud');
+    expect(publish).toContain('drafts.remove');
+    expect(publish).toContain('publishDraftId');
+  });
+
+  it('草稿箱页面存在并注册（app.json + mine 入口）', () => {
+    expect(readJson('app.json').pages).toContain('pages/mine/drafts/drafts');
+    expect(read('pages/mine/mine.wxml')).toContain('onGoDrafts');
+  });
+
   it('auth 模块覆盖登录态（token 存取与 wxLogin 字样）', () => {
     const auth = read('utils/auth.js');
     expect(auth).toMatch(/token/i);

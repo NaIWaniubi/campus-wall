@@ -1,0 +1,26 @@
+<view class="page-drafts {{perfLowClass}}">
+  <!-- 未登录 -->
+  <view class="drafts-list" wx:if="{{!isLoggedIn}}">
+    <empty-state text="登录后查看云草稿" subText="草稿云端同步，换设备也能继续编辑" customIcon="📋" btnText="去登录" bind:btntap="onGoLogin"></empty-state>
+  </view>
+
+  <!-- 草稿列表 -->
+  <view class="drafts-list" wx:else>
+    <skeleton wx:if="{{loading && !list.length}}" type="post" count="{{3}}" />
+    <view class="draft-card card" wx:for="{{list}}" wx:key="id">
+      <view class="draft-main" hover-class="draft-main--hover" bindtap="onTapDraft" data-id="{{item.id}}">
+        <view class="draft-head flex-between">
+          <text class="draft-section">📝 {{item.sectionName}}</text>
+          <text class="draft-time gray-color">{{item.timeText}}</text>
+        </view>
+        <text class="draft-title">{{item.title}}</text>
+        <text class="draft-content gray-color" wx:if="{{item.content}}">{{item.content}}</text>
+        <view class="draft-foot flex-between">
+          <text class="draft-edit-hint">继续编辑 ></text>
+          <view class="draft-delete" hover-class="draft-delete--hover" catchtap="onDeleteDraft" data-id="{{item.id}}">删除</view>
+        </view>
+      </view>
+    </view>
+    <empty-state wx:if="{{list.length === 0 && !loading}}" text="暂无云草稿" subText="发布页填写的内容会自动同步到这里" customIcon="📋"></empty-state>
+  </view>
+</view>

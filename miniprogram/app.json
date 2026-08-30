@@ -25,7 +25,8 @@
     "pages/mine/feedback/feedback",
     "pages/admin/moderation/moderation",
     "pages/legal/userAgreement",
-    "pages/legal/privacyPolicy"
+    "pages/legal/privacyPolicy",
+    "pages/mine/drafts/drafts"
   ],
   "window": {
     "backgroundTextStyle": "light",

@@ -128,6 +128,16 @@ const admin = {
   users: (params) => get('/admin/users', params, false),
 }
 
+/* ---------- drafts 云草稿（Q4：跨设备可见；后端 GET/POST/PUT ?id=/DELETE） ---------- */
+const drafts = {
+  /** 最近 10 条，按 created_at DESC；字段已 camelCase（id/sectionId/title/content/images/isAnonymous/extraFields/createdAt） */
+  list: () => get('/drafts', {}, false),
+  save: (data) => post('/drafts', data, false),
+  /** 编辑已有草稿必须走 PUT ?id=，POST 会新建一条并挤掉旧草稿 */
+  update: (id, data) => put('/drafts?id=' + id, data, false),
+  remove: (id) => del('/drafts/' + id, {}, false),
+}
+
 /* ---------- upload（multipart） ---------- */
 const uploadFile = (filePath, name = 'file') => {
   return new Promise((resolve, reject) => {
@@ -178,5 +188,5 @@ module.exports = {
   get, post, put, del, request, uploadFile,
   absUrl, toMs,
   followToggle, followingList, followersList, followStatus,
-  posts, users, follow, search, messages, sections, feedback, admin,
+  posts, users, follow, search, messages, sections, feedback, admin, drafts,
 }

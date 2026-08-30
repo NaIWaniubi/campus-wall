@@ -1,6 +1,7 @@
 const app = getApp()
 const { getCategoryList, getSubTypeList } = require('../../utils/category')
-const { get, post, put, uploadFile } = require('../../utils/api')
+const { get, post, put, uploadFile, drafts } = require('../../utils/api')
+const { CATEGORY_TO_SECTION, SECTION_TO_CATEGORY } = require('../../utils/constants')
 const { showToast, chooseImage } = require('../../utils/util')
 
 /**
@@ -43,6 +44,7 @@ Page({
     tradeTypeIndex: -1,
     extraData: {},
     editId: '',
+    draftCloudId: 0,
     isEdit: false,
     publishTip: '先选择一个分类'
   },
@@ -53,9 +55,13 @@ Page({
     if (options.editId) {
       this.setData({ editId: options.editId, isEdit: true })
       this.loadPostForEdit(options.editId)
+    } else if (options.draftId) {
+      // 草稿箱跳入：按云端草稿 id 恢复（发布为 tabBar 页，经 storage 中转由 onShow 消费）
     } else {
       const draft = wx.getStorageSync('publishDraft')
       if (draft) this.restoreDraft(draft)
+      // 云端优先：异步拉取云草稿，拉到则覆盖本地单槽（Q4 跨设备可见）
+      this.hydrateCloudDraft()
     }
 
     if (options.category) {
@@ -75,11 +81,99 @@ Page({
       this.loadPostForEdit(editId)
       return
     }
+    // 草稿箱「继续编辑」：恢复指定云草稿（一次性消费，避免每次切 tab 触发）
+    const draftId = wx.getStorageSync('publishDraftId')
+    if (draftId) {
+      wx.removeStorageSync('publishDraftId')
+      this.resetForm()
+      this.setData({ editId: '', isEdit: false })
+      this.loadCloudDraft(Number(draftId))
+      return
+    }
     const category = wx.getStorageSync('publishCategory')
     if (category) {
       wx.removeStorageSync('publishCategory')
       if (this.data.isEdit) this.resetForm()
       this.onSelectCategory({ currentTarget: { dataset: { id: category } } })
+    }
+  },
+
+  // ---------- 云端草稿（Q4）：表单 <-> /drafts 契约 ----------
+
+  /** 表单 → 云草稿 payload：分类转 sectionId；本地临时图不上云（仅 http）；subType 挂 extraFields */
+  collectCloudPayload(localDraft) {
+    const d = localDraft || this.data
+    const extraFields = Object.assign({}, d.extraData, { subType: d.selectedSubType || '' })
+    return {
+      sectionId: CATEGORY_TO_SECTION[d.selectedCategory],
+      title: d.title || '',
+      content: d.content || '',
+      images: (d.imageList || []).filter(function (i) { return /^https?:/i.test(i) }),
+      isAnonymous: !!d.isAnonymous,
+      extraFields: extraFields
+    }
+  },
+
+  /** 云草稿 → 表单并恢复；同时镜像到本地单槽，弱网下次冷启动可恢复同一份 */
+  applyCloudDraft(cloud) {
+    if (!cloud || !cloud.id) return
+    const extra = cloud.extraFields || {}
+    const subType = extra.subType || ''
+    const extraData = Object.assign({}, extra)
+    delete extraData.subType
+    const form = {
+      selectedCategory: SECTION_TO_CATEGORY[Number(cloud.sectionId)] || '',
+      selectedSubType: subType,
+      title: cloud.title || '',
+      content: cloud.content || '',
+      imageList: Array.isArray(cloud.images) ? cloud.images : [],
+      isAnonymous: !!cloud.isAnonymous,
+      extraData: extraData
+    }
+    this.restoreDraft(form)
+    wx.setStorageSync('publishDraft', form)
+    this.setData({ draftCloudId: cloud.id })
+  },
+
+  /** 草稿箱「继续编辑」：按 id 拉取并恢复 */
+  async loadCloudDraft(id) {
+    try {
+      const list = await drafts.list()
+      const target = (list || []).find(function (d) { return Number(d.id) === id })
+      if (!target) {
+        showToast('草稿不存在或已被清理')
+        return
+      }
+      this.applyCloudDraft(target)
+    } catch (e) {
+      showToast('草稿加载失败')
+    }
+  },
+
+  /** 冷启动云端优先：拉最近一条云草稿覆盖本地恢复（静默，离线走本地） */
+  async hydrateCloudDraft() {
+    if (!app.checkLogin()) return
+    try {
+      const list = await drafts.list()
+      if (list && list.length) this.applyCloudDraft(list[0])
+    } catch (e) { /* 离线/游客态静默走本地 */ }
+  },
+
+  /** 发布前静默上云：已有云 id 走 PUT（更新原稿，不挤占 10 条上限），否则 POST 新建 */
+  async saveDraftToCloud(localDraft) {
+    try {
+      const payload = this.collectCloudPayload(localDraft)
+      if (!payload.title && !payload.content) return
+      const cloudId = this.data.draftCloudId
+      if (cloudId) {
+        await drafts.update(cloudId, payload)
+      } else {
+        const res = await drafts.save(payload)
+        const newId = res && res.id ? res.id : (res && res.data && res.data.id)
+        if (newId) this.setData({ draftCloudId: Number(newId) })
+      }
+    } catch (e) {
+      console.warn('云端草稿保存失败（本地兜底仍有效）', e)
     }
   },
 
@@ -298,8 +392,8 @@ Page({
 
     const { title, content, selectedCategory, selectedSubType, isAnonymous, imageList, extraData, editId, isEdit } = this.data
 
-    // 落草稿：上传/请求中断后可恢复
-    wx.setStorageSync('publishDraft', {
+    // 落草稿：上传/请求中断后可恢复（本地单槽兜底 + 云端 upsert 跨设备可见）
+    const localDraft = {
       selectedCategory,
       selectedSubType,
       title,
@@ -307,7 +401,9 @@ Page({
       imageList,
       isAnonymous,
       extraData
-    })
+    }
+    wx.setStorageSync('publishDraft', localDraft)
+    this.saveDraftToCloud(localDraft)
 
     wx.showLoading({ title: isEdit ? '保存中...' : '发布中...' })
 
@@ -349,6 +445,10 @@ Page({
       }
 
       wx.removeStorageSync('publishDraft')
+      // 发布成功：云草稿一并清理（静默，失败由 10 条上限轮换兜底）
+      const cloudId = this.data.draftCloudId
+      if (cloudId) drafts.remove(cloudId).catch(() => {})
+      this.setData({ draftCloudId: 0 })
 
       setTimeout(() => {
         this.resetForm()

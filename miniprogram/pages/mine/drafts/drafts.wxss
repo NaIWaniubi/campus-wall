@@ -1,0 +1,61 @@
+.page-drafts {
+  background: #F5F6F8;
+  min-height: 100vh;
+}
+
+.drafts-list {
+  padding: 24rpx 22rpx;
+}
+
+.draft-card {
+  margin-bottom: var(--space-4, 18rpx);
+  padding: var(--space-6, 24rpx);
+}
+
+.draft-head {
+  margin-bottom: var(--space-2, 12rpx);
+}
+.draft-section {
+  font-size: 22rpx;
+  color: var(--color-brand, #16A085);
+  background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+.draft-time { font-size: 22rpx; }
+
+.draft-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary, #17202A);
+  margin-bottom: var(--space-2, 12rpx);
+}
+
+.draft-content {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 26rpx;
+  line-height: 1.5;
+  margin-bottom: var(--space-3, 16rpx);
+}
+
+.draft-foot {
+  border-top: 1rpx solid var(--color-divider, #ececee);
+  padding-top: var(--space-3, 16rpx);
+}
+.draft-edit-hint {
+  font-size: 24rpx;
+  color: var(--color-brand, #16A085);
+}
+.draft-delete {
+  font-size: 24rpx;
+  color: var(--color-danger, #FF6B6B);
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--color-danger, #FF6B6B);
+}
+.draft-delete--hover { opacity: 0.6; }
+.draft-main--hover { opacity: 0.85; }

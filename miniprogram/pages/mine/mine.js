@@ -124,6 +124,12 @@ Page({
     })
   },
 
+  onGoDrafts() {
+    app.requireLogin(() => {
+      wx.navigateTo({ url: '/pages/mine/drafts/drafts' })
+    })
+  },
+
   onGoMyFavorites() {
     app.requireLogin(() => {
       wx.navigateTo({ url: '/pages/mine/myFavorites/myFavorites' })

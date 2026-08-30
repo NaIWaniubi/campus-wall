@@ -1,13 +1,15 @@
 <script setup lang="ts">
 /**
- * 私信聊天面板：升序气泡（自己右/对方左）、底部输入即时上屏、15s 增量轮询
- * 进入会话时后端 GET 即清未读，通知父组件同步列表红点；
- * 轮询只拉 afterId 增量，后台标签页暂停、恢复可见立即补拉一次；
+ * 私信聊天面板：升序气泡（自己右/对方左）、底部输入即时上屏
+ * 实时链路：WS 在线时收发走 WS（发消息乐观上屏 + ack 回填），离线自动回落 REST
+ * 轮询仅作 WS 断线兜底（15s 增量），后台标签页暂停、恢复可见立即补拉一次；
  * 收到/发出新消息 emit('activity') 让父级刷新会话列表顺序与 lastMessage
  */
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { ArrowLeft, Send } from '@lucide/vue'
 import { conversationApi } from '@/utils/api'
+import { useUserStore } from '@/stores/user'
+import { useChatSocket } from '@/composables/useChatSocket'
 import { formatTime } from '@/utils/helpers'
 import EmptyState from '@/components/EmptyState.vue'
 
@@ -16,6 +18,8 @@ interface ChatMessage {
   content: string
   isMine: boolean
   createdAt: string | null
+  /** WS 发送未回执的乐观消息：clientMsgId，ack 后回填真实 id */
+  pendingId?: string
 }
 
 const props = defineProps<{
@@ -26,6 +30,9 @@ const emit = defineEmits<{
   (e: 'read', convId: number): void
   (e: 'activity', convId: number): void
 }>()
+
+const userStore = useUserStore()
+const { status: wsStatus, onIncoming, onAck, sendChat } = useChatSocket()
 
 const messages = ref<ChatMessage[]>([])
 const loading = ref(true)
@@ -67,10 +74,18 @@ function mergeIncoming(incoming: ChatMessage[]) {
   const known = new Set(messages.value.map((m) => m.id))
   let added = false
   for (const m of incoming) {
-    if (!known.has(m.id)) {
-      messages.value.push(m)
-      added = true
+    if (known.has(m.id)) continue
+    // 自己消息的其他端同步：与未回执的乐观消息内容一致时直接替换，避免临时 id 与真实 id 双条
+    if (m.isMine) {
+      const pIdx = messages.value.findIndex((x) => x.pendingId && x.content === m.content)
+      if (pIdx >= 0) {
+        messages.value.splice(pIdx, 1, { ...m })
+        added = true
+        continue
+      }
     }
+    messages.value.push(m)
+    added = true
   }
   if (!added) return
   messages.value.sort((a, b) => a.id - b.id)
@@ -109,13 +124,26 @@ async function send() {
   if (!text || sending.value) return
   sending.value = true
   try {
-    const res: any = await conversationApi.send(props.conv.id, text)
-    messages.value.push({
-      id: res.data.id,
-      content: text,
-      isMine: true,
-      createdAt: new Date().toISOString(),
-    })
+    if (wsStatus.value === 'open') {
+      // WS 在线：乐观上屏（临时负 id），ack 后回填真实 id；失败由重连后的增量拉取兜底
+      const clientMsgId = crypto.randomUUID()
+      messages.value.push({
+        id: -Date.now(),
+        content: text,
+        isMine: true,
+        createdAt: new Date().toISOString(),
+        pendingId: clientMsgId,
+      })
+      sendChat(props.conv.peer.id, text, clientMsgId)
+    } else {
+      const res: any = await conversationApi.send(props.conv.id, text)
+      messages.value.push({
+        id: res.data.id,
+        content: text,
+        isMine: true,
+        createdAt: new Date().toISOString(),
+      })
+    }
     draft.value = ''
     // 发送也会改变会话顺序/lastMessage → 通知父级刷新
     emit('activity', props.conv.id)
@@ -127,9 +155,10 @@ async function send() {
   }
 }
 
-// ---------- 轮询生命周期：后台标签页暂停，恢复可见立即补拉一次 ----------
+// ---------- 轮询生命周期：WS 在线时停轮询，断线自动恢复兜底 ----------
 function startPoll() {
   if (pollTimer !== null || document.hidden) return
+  if (wsStatus.value === 'open') return // WS 实时在线，无需轮询
   pollTimer = setInterval(() => {
     if (document.hidden) return
     load(false)
@@ -150,6 +179,36 @@ function onVisibility() {
   }
 }
 
+// ---------- WS 实时接入 ----------
+// 本会话新消息：直接合并上屏；正在看时顺带让服务端清未读并同步红点
+const offIncoming = onIncoming((m) => {
+  if (m.convId !== props.conv.id) return
+  const me = userStore.user?.id
+  mergeIncoming([{ id: m.messageId, content: m.body, isMine: m.from === me, createdAt: m.createdAt }])
+  if (!document.hidden && m.from !== me) {
+    // afterId GET 顺带把服务端该会话未读清零；merge 去重保证不重复上屏
+    conversationApi.messages(props.conv.id, { afterId: m.messageId }).catch(() => {})
+    emit('read', props.conv.id)
+  }
+})
+// 自己 WS 消息的服务端回执：把乐观消息的临时 id 回填为真实 id
+const offAck = onAck((ack) => {
+  const idx = messages.value.findIndex((m) => m.pendingId && m.pendingId === ack.clientMsgId)
+  if (idx < 0) return
+  messages.value[idx] = {
+    id: ack.messageId,
+    content: messages.value[idx].content,
+    isMine: true,
+    createdAt: ack.createdAt,
+  }
+  messages.value.sort((a, b) => a.id - b.id)
+})
+// WS 连接状态变化 → 停/恢复轮询兜底
+const stopWatchStatus = watch(wsStatus, (s) => {
+  if (s === 'open') stopPoll()
+  else if (!document.hidden) startPoll()
+}, { immediate: true })
+
 onMounted(() => {
   load(true)
   startPoll()
@@ -157,6 +216,9 @@ onMounted(() => {
 })
 onUnmounted(() => {
   stopPoll()
+  offIncoming()
+  offAck()
+  stopWatchStatus()
   document.removeEventListener('visibilitychange', onVisibility)
 })
 </script>

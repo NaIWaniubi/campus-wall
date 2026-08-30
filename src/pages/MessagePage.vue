@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, MessageCircle, Heart, Bell, CheckCheck, MapPin, Newspaper } from '@lucide/vue'
 import { messageApi, conversationApi } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
+import { useChatSocket } from '@/composables/useChatSocket'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import EmptyState from '@/components/EmptyState.vue'
@@ -148,15 +149,34 @@ function switchView(v: 'notice' | 'chat') {
   if (v === 'chat' && !convsLoaded.value) loadConvs()
 }
 
-// ChatPanel 轮询到新消息/发送消息后静默刷新会话列表（节流 2s，避免高频重拉）
+// ChatPanel 轮询/WS 推到新消息后静默刷新会话列表（节流 2s，避免高频重拉）
+// 通知 tab 下也刷新：私信未读角标（chatUnread）需保持最新
 let convRefreshTimer: ReturnType<typeof setTimeout> | null = null
 function onConvActivity() {
   if (convRefreshTimer !== null) return
   convRefreshTimer = setTimeout(() => {
     convRefreshTimer = null
-    if (view.value === 'chat') loadConvs(true)
+    if (convsLoaded.value) loadConvs(true)
   }, 2000)
 }
+
+// ---------- WS 实时接入 ----------
+const { onIncoming, onNotify } = useChatSocket()
+// 收到私信推送：静默刷会话列表 + 全局未读角标
+const offIncoming = onIncoming(() => {
+  onConvActivity()
+  appStore.fetchUnreadCount().catch(() => {})
+})
+// 收到通知推送：全局未读角标 + 通知 tab 节流重载列表
+let noticeRefreshTimer: ReturnType<typeof setTimeout> | null = null
+const offNotify = onNotify(() => {
+  appStore.fetchUnreadCount().catch(() => {})
+  if (view.value !== 'notice' || noticeRefreshTimer !== null) return
+  noticeRefreshTimer = setTimeout(() => {
+    noticeRefreshTimer = null
+    load()
+  }, 1500)
+})
 
 onMounted(() => {
   load()
@@ -167,6 +187,12 @@ onUnmounted(() => {
     clearTimeout(convRefreshTimer)
     convRefreshTimer = null
   }
+  if (noticeRefreshTimer !== null) {
+    clearTimeout(noticeRefreshTimer)
+    noticeRefreshTimer = null
+  }
+  offIncoming()
+  offNotify()
 })
 </script>
 

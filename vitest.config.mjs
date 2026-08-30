@@ -19,6 +19,14 @@ export default defineConfig({
           pool: 'threads',
         },
       },
+      {
+        test: {
+          name: 'mini',
+          environment: 'node',
+          include: ['tests/miniprogram/**/*.test.ts'],
+          pool: 'threads',
+        },
+      },
     ],
   },
 });

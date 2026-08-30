@@ -143,10 +143,15 @@ D 方向 vitest/happy-dom 已入 package.json 但未 commit；A T3 虚拟滚动�
 - ✅ Q4 小程序草稿云同步 → `738e5c8`（publish.js 云优先/本地兜底 + 云端 upsert + 发布成功清理；新增草稿箱页 + mine 入口；33 个 mini 静态断言固守）
 - ✅ eslint 历史警告归零 → `b129235`（s3.ts / shadow-write.ts 6 个失效 disable 指令）
 
+### 第六批（2026-08-30 已完成，3 commit）
+- ✅ B-T4 PostCard 小红书风 → `6bbc86f`（封面优先 + 浮层徽章 + 两行标题/摘要 + 事件契约零改动）
+- ✅ B-T5 详情阅读体验 → `8448e5f`（死文案「私信即将上线」下线，接通既有 onContactAuthor；排版放宽）
+- ✅ B-T6 发布 Apple 风 → `a09beb1`（补回丢失的图片选择 UI——处理器在而 UI 缺；分类横滑胶囊）
+- 备注：视觉任务按「视觉照 spec、数据/事件契约保持现状」适配，未照抄 spec 里不存在的资产/字段
+
 ### 仍未做（后续批次候选）
 - C-T7 OpenAPI + zod（大工程，建议单独批）
 - C-T9 推送抽象 / Web Push（需外部服务与 env）
 - D-T4/D-T5 Playwright E2E（需装包 + 浏览器下载）
 - D-T8 Sentry / D-T9 LHCI（外部服务 / Chrome 环境）
 - D-T10 VitePress 文档站（需新依赖；文档暂由 README 承接）
-- B-T4/T5 视觉任务（2026-07-31 spec，主观大改）

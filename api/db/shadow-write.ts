@@ -55,7 +55,7 @@ export async function shadowWrite<T>(
   // 异步：失败仅记录
   const sh = getShadow();
   fn(sh).catch((e: any) => {
-    // eslint-disable-next-line no-console
+
     console.error(`[shadow-write] ${table} failed:`, e?.message ?? e);
   });
   return result;

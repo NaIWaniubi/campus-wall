@@ -13,12 +13,14 @@
 
   <view class="message-list" wx:elif="{{activeTab === 'chat'}}">
     <block wx:if="{{isLoggedIn}}">
+      <skeleton wx:if="{{loading && !conversations.length}}" type="post" count="{{3}}" />
       <conversation-item wx:for="{{conversations}}" wx:key="id" item="{{item}}" bind:tap="onOpenConversation"></conversation-item>
       <empty-state wx:if="{{conversations.length === 0}}" text="暂无私信" subText="在帖子详情点「联系TA」即可发起私信" customIcon="💬"></empty-state>
     </block>
   </view>
 
   <view class="message-list" wx:else>
+    <skeleton wx:if="{{loading && !notifications.length}}" type="post" count="{{4}}" />
     <view class="message-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}">
       <view class="message-icon-wrap">
         <text class="message-icon">{{item.iconText}}</text>

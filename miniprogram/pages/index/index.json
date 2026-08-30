@@ -5,6 +5,7 @@
     "post-card": "/components/post-card/post-card",
     "empty-state": "/components/empty-state/empty-state",
     "load-more": "/components/load-more/load-more",
-    "announce-dialog": "/components/announce-dialog/announce-dialog"
+    "announce-dialog": "/components/announce-dialog/announce-dialog",
+    "skeleton": "/components/skeleton/skeleton"
   }
 }

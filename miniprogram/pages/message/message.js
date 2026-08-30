@@ -20,6 +20,7 @@ Page({
     ],
     activeTab: 'all',
     isLoggedIn: false,
+    loading: true,
     notifications: [],
     unreadCount: 0,
     conversations: [],
@@ -39,7 +40,7 @@ Page({
 
   async loadNotifications() {
     if (!app.checkLogin()) {
-      this.setData({ isLoggedIn: false, notifications: [], unreadCount: 0, conversations: [], chatUnread: 0 })
+      this.setData({ isLoggedIn: false, loading: false, notifications: [], unreadCount: 0, conversations: [], chatUnread: 0 })
       return
     }
     this.setData({ isLoggedIn: true })
@@ -66,6 +67,8 @@ Page({
       this.setData({ notifications, unreadCount })
     } catch (e) {
       console.error('加载消息失败', e)
+    } finally {
+      this.setData({ loading: false })
     }
   },
 
@@ -87,6 +90,8 @@ Page({
       })
     } catch (e) {
       console.error('加载会话失败', e)
+    } finally {
+      this.setData({ loading: false })
     }
   },
 

@@ -9,6 +9,7 @@ Page({
   data: {
     postId: '',
     post: {},
+    postLoadFailed: false,
     comments: [],
     commentText: '',
     replyPlaceholder: '写评论...',
@@ -58,6 +59,7 @@ Page({
       // 「可能相关」仅失物招领板块请求（后端对其他板块返回空，省一次请求）
       if (post.category === 'lost') this.loadMatches()
     } catch (e) {
+      this.setData({ postLoadFailed: true })
       showToast('加载失败')
     }
   },

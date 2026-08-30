@@ -3,6 +3,7 @@
   "usingComponents": {
     "post-card": "/components/post-card/post-card",
     "empty-state": "/components/empty-state/empty-state",
-    "load-more": "/components/load-more/load-more"
+    "load-more": "/components/load-more/load-more",
+    "skeleton": "/components/skeleton/skeleton"
   }
 }

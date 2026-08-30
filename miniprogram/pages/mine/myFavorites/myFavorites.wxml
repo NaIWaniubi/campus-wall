@@ -1,5 +1,6 @@
 <view class="page-my-favorites {{perfLowClass}}">
   <view class="post-list">
+    <skeleton wx:if="{{loading && !posts.length}}" type="post" count="{{3}}" />
     <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
     <empty-state wx:if="{{posts.length === 0}}" text="还没有收藏内容" customIcon="⭐"></empty-state>
   </view>

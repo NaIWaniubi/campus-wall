@@ -1,0 +1,45 @@
+<view class="skeleton">
+  <!-- 帖子卡骨架：头像 + 作者行 + 正文两行 + 图片带（隔行） + 操作行 -->
+  <block wx:if="{{type === 'post'}}">
+    <view class="sk-card" wx:for="{{blocks}}" wx:key="*this">
+      <view class="sk-row">
+        <view class="sk sk-avatar"></view>
+        <view class="sk-col">
+          <view class="sk sk-line" style="width: 30%"></view>
+          <view class="sk sk-line sk-thin" style="width: 22%"></view>
+        </view>
+      </view>
+      <view class="sk sk-line" style="width: 88%"></view>
+      <view class="sk sk-line" style="width: 62%"></view>
+      <view class="sk sk-band" wx:if="{{index % 2 === 0}}"></view>
+      <view class="sk-row sk-foot">
+        <view class="sk sk-chip"></view>
+        <view class="sk sk-chip"></view>
+        <view class="sk sk-chip"></view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 详情骨架：标题 + 作者 + 三段正文 + 内容带 + 操作行 -->
+  <block wx:elif="{{type === 'detail'}}">
+    <view class="sk sk-line sk-title" style="width: 76%"></view>
+    <view class="sk-row">
+      <view class="sk sk-avatar"></view>
+      <view class="sk sk-line" style="width: 26%"></view>
+    </view>
+    <view class="sk sk-line" wx:for="{{[0, 1, 2]}}" wx:key="*this" style="width: {{92 - index * 18}}%"></view>
+    <view class="sk sk-band sk-tall"></view>
+    <view class="sk-row sk-foot">
+      <view class="sk sk-chip"></view>
+      <view class="sk sk-chip"></view>
+      <view class="sk sk-chip"></view>
+    </view>
+  </block>
+
+  <!-- 聊天记录骨架：左右交替气泡 -->
+  <block wx:elif="{{type === 'chat'}}">
+    <view wx:for="{{blocks}}" wx:key="*this" class="sk-msg-row {{index % 2 === 0 ? 'is-mine' : ''}}">
+      <view class="sk sk-bubble {{index % 3 === 0 ? 'sk-bubble--lg' : ''}}"></view>
+    </view>
+  </block>
+</view>

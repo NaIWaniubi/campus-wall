@@ -6,6 +6,7 @@
     <view class="tab-item {{activeTab === 'rejected' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="rejected"><text>未通过</text></view>
   </view>
   <view class="post-list">
+    <skeleton wx:if="{{loading && !posts.length}}" type="post" count="{{3}}" />
     <view class="post-item-wrap" wx:for="{{posts}}" wx:key="id">
       <post-card post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
       <view class="reject-reason" wx:if="{{item.status === 'rejected' && item.rejectReason}}">

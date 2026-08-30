@@ -32,6 +32,7 @@
   </view>
 
   <view class="post-list">
+    <skeleton wx:if="{{isLoading && !posts.length}}" type="post" count="{{4}}" />
     <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" current-user-id="{{currentUserId}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost" bind:follow="onFollowAuthor" bind:share="onSharePost"></post-card>
     <empty-state wx:if="{{posts.length === 0 && !isLoading}}" text="{{emptyStateText}}" subText="{{emptyStateSubText}}" customIcon="{{emptyStateIcon}}" btnText="{{emptyStateBtnText}}" bind:btntap="onEmptyStateAction"></empty-state>
     <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>

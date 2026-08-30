@@ -9,7 +9,7 @@
 
   <block wx:else>
     <scroll-view class="message-scroll" scroll-y scroll-into-view="{{scrollInto}}" scroll-with-animation>
-      <view wx:if="{{loading}}" class="chat-loading">加载中...</view>
+      <skeleton wx:if="{{loading}}" type="chat" count="{{6}}" />
 
       <block wx:if="{{!loading}}">
         <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg-row {{item.isMine ? 'mine' : ''}}">

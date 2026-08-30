@@ -4,7 +4,7 @@ const { showModal, showToast } = require('../../../utils/util')
 const { buildPostShare } = require('../../../utils/share')
 
 Page({
-  data: { posts: [], activeTab: 'all' },
+  data: { posts: [], activeTab: 'all', loading: true },
 
   // 新后端帖子状态值域：published/pending/pending_review/rejected/deleted（deleted 不可见）
   STATUS_TABS: {
@@ -17,7 +17,8 @@ Page({
   onLoad() { this.loadPosts() },
 
   async loadPosts() {
-    if (!app.checkLogin()) return
+    if (!app.checkLogin()) { this.setData({ loading: false }); return }
+    this.setData({ loading: true })
     try {
       // 后端 /users/me/posts 返回全部非 deleted 帖子且忽略 status 参数，按 tab 客户端过滤
       const posts = await get('/user/posts', {}, false)
@@ -28,6 +29,8 @@ Page({
       this.setData({ posts: list })
     } catch (e) {
       console.error('加载帖子失败', e)
+    } finally {
+      this.setData({ loading: false })
     }
   },
 

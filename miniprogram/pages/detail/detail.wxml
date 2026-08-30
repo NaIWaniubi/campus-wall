@@ -1,6 +1,7 @@
 <view class="page-detail {{perfLowClass}}">
   <scroll-view class="detail-scroll" scroll-y scroll-into-view="{{scrollIntoView}}">
-    <view class="post-detail card">
+    <skeleton wx:if="{{!post.id && !postLoadFailed}}" type="detail" />
+    <view class="post-detail card" wx:if="{{post.id}}">
       <view class="post-header">
         <view class="post-author">
           <image class="avatar" src="{{post.author.isAnonymous ? '/images/default_avatar.png' : (post.author.avatar || '/images/default_avatar.png')}}" mode="aspectFill" lazy-load></image>

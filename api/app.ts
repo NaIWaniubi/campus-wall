@@ -7,11 +7,15 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
+import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 
 import './db.js'
+import { db } from './db.js'
+import { getStorage } from './storage/index.js'
+import { stats as wsStats } from './ws/hub.js'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
 import commentRoutes from './routes/comments.js'
@@ -80,6 +84,17 @@ app.use((req, _res, next) => {
 })
 
 /**
+ * 5xx 错误计数（内存）：暴露在 /api/health 供监控轮询，零依赖
+ */
+let error5xxCount = 0
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.on('finish', () => {
+    if (res.statusCode >= 500) error5xxCount++
+  })
+  next()
+})
+
+/**
  * API 路由
  */
 app.use('/api/auth', authRoutes)
@@ -102,10 +117,48 @@ app.use('/api/conversations', conversationRoutes)
 app.use('/api/users', followRoutes)
 
 /**
- * 健康检查
+ * 健康检查（升级版）：db / storage / ws 三路探测 + uptime/version + 5xx 计数
+ * - 匿名可访问（位于鉴权之前），供负载均衡 / 监控轮询
+ * - db/storage 探测失败时整体 status=degraded，但不抛 500（健康检查自身必须活着）
  */
 app.use('/api/health', (_req: Request, res: Response) => {
-  res.status(200).json({ code: 200, message: 'ok', data: { status: 'running', timestamp: Date.now() } })
+  let version = 'unknown'
+  try {
+    version = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')) as any).version ?? 'unknown'
+  } catch { /* 版本读取失败不影响健康检查 */ }
+
+  // db 探测：sqlite 轻量 SELECT 1
+  let dbOk = false
+  try {
+    dbOk = !!db.prepare('SELECT 1 AS ok').get()
+  } catch { /* 探测失败 → degraded */ }
+
+  // storage 探测：工厂可实例化 + local 驱动根目录存在
+  let storageOk = false
+  const storageMode = (process.env.STORAGE_DRIVER ?? 'local').toLowerCase()
+  try {
+    const storage = getStorage()
+    const root = (storage as any).root as string | undefined
+    storageOk = !root || fs.existsSync(root)
+  } catch { /* 探测失败 → degraded */ }
+
+  const dbDriver = (process.env.DB_DRIVER ?? 'sqlite').toLowerCase()
+  const degraded = !dbOk || !storageOk
+
+  res.status(200).json({
+    code: 200,
+    message: degraded ? 'degraded' : 'ok',
+    data: {
+      status: degraded ? 'degraded' : 'ok',
+      timestamp: Date.now(),
+      uptime: Math.round(process.uptime()),
+      version,
+      db: { driver: dbDriver, ok: dbOk },
+      storage: { mode: storageMode, ok: storageOk },
+      ws: wsStats(),
+      errors: { count5xx: error5xxCount },
+    },
+  })
 })
 
 /**

@@ -24,6 +24,8 @@ Page({
     inputText: '',
     sending: false,
     loading: true,
+    chatTemplateId: '',
+    subscribeAsked: false,
     needLogin: false,
     loadError: '',
     scrollInto: ''
@@ -37,6 +39,10 @@ Page({
       conversationId: options.conversationId || ''
     })
     this.enter()
+    // 订阅消息模板（wx-push 预埋）：服务端未配置时 data 为 null，端上不弹授权
+    api.get('/wx/push-config', {}, false).then((cfg) => {
+      if (cfg && cfg.chatTemplateId) this.setData({ chatTemplateId: cfg.chatTemplateId })
+    }).catch(() => {})
   },
 
   onShow() {
@@ -144,6 +150,14 @@ Page({
   async onSendMessage() {
     const content = (this.data.inputText || '').trim()
     if (!content || this.data.sending || !this.data.conversationId) return
+    // 订阅消息授权（wx-push 预埋）：仅在服务端配置了模板时触发，用户点击时请求一次/会话
+    if (this.data.chatTemplateId && !this.data.subscribeAsked && wx.requestSubscribeMessage) {
+      this.setData({ subscribeAsked: true })
+      wx.requestSubscribeMessage({
+        tmplIds: [this.data.chatTemplateId],
+        fail: () => {} // 拒绝/失败不影响发消息
+      })
+    }
 
     const tempId = 'tmp-' + Date.now()
     this.setData({

@@ -28,9 +28,46 @@ const warnWords = [
   '刷单', '代考', '代写论文', '代写作业', '私彩', '套现', '外挂代练',
 ];
 
+/**
+ * 单词匹配：纯 ASCII 词（sb/nm/nmsl 等）用 \b 词边界，
+ * 防止「USB」「NM 能量」等正常文本被子串误伤（与前端 src/utils/helpers.ts 同语义）。
+ * 注意：入参需先 toLowerCase，正则只拼 ASCII 安全词，无注入面。
+ */
+function matchWord(lowerText: string, word: string): boolean {
+  const w = word.toLowerCase();
+  if (/^[a-z0-9]+$/i.test(w)) {
+    return new RegExp(`\\b${w}\\b`).test(lowerText);
+  }
+  return lowerText.includes(w);
+}
+
 function matchWords(text: string, words: string[]): string[] {
   const lower = text.toLowerCase();
-  return words.filter((w) => lower.includes(w.toLowerCase()));
+  return words.filter((w) => matchWord(lower, w));
+}
+
+/**
+ * 命中位置提取（spec-C T8 高亮定位预留）：返回每个命中词在原文中的首个位置。
+ * 管理端审核视图 / 前端发布提示后续可直接用 (word, index) 做上下文高亮。
+ */
+export function findSensitiveHits(
+  text: string,
+  words: string[] = sensitiveWords
+): { word: string; index: number }[] {
+  const lower = text.toLowerCase();
+  const hits: { word: string; index: number }[] = [];
+  for (const raw of words) {
+    const w = raw.toLowerCase();
+    let idx = -1;
+    if (/^[a-z0-9]+$/i.test(w)) {
+      const m = new RegExp(`\\b${w}\\b`).exec(lower);
+      idx = m ? m.index : -1;
+    } else {
+      idx = lower.indexOf(w);
+    }
+    if (idx >= 0) hits.push({ word: raw, index: idx });
+  }
+  return hits;
 }
 
 /**

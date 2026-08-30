@@ -51,8 +51,17 @@ export const MessageIncoming = z.object({
   createdAt: z.string(),
 });
 export const Pong = z.object({ type: z.literal('pong'), ts: z.number() });
+/** 通知实时推送（订阅 notifications 主题后收到；字段对齐 messages 表的通知行） */
+export const NotificationPush = z.object({
+  type: z.literal('notification:push'),
+  notificationId: z.number().int(),
+  kind: z.string(),                        // 通知类型：comment/like/match/digest/chat/system
+  content: z.string(),
+  relatedId: z.number().int().nullable(),
+  createdAt: z.string(),
+});
 export const ServerMsg = z.discriminatedUnion('type', [
-  ServerError, MessageAck, MessageIncoming, Pong,
+  ServerError, MessageAck, MessageIncoming, Pong, NotificationPush,
 ]);
 
 export type TClientMsg = z.infer<typeof ClientMsg>;

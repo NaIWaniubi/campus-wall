@@ -5,7 +5,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
-import { upsertNotification } from '../utils/notification.js';
+import { dispatchChatMessage } from '../ws/handlers/dispatcher.js';
 
 const router = Router();
 
@@ -131,29 +131,12 @@ router.post('/:id/messages', authRequired, (req, res) => {
   if (!content) return fail(res, '消息内容不能为空');
   if (content.length > 500) return fail(res, '消息最多500字');
 
-  const { conv, isA } = found;
-  const peerId = isA ? conv.user_b_id : conv.user_a_id;
+  const { conv } = found;
 
-  let messageId = 0;
-  db.transaction(() => {
-    const r = db
-      .prepare('INSERT INTO chat_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)')
-      .run(convId, req.currentUser!.id, content);
-    messageId = Number(r.lastInsertRowid);
-    db.prepare(
-      `UPDATE conversations SET last_message = ?, last_at = CURRENT_TIMESTAMP,
-       ${isA ? 'unread_b' : 'unread_a'} = ${isA ? 'unread_b' : 'unread_a'} + 1 WHERE id = ?`
-    ).run(content.slice(0, 50), convId);
-  })();
+  // 双路分发：落库 + 摘要/未读 + WS 推送 + 站内通知（与 WS message:send 同一套）
+  const result = dispatchChatMessage(conv, req.currentUser!.id, content);
 
-  // 给对方一条 type:'chat' 的站内通知（7天窗口去重，失败不影响主流程）
-  try {
-    upsertNotification(peerId, 'chat', `${req.currentUser!.nickname}：${content}`, convId);
-  } catch (err: any) {
-    console.error('私信通知失败:', err?.message);
-  }
-
-  success(res, { id: messageId }, '发送成功');
+  success(res, { id: result.messageId }, '发送成功');
 });
 
 // 我全部会话的未读总和

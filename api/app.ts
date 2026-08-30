@@ -17,6 +17,7 @@ import { db } from './db.js'
 import { getStorage } from './storage/index.js'
 import { stats as wsStats } from './ws/hub.js'
 import { buildOpenApiDocument, swaggerHtml } from './openapi/document.js'
+import { captureError } from './observability.js'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
 import commentRoutes from './routes/comments.js'
@@ -34,6 +35,8 @@ import tradeRoutes from './routes/trades.js'
 import feedbackRoutes from './routes/feedback.js'
 import conversationRoutes from './routes/conversations.js'
 import followRoutes from './routes/follows.js'
+import pushRoutes from './routes/push.js'
+import wxRoutes from './routes/wx.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -116,6 +119,10 @@ app.use('/api/feedback', feedbackRoutes)
 app.use('/api/conversations', conversationRoutes)
 // 关注路由与 users 共用前缀（均为两段以上路径，不与 users.ts 的单段 /:id 冲突）
 app.use('/api/users', followRoutes)
+// Web Push（VAPID 未配置时端点存在但返回 501/null，前端据此隐藏入口）
+app.use('/api/push', pushRoutes)
+// 微信小程序辅助配置（订阅消息模板等，未配置返回 null）
+app.use('/api/wx', wxRoutes)
 
 /**
  * OpenAPI 契约（spec-C T7 裁剪版）：zod schema 为唯一契约源
@@ -217,6 +224,8 @@ app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
   // 其余一律 5xx：生产环境隐藏细节，开发环境保留 message 便于调试
   const isProd = process.env.NODE_ENV === 'production'
   const safeMessage = isProd ? '服务异常，请稍后重试' : (error.message || '服务器内部错误')
+  // Sentry 已启用（SENTRY_DSN 配置）时上报服务端错误；未启用为 no-op
+  captureError(error, { path: req.path, method: req.method })
   res.status(500).json({ code: 500, message: safeMessage, data: null })
 })
 

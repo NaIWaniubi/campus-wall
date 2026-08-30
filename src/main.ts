@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import * as Sentry from '@sentry/vue'
 import './style.css'
 import App from './App.vue'
 import router from './router'
@@ -9,6 +10,15 @@ import { useWebSocket } from './composables/useWebSocket'
 
 // 创建Vue应用实例
 const app = createApp(App)
+
+// 前端 Sentry：VITE_SENTRY_DSN 未配置时 no-op（构建期内联，未配置即零开销）
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    app,
+    dsn: import.meta.env.VITE_SENTRY_DSN as string,
+    environment: import.meta.env.MODE,
+  })
+}
 
 // 创建Pinia并启用持久化插件
 const pinia = createPinia()

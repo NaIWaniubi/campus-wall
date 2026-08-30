@@ -1,10 +1,14 @@
 /**
  * local server entry file, for local development
  */
+import { initObservability } from './observability.js';
 import app from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';
 import { runBackup, countBackups } from './jobs/backup.js';
 import { attachWebSocket } from './ws/server.js';
+
+// Sentry 等可观测性：SENTRY_DSN 未配置时 no-op，需尽量早执行
+initObservability();
 
 /**
  * start server with port

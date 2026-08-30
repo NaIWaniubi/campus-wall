@@ -9,6 +9,7 @@ import { Bot, X, Send, Loader2, MessagesSquare, ChevronRight, Trash2 } from '@lu
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { aiApi, type AiForumItem } from '@/utils/api'
+import { toast } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
 interface ChatMessage {
@@ -141,6 +142,8 @@ async function send(text?: string) {
 
   let gotDelta = false
   let ok = false
+  let httpStatus = 0
+  let networkFail = false
   try {
     const resp = await fetch('/api/ai/chat/stream', {
       method: 'POST',
@@ -150,6 +153,7 @@ async function send(text?: string) {
       },
       body: JSON.stringify({ message: content, history: buildRequestMessages().slice(0, -1) }),
     })
+    httpStatus = resp.status
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
 
     const reader = resp.body.getReader()
@@ -189,7 +193,21 @@ async function send(text?: string) {
     }
     if (!gotDelta && !ok) throw new Error('空响应')
   } catch {
-    // 流式失败且尚未收到任何增量 → 回退非流式接口
+    // 未收到任何 HTTP 响应 = 网络层失败（fetch 直接 reject）
+    networkFail = httpStatus === 0
+    // 401/403：token 过期或无权限——与 axios 拦截器同款处理（登出 + 带 redirect 回登录页），不回退非流式
+    if (httpStatus === 401 || httpStatus === 403) {
+      if (httpStatus === 401) {
+        userStore.logout()
+        toast.error('登录已过期，请重新登录')
+        router.push({ path: '/login', query: { redirect: route.fullPath } })
+      } else {
+        toast.error('无权使用 AI 助手')
+      }
+      reply.content = httpStatus === 401 ? '登录已过期，请重新登录后再来继续对话～' : '当前账号无权使用 AI 助手。'
+      return
+    }
+    // 流式失败且尚未收到任何增量 → 回退非流式接口（401/403 已在上面处理，axios 层错误亦有 toast）
     if (!gotDelta) {
       try {
         const res: any = await aiApi.chat({
@@ -204,7 +222,12 @@ async function send(text?: string) {
         /* 落到统一兜底文案 */
       }
     }
-    if (!ok) reply.content = reply.content || '抱歉，我暂时出了点问题，请稍后再试。'
+    if (!ok) {
+      // 区分网络错 / 服务端错，给出可行动的文案
+      if (networkFail) reply.content = reply.content || '网络异常，请检查网络连接后再试。'
+      else if (httpStatus >= 500) reply.content = reply.content || 'AI 服务暂时不可用，请稍后再试。'
+      else reply.content = reply.content || '抱歉，我暂时出了点问题，请稍后再试。'
+    }
   } finally {
     reply.streaming = false
     loading.value = false

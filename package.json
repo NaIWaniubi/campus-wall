@@ -31,6 +31,7 @@
     "cors": "^2.8.5",
     "dompurify": "^3.4.14",
     "dotenv": "^17.2.1",
+    "echarts": "^5.6.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
     "kysely": "^0.29.5",
@@ -41,6 +42,7 @@
     "pinia-plugin-persistedstate": "^4.2.0",
     "sharp": "^0.35.3",
     "vue": "^3.5.41",
+    "vue-echarts": "^7.0.3",
     "vue-router": "^4.6.4",
     "ws": "^8.21.3",
     "zod": "^4.4.3"

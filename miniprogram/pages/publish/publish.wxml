@@ -2,14 +2,16 @@
   <view class="publish-form">
     <view class="category-select card">
       <text class="label">选择分类</text>
-      <view class="category-grid">
-        <view class="category-option {{selectedCategory === item.id ? 'active' : ''}}"
-              wx:for="{{categoryList}}" wx:key="id"
-              bindtap="onSelectCategory" data-id="{{item.id}}">
-          <text class="category-icon">{{item.icon}}</text>
-          <text class="category-name">{{item.name}}</text>
+      <scroll-view class="category-scroll" scroll-x enable-flex>
+        <view class="category-row">
+          <view class="category-option {{selectedCategory === item.id ? 'active' : ''}}"
+                wx:for="{{categoryList}}" wx:key="id"
+                bindtap="onSelectCategory" data-id="{{item.id}}">
+            <text class="category-icon">{{item.icon}}</text>
+            <text class="category-name">{{item.name}}</text>
+          </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
 
     <view class="subtype-select card" wx:if="{{subTypeList.length > 0}}">
@@ -48,6 +50,21 @@
       <view class="content-footer flex-between">
         <text class="char-count gray-color">{{content.length}}/500</text>
       </view>
+    </view>
+
+    <!-- 图片区（选填，最多6张；处理器 onChooseImage/onDeleteImage 既有，本次补回丢失的 UI） -->
+    <view class="media-section card" wx:if="{{selectedCategory}}">
+      <text class="label">图片（选填，最多6张）</text>
+      <view class="media-grid">
+        <view class="media-item" wx:for="{{imageList}}" wx:key="*this">
+          <image src="{{item}}" mode="aspectFill" lazy-load></image>
+          <view class="media-remove" catchtap="onDeleteImage" data-index="{{index}}">×</view>
+        </view>
+        <view class="media-add" wx:if="{{imageList.length < 6}}" bindtap="onChooseImage">
+          <text class="media-add-plus">＋</text>
+        </view>
+      </view>
+      <text class="anon-note gray-color">首图将作为信息流封面展示</text>
     </view>
 
     <!-- 失物招领：direction(我捡到了/我丢失了) + time/location/itemType(类型选择) + contact 选填 -->

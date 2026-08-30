@@ -232,4 +232,19 @@ describe('补充断言：高频页组件注册与关键契约', () => {
   it('一键封禁含时长选择步骤（先原因、再时长、后执行）', () => {
     expect(read('pages/admin/moderation/moderation.js')).toMatch(/时长|duration|actionSheet/i);
   });
+
+  it('发布页图片选择 UI 与处理器成对存在（防「处理器在、UI 丢失」回归）', () => {
+    const wxml = read('pages/publish/publish.wxml');
+    const js = read('pages/publish/publish.js');
+    expect(wxml).toContain('onChooseImage');
+    expect(wxml).toContain('onDeleteImage');
+    expect(js).toContain('onChooseImage');
+    expect(js).toContain('onDeleteImage');
+  });
+
+  it('详情页私信作者入口已接线（死文案「即将上线」不复生）', () => {
+    const wxml = read('pages/detail/detail.wxml');
+    expect(wxml).toContain('onContactAuthor');
+    expect(wxml).not.toContain('私信功能即将上线');
+  });
 });

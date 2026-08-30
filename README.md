@@ -45,17 +45,23 @@
 - **五大 Tab**：首页 / 话题（八板块分类页）/ 发布 / 消息 / 我的（自定义 TabBar）
 - **登录双通道**：学号密码 JWT；wx.login 静默登录（服务端未配置 `WX_APPID`/`WX_SECRET` 时自动回退表单登录）
 - **完整能力**：私信会话、关注体系、失物招领方向双 Tab（丢失/拾获）、我的点赞/收藏、内容审核、订阅按钮
-- **API 适配层**：`utils/api.js` 将旧版页面调用路径/字段名翻译为新后端契约并归一化响应
+- **API 适配层**：`utils/api.js` 将旧版页面调用路径/字段名翻译为新后端契约并归一化响应（已拆分 request / endpoints / auth / legacy-adapter 四模块）
+- **骨架屏与低端机**：通用 skeleton 组件（帖子/详情/聊天三形态）接入 8 处加载态；`lazyCodeLoading` 按需注入
 
 ### 内容安全
 - 前后端双重敏感词检测，风险三级评定：高风险直接驳回、中风险进人工审核队列、低风险正常发布
+- ASCII 敏感词按词边界匹配（`USB` 不会被 `sb` 子串误杀），后端支持命中位置提取供审核高亮
 - 信誉分阈值控制发帖/评论/匿名权限
 - 频控：发帖每日上限、评论 10s 频控、举报 24h 频控
 - 软删除机制，数据可追溯
 
 ### 可靠性与性能
+- **实时链路**：WebSocket 单连接承载私信与通知（hello 帧鉴权 + 心跳 + 指数退避重连），REST 永远兜底
 - 信息流读缓存：LRU（200 条）+ TTL（60s），写路径前缀失效，`X-Cache: HIT/MISS` 可观测
-- SQLite 在线热备份（WAL 安全），默认保留 7 份自动轮换
+- SQLite 在线热备份（WAL 安全），默认保留 7 份自动轮换；配置 `BACKUP_ENCRYPTION_KEY` 后落盘 AES-256-GCM 加密（恢复用 `api/scripts/decrypt-backup.mjs`）
+- **滑动窗口限流**：发帖 10/min、评论 30/min、上传 20/min、AI 10/min（IP/学号/UA 维度），登录注册另有失败锁定
+- **健康检查**：`/api/health` 返回 db/storage/ws 状态、uptime、版本与 5xx 计数
+- **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
 - 图片上传压缩管线：大图重编码 + WebP 缩略图
 
 ---

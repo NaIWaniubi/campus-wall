@@ -113,3 +113,38 @@ D 方向 vitest/happy-dom 已入 package.json 但未 commit；A T3 虚拟滚动�
 - 4 subagent 并行可能再撞 npm 锁死。**应对**：subagent 指令要求"装新包前先 `npm install --prefer-offline --no-audit`；不行就跳过依赖改动，只改代码"
 - 单 subagent 容量 ~8 commit，3 个 audit 类重改可能 1 subagent 做不完 → 报告里明确"未完成清单"，我立即补第二批 subagent
 - 已落地 commit 不动；冲突时优先 subagent 让步（避免覆盖）
+
+## 7. 进度追记
+
+### 第三批（2026-08-30 已完成，12 commit）
+- ✅ 🟢21 AI 助手 401 → `bad1fb5`（登出 + redirect + 错误分支区分）
+- ✅ C-T5 私信切 WS 双路分发 → `54ddb55`（顺带补齐 WS 路径漏掉的未读自增与 chat 通知）
+- ✅ C-T6 增量拉取 → 复查发现 `?afterId=` 已在 conversations.ts 实现，未重复做
+- ✅ C-T6 通知 WS 广播 → `2cb09c7`（NotificationPush 帧）
+- ✅ A-T4 Web WS 客户端 → `865fca0` + `d50e316`（三件套 + ChatPanel/MessagePage 接入 + 轮询降级）
+- ✅ A-T5 Dashboard → `f2e5351`（echarts 趋势折线 + 双分布条形图；卡片下钻 6385bfd 已达成）
+- ✅ A-T6 暗色 → `efbf5f7`（灰阶语义重映射 + SettingsPage 三态切换）
+- ✅ C-T10 限流 → `a07f3d8`（滑动窗口，IP/学号/UA 维度，写端点挂载 + 单测）
+- ✅ C-T11 健康检查 → `0cc7202`（db/storage/ws 探测 + 5xx 计数）
+- ✅ D-T2/D-T3 前端单测 → `619260e`（helpers/theme 13 用例）
+- ✅ A-T9 vite 分包 → `5b36c1e`（echarts 独立 chunk 492KB，Dashboard 业务块 496KB→<12KB）
+- ✅ B-T8 小程序骨架屏 → `57f351f`（三形态组件 + 8 处接入 + 按需注入）
+- 备注：4 个并行 subagent 全因基础设施问题失败（并发上限×2 / 模型请求失败 / captcha），全部工作由主会话完成
+
+### 第四批（2026-08-30 已完成，6 commit）
+- ✅ C-T8 敏感词 → `ac8c5c2`（后端 ASCII 词边界，修复 USB 被 sb 误杀；findSensitiveHits 高亮预留 + 5 用例）
+- ✅ D-T7 CI → `8081933`（GitHub Actions：lint/check/test/build）
+- ✅ D-T6 小程序静态断言 → `1a5585f`（30 用例 + vitest mini project）
+- ✅ A-T7 PWA → `a5e02c3`（manifest + 保守 SW + sharp 生成图标）
+- ✅ C-T12 备份加密 → `838eea1`（BACKUP_ENCRYPTION_KEY AES-256-GCM + 解密脚本，回路已验证）
+- ✅ A-T10 文档收尾 → README 能力清单更新 + 本追记
+
+### 仍未做（后续批次候选）
+- C-T7 OpenAPI + zod（大工程，建议单独批）
+- C-T9 推送抽象 / Web Push（需外部服务与 env）
+- D-T4/D-T5 Playwright E2E（需装包 + 浏览器下载）
+- D-T8 Sentry / D-T9 LHCI（外部服务 / Chrome 环境）
+- D-T10 VitePress 文档站（需新依赖；文档暂由 README 承接）
+- B-T4/T5 视觉任务（2026-07-31 spec，主观大改）
+- ⚠️ 新发现：小程序草稿仍为本地单槽（publish.js:57 wx.setStorageSync），Q4 的「草稿云同步」只做了后端 upsert 与 Web 端，小程序侧切 /drafts 未做
+- ⚠️ 新发现：6 个 eslint warning（s3.ts/shadow-write.ts 失效 eslint-disable 指令），历史遗留非阻塞

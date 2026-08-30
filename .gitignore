@@ -59,3 +59,7 @@ tmp-test-*.png
 # vitest 本地重定向日志
 vitest-out.txt
 vitest-err.txt
+
+# Playwright 产物（E2E 运行时生成）
+test-results/
+playwright-report/

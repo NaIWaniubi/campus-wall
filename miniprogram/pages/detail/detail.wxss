@@ -133,18 +133,18 @@
 }
 
 .post-title {
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: 800;
   color: #17202A;
-  margin-bottom: 14rpx;
-  line-height: 1.38;
+  margin-bottom: 16rpx;
+  line-height: 1.3;
   letter-spacing: 0;
 }
 
 .post-content {
-  font-size: 29rpx;
+  font-size: 30rpx;
   color: #26323D;
-  line-height: 1.7;
+  line-height: 1.85;
   margin-bottom: 20rpx;
   word-break: break-all;
   letter-spacing: 0;

@@ -140,7 +140,7 @@
         <text class="stat-item gray-color">{{post.favorites}} 收藏</text>
       </view>
 
-      <view class="contact-disabled">私信功能即将上线</view>
+      <button class="contact-btn" wx:if="{{canContactAuthor}}" bindtap="onContactAuthor">💬 私信作者</button>
     </view>
 
     <view class="match-section card" wx:if="{{matches.length > 0}}">

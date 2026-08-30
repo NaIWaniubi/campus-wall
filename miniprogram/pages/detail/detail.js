@@ -21,7 +21,8 @@ Page({
     categoryColor: '#4A90D9',
     scrollIntoView: '',
     matches: [],
-    canFollowAuthor: false
+    canFollowAuthor: false,
+    canContactAuthor: false
   },
 
   onLoad(options) {
@@ -53,7 +54,9 @@ Page({
         categoryName: category ? category.name : '',
         categoryColor: category ? category.color : '#4A90D9',
         // 匿名帖/自己 authored 的帖子不展示关注按钮
-        canFollowAuthor: !!(post.author && post.author.id && !post.author.isAnonymous && (!me || me.id !== post.author.id))
+        canFollowAuthor: !!(post.author && post.author.id && !post.author.isAnonymous && (!me || me.id !== post.author.id)),
+        // 私信作者入口：同口径（非匿名、有 id、非自己）——底部死文案「即将上线」下线
+        canContactAuthor: !!(post.author && post.author.id && !post.author.isAnonymous && (!me || me.id !== post.author.id))
       })
       this.loadFollowStatus()
       // 「可能相关」仅失物招领板块请求（后端对其他板块返回空，省一次请求）

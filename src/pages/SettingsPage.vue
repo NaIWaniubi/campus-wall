@@ -43,6 +43,25 @@ onMounted(async () => {
   }
 })
 
+/** 关闭推送：退订当前浏览器订阅并同步服务端 */
+async function disablePush() {
+  pushBusy.value = true
+  try {
+    const reg = await navigator.serviceWorker.getRegistration()
+    const sub = await reg?.pushManager.getSubscription()
+    if (sub) {
+      await pushApi.unsubscribe(sub.endpoint)
+      await sub.unsubscribe()
+    }
+    pushEnabled.value = false
+    toast.success('消息推送已关闭')
+  } catch {
+    toast.error('关闭失败，请重试')
+  } finally {
+    pushBusy.value = false
+  }
+}
+
 async function enablePush() {
   if (pushEnabled.value || pushBusy.value) return
   pushBusy.value = true
@@ -301,12 +320,19 @@ onMounted(() => {
         </h3>
         <div class="flex items-center justify-between">
           <span class="text-xs text-zinc-400">离线时通过浏览器通知提醒新消息</span>
-          <button :disabled="pushBusy || pushEnabled"
-            class="px-4 py-1.5 rounded-full text-xs font-medium transition"
-            :class="pushEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-brand-500 text-white hover:bg-brand-600'"
-            @click="enablePush">
-            {{ pushEnabled ? '已开启' : (pushBusy ? '开启中...' : '开启') }}
-          </button>
+          <div class="flex items-center gap-2">
+            <button :disabled="pushBusy || pushEnabled"
+              class="px-4 py-1.5 rounded-full text-xs font-medium transition"
+              :class="pushEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-brand-500 text-white hover:bg-brand-600'"
+              @click="enablePush">
+              {{ pushEnabled ? '已开启' : (pushBusy ? '开启中...' : '开启') }}
+            </button>
+            <button v-if="pushEnabled" :disabled="pushBusy"
+              class="px-3 py-1.5 rounded-full text-xs text-zinc-500 hover:text-zinc-700 transition"
+              @click="disablePush">
+              关闭
+            </button>
+          </div>
         </div>
       </section>
 

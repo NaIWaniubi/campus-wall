@@ -55,13 +55,11 @@ Page({
     if (options.editId) {
       this.setData({ editId: options.editId, isEdit: true })
       this.loadPostForEdit(options.editId)
-    } else if (options.draftId) {
-      // 草稿箱跳入：按云端草稿 id 恢复（发布为 tabBar 页，经 storage 中转由 onShow 消费）
     } else {
       const draft = wx.getStorageSync('publishDraft')
       if (draft) this.restoreDraft(draft)
-      // 云端优先：异步拉取云草稿，拉到则覆盖本地单槽（Q4 跨设备可见）
-      this.hydrateCloudDraft()
+      // 云端优先：本地无草稿时才拉取云草稿补位（Q4 跨设备可见）
+      if (!draft) this.hydrateCloudDraft()
     }
 
     if (options.category) {
@@ -150,12 +148,15 @@ Page({
     }
   },
 
-  /** 冷启动云端优先：拉最近一条云草稿覆盖本地恢复（静默，离线走本地） */
+  /** 冷启动云端优先：本地无草稿时拉最近一条云草稿补位（静默，离线/用户已开始输入则放弃） */
   async hydrateCloudDraft() {
     if (!app.checkLogin()) return
     try {
       const list = await drafts.list()
-      if (list && list.length) this.applyCloudDraft(list[0])
+      // 用户已开始输入（或编辑态被 onShow 抢先初始化）时不覆盖
+      if (!list || !list.length) return
+      if (this.data.title || this.data.content) return
+      this.applyCloudDraft(list[0])
     } catch (e) { /* 离线/游客态静默走本地 */ }
   },
 
@@ -170,7 +171,13 @@ Page({
       } else {
         const res = await drafts.save(payload)
         const newId = res && res.id ? res.id : (res && res.data && res.data.id)
-        if (newId) this.setData({ draftCloudId: Number(newId) })
+        if (!newId) return
+        // POST 在途期间发布已成功清场 → 立即补删，避免孤儿云草稿
+        if (this._draftCleared) {
+          drafts.remove(Number(newId)).catch(() => {})
+          return
+        }
+        this.setData({ draftCloudId: Number(newId) })
       }
     } catch (e) {
       console.warn('云端草稿保存失败（本地兜底仍有效）', e)
@@ -196,6 +203,7 @@ Page({
   },
 
   resetForm() {
+    this._draftCleared = false
     this.setData({
       selectedCategory: '',
       subTypeList: [],
@@ -448,6 +456,7 @@ Page({
       // 发布成功：云草稿一并清理（静默，失败由 10 条上限轮换兜底）
       const cloudId = this.data.draftCloudId
       if (cloudId) drafts.remove(cloudId).catch(() => {})
+      this._draftCleared = true
       this.setData({ draftCloudId: 0 })
 
       setTimeout(() => {

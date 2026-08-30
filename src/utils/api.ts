@@ -92,6 +92,13 @@ export const draftApi = {
   clear: () => request.delete('/drafts'),
 }
 
+// Web Push（VAPID 未开启时 publicKey 为 null，设置页据此隐藏入口）
+export const pushApi = {
+  publicKey: () => request.get('/push/public-key'),
+  subscribe: (subscription: unknown) => request.post('/push/subscribe', { subscription }),
+  unsubscribe: (endpoint: string) => request.post('/push/unsubscribe', { endpoint }),
+}
+
 // 公告
 export const announcementApi = {
   active: () => request.get('/announcements/active'),

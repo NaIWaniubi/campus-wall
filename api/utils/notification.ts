@@ -6,6 +6,8 @@
 import { db } from '../db.js';
 import { broadcastTopic } from '../ws/hub.js';
 import { NotificationPush } from '../ws/protocol.js';
+import { isPushEnabled, sendPushToUser } from './push.js';
+import { isWxPushEnabled, sendWxSubscribeMessage } from './wx-push.js';
 
 const DEDUP_WINDOW_DAYS = 7;
 
@@ -55,4 +57,16 @@ export function upsertNotification(
       createdAt: new Date().toISOString(),
     }));
   } catch { /* 推送失败静默 */ }
+
+  // 离线推送双通道（spec-C T9 预埋）：VAPID / 微信订阅消息未配置时各自内部静默跳过
+  if (isPushEnabled()) {
+    void sendPushToUser(user_id, {
+      title: '校园墙',
+      body: content.slice(0, 80),
+      url: type === 'chat' ? '/message?tab=chat' : '/message',
+    });
+  }
+  if (isWxPushEnabled() && (type === 'chat' || type === 'system')) {
+    void sendWxSubscribeMessage(user_id, type, content, related_id ?? null);
+  }
 }

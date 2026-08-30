@@ -4,16 +4,70 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Camera, Loader2, Lock, LogOut, Monitor, Moon, Sun, UserX } from '@lucide/vue'
+import { ArrowLeft, Bell, Camera, Loader2, Lock, LogOut, Monitor, Moon, Sun, UserX } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
-import { uploadApi, authApi } from '@/utils/api'
+import { uploadApi, authApi, pushApi } from '@/utils/api'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+
+// ---------- 消息推送（Web Push，服务端 VAPID 未配置时入口自动隐藏） ----------
+const pushAvailable = ref(false)
+const pushEnabled = ref(false)
+const pushBusy = ref(false)
+
+function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const raw = atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+  const buffer = new ArrayBuffer(raw.length)
+  const output = new Uint8Array(buffer)
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i)
+  return output
+}
+
+onMounted(async () => {
+  try {
+    const res: any = await pushApi.publicKey()
+    const key: string | null = res.data?.publicKey
+    if (!key || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    pushAvailable.value = true
+    const reg = await navigator.serviceWorker.getRegistration()
+    const sub = await reg?.pushManager.getSubscription()
+    pushEnabled.value = !!sub
+  } catch {
+    pushAvailable.value = false
+  }
+})
+
+async function enablePush() {
+  if (pushEnabled.value || pushBusy.value) return
+  pushBusy.value = true
+  try {
+    const res: any = await pushApi.publicKey()
+    const key: string | null = res.data?.publicKey
+    if (!key) return
+    if (Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') {
+        toast.error('通知权限未授予')
+        return
+      }
+    }
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) })
+    await pushApi.subscribe(sub.toJSON())
+    pushEnabled.value = true
+    toast.success('消息推送已开启')
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    pushBusy.value = false
+  }
+}
 
 // 外观三态：亮色 / 暗色 / 跟随系统
 const themeOptions: { mode: ThemeMode; label: string; icon: any }[] = [
@@ -236,6 +290,22 @@ onMounted(() => {
             @click="themeStore.setMode(opt.mode)">
             <component :is="opt.icon" class="w-5 h-5" />
             {{ opt.label }}
+          </button>
+        </div>
+      </section>
+
+      <!-- 消息推送（服务端 VAPID 未配置时整块隐藏） -->
+      <section v-if="pushAvailable" class="bg-white rounded-xl p-4 space-y-3">
+        <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
+          <Bell class="w-4 h-4" /> 消息推送
+        </h3>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-zinc-400">离线时通过浏览器通知提醒新消息</span>
+          <button :disabled="pushBusy || pushEnabled"
+            class="px-4 py-1.5 rounded-full text-xs font-medium transition"
+            :class="pushEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-brand-500 text-white hover:bg-brand-600'"
+            @click="enablePush">
+            {{ pushEnabled ? '已开启' : (pushBusy ? '开启中...' : '开启') }}
           </button>
         </div>
       </section>

@@ -61,3 +61,38 @@ self.addEventListener('fetch', (e) => {
     );
   }
 });
+
+/* ---------- Web Push（spec-C T9 预埋；VAPID 未配置时服务端不发推送，以下仅是端上接收器） ---------- */
+self.addEventListener('push', (e) => {
+  let payload = { title: '校园墙', body: '你有新的消息', url: '/message' };
+  try {
+    payload = { ...payload, ...(e.data ? e.data.json() : {}) };
+  } catch {
+    /* 非 JSON 数据用默认文案 */
+  }
+  e.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: payload.url || '/message' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/message';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      // 已有打开的窗口则聚焦并跳转，否则新开
+      for (const client of list) {
+        if (client.url.includes(location.origin)) {
+          client.navigate(url).catch(() => {});
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

@@ -439,3 +439,21 @@ db.exec(`
 `);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_admin_logs_actor_created ON admin_logs (actor_id, created_at);`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_admin_logs_target ON admin_logs (target_type, target_id);`);
+
+/**
+ * Web Push 订阅表（spec-C T9 预埋）：
+ * - VAPID 凭据（VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY）未配置时发送逻辑静默关闭，本表只是闲置
+ * - endpoint UNIQUE：同一浏览器重复授权走 INSERT OR REPLACE 刷新 keys
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions (user_id);`);

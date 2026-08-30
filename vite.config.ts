@@ -12,6 +12,10 @@ export default defineConfig({
         // 框架代码独立分包：业务迭代不影响 vendor 缓存（Rolldown 仅支持函数形式）
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return undefined
+          // echarts 体积大且仅 admin 使用：独立分包，避免打入 Dashboard 业务 chunk、复用浏览器缓存
+          if (/[\\/]node_modules[\\/](echarts|vue-echarts|zrender)[\\/]/.test(id)) {
+            return 'vendor-echarts'
+          }
           if (/[\\/]node_modules[\\/](vue|@vue|vue-router|pinia|pinia-plugin-persistedstate|axios)[\\/]/.test(id)) {
             return 'vendor'
           }

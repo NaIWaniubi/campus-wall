@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.0.0",
+    "@sentry/node": "^10.72.0",
+    "@sentry/vue": "^10.72.0",
     "axios": "^1.7.9",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
@@ -46,6 +48,7 @@
     "vue": "^3.5.41",
     "vue-echarts": "^7.0.3",
     "vue-router": "^4.6.4",
+    "web-push": "^3.6.7",
     "ws": "^8.21.3",
     "zod": "^4.4.3"
   },
@@ -57,6 +60,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.13.3",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "@vercel/node": "^5.3.6",
     "@vitejs/plugin-vue": "^6.0.8",

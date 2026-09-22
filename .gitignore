@@ -71,3 +71,7 @@ playwright-report/
 
 # v2c plugin runtime
 .v2c/
+
+# VitePress build artifacts
+docs/.vitepress/cache/
+docs/.vitepress/dist/

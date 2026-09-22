@@ -5,8 +5,11 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
+import { draftLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
+
+// 仅写端点限流：POST/PUT/DELETE；GET 列表不受影响（用户进入编辑页高频拉取）
 
 // 草稿列表（最近10条）
 router.get('/', authRequired, (req, res) => {
@@ -35,7 +38,7 @@ router.get('/', authRequired, (req, res) => {
 });
 
 // 保存草稿
-router.post('/', authRequired, (req, res) => {
+router.post('/', authRequired, draftLimiter, (req, res) => {
   const { sectionId, title, content, images, isAnonymous, extraFields } = req.body;
 
   // 限制草稿总数10条，超出删除最早的
@@ -67,7 +70,7 @@ router.post('/', authRequired, (req, res) => {
 
 // 更新草稿（编辑已有草稿走 PUT，不走 POST 重建——后者会撑爆 10 条上限并丢 created_at 顺序）
 // 路径：PUT /api/drafts?id=123
-router.put('/', authRequired, (req, res) => {
+router.put('/', authRequired, draftLimiter, (req, res) => {
   const id = Number(req.query.id);
   if (!Number.isFinite(id) || id <= 0) return fail(res, '缺少有效 id（query ?id=）', 400, 400);
   const existing = db.prepare('SELECT id FROM drafts WHERE id = ? AND user_id = ?').get(id, req.currentUser!.id) as any;
@@ -93,7 +96,7 @@ router.put('/', authRequired, (req, res) => {
 });
 
 // 删除草稿
-router.delete('/:id', authRequired, (req, res) => {
+router.delete('/:id', authRequired, draftLimiter, (req, res) => {
   const id = Number(req.params.id);
   const draft = db.prepare('SELECT * FROM drafts WHERE id = ? AND user_id = ?').get(id, req.currentUser!.id) as any;
   if (!draft) return fail(res, '草稿不存在', 404, 404);
@@ -102,7 +105,7 @@ router.delete('/:id', authRequired, (req, res) => {
 });
 
 // 清空草稿
-router.delete('/', authRequired, (req, res) => {
+router.delete('/', authRequired, draftLimiter, (req, res) => {
   db.prepare('DELETE FROM drafts WHERE user_id = ?').run(req.currentUser!.id);
   success(res, null, '草稿已清空');
 });

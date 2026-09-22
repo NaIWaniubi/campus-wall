@@ -1,8 +1,8 @@
 /**
  * local server entry file, for local development
  */
-import { initObservability } from './observability.js';
-import app from './app.js';
+import { initObservability, captureError } from './observability.js';
+import app, { reportBackup } from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';
 import { runBackup, countBackups } from './jobs/backup.js';
 import { attachWebSocket } from './ws/server.js';
@@ -10,10 +10,25 @@ import { attachWebSocket } from './ws/server.js';
 // Sentry 等可观测性：SENTRY_DSN 未配置时 no-op，需尽量早执行
 initObservability();
 
+// 全局未捕获异常兜底：避免单条同步/异步异常直接拖死进程
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  captureError(err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err);
+  captureError(err as Error);
+});
+
 /**
  * start server with port
  */
 const PORT = process.env.PORT || 3001;
+
+// 生产环境部署安全兜底：CORS_ORIGIN 未显式设置则只放行 localhost，生产域名会被拦截
+if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+  console.warn('[security] CORS_ORIGIN 未设置，仅允许 localhost 跨域；生产域名请求将被 CORS 拒绝，请尽快配置环境变量。');
+}
 
 const server = app.listen(PORT, () => {
   console.log(`Server ready on port ${PORT}`);
@@ -71,36 +86,39 @@ const BACKUP_INTERVAL_HOURS = (() => {
 })();
 
 setInterval(() => {
-  runBackup().catch((err) => console.error('[backup] 定时备份失败:', err));
+  runBackup()
+    .then(() => reportBackup(true))
+    .catch((err) => { reportBackup(false, err); console.error('[backup] 定时备份失败:', err); });
 }, BACKUP_INTERVAL_HOURS * 3_600_000);
 
 // 启动基线：backups/ 为空（首次运行）时立即补一份
 if (countBackups() === 0) {
-  runBackup().catch((err) => console.error('[backup] 启动基线备份失败:', err));
+  runBackup()
+    .then(() => reportBackup(true))
+    .catch((err) => { reportBackup(false, err); console.error('[backup] 启动基线备份失败:', err); });
 }
 
 // 调试用：BACKUP_NOW=1 启动时立即手动执行一次备份（不等定时时刻）
 if (process.env.BACKUP_NOW === '1') {
-  runBackup().catch((err) => console.error('[backup] 手动执行失败:', err));
+  runBackup()
+    .then(() => reportBackup(true))
+    .catch((err) => { reportBackup(false, err); console.error('[backup] 手动执行失败:', err); });
 }
 
 /**
  * close server
  */
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received');
+const shutdown = (sig: string) => {
+  console.log(`${sig} signal received`);
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
-});
+  // Force-exit if not closed in 10s
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
 
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;

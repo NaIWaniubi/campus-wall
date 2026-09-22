@@ -3,10 +3,42 @@
  */
 import request from '@/utils/request'
 
+// ─────────────────────────────────────────────────────────────
+// 公共入参类型（部分高频方法使用，显式声明替代 any 的样板）
+// ─────────────────────────────────────────────────────────────
+export interface CreatePostPayload {
+  sectionId: number
+  title: string
+  content: string
+  images?: string[]
+  isAnonymous?: boolean
+  extraFields?: Record<string, unknown>
+}
+
+export type UpdatePostPayload = CreatePostPayload
+
+export interface LoginPayload {
+  studentId: string
+  password: string
+}
+
+export interface RegisterPayload {
+  studentId: string
+  password: string
+  nickname: string
+  college?: string
+  grade?: string
+}
+
+export interface CommentPayload {
+  content: string
+  isAnonymous?: boolean
+}
+
 // 认证
 export const authApi = {
-  login: (data: { studentId: string; password: string }) => request.post('/auth/login', data),
-  register: (data: { studentId: string; password: string; nickname: string; college?: string; grade?: string }) => request.post('/auth/register', data),
+  login: (data: LoginPayload) => request.post('/auth/login', data),
+  register: (data: RegisterPayload) => request.post('/auth/register', data),
   me: () => request.get('/auth/me'),
   updatePassword: (data: { oldPassword: string; newPassword: string }) => request.put('/auth/password', data),
   logout: () => request.post('/auth/logout'),
@@ -17,8 +49,8 @@ export const postApi = {
   list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string; authorId?: number }) => request.get('/posts', { params }),
   detail: (id: number) => request.get(`/posts/${id}`),
   matches: (id: number) => request.get(`/posts/${id}/matches`),
-  publish: (data: any) => request.post('/posts', data),
-  edit: (id: number, data: any) => request.put(`/posts/${id}`, data),
+  publish: (data: CreatePostPayload) => request.post('/posts', data),
+  edit: (id: number, data: UpdatePostPayload) => request.put(`/posts/${id}`, data),
   delete: (id: number) => request.delete(`/posts/${id}`),
   like: (id: number) => request.post(`/posts/${id}/like`),
   favorite: (id: number) => request.post(`/posts/${id}/favorite`),
@@ -28,8 +60,8 @@ export const postApi = {
 // 评论
 export const commentApi = {
   list: (postId: number) => request.get(`/posts/${postId}/comments`),
-  publish: (postId: number, data: { content: string; isAnonymous?: boolean }) => request.post(`/posts/${postId}/comments`, data),
-  reply: (commentId: number, data: { content: string; isAnonymous?: boolean }) => request.post(`/comments/${commentId}/reply`, data),
+  publish: (postId: number, data: CommentPayload) => request.post(`/posts/${postId}/comments`, data),
+  reply: (commentId: number, data: CommentPayload) => request.post(`/comments/${commentId}/reply`, data),
   delete: (commentId: number) => request.delete(`/comments/${commentId}`),
   like: (commentId: number) => request.post(`/comments/${commentId}/like`),
 }
@@ -56,7 +88,7 @@ export const conversationApi = {
   create: (peerId: number) => request.post('/conversations', { peerId }),
   messages: (id: number, params?: { page?: number; pageSize?: number; afterId?: number }) =>
     request.get(`/conversations/${id}/messages`, { params }),
-  send: (id: number, content: string) => request.post(`/conversations/${id}/messages`, { content }),
+  send: (id: number, data: { content: string }) => request.post(`/conversations/${id}/messages`, data),
 }
 
 // 关注体系（挂载于 /users）

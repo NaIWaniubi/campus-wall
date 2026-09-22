@@ -136,7 +136,7 @@ async function send() {
       })
       // 竞态兜底：判定在线后 socket 恰好断开（send 返回 false）→ 改走 REST 并回填乐观条目
       if (!sendChat(props.conv.peer.id, text, clientMsgId)) {
-        const res: any = await conversationApi.send(props.conv.id, text)
+        const res: any = await conversationApi.send(props.conv.id, { content: text })
         const idx = messages.value.findIndex((m) => m.pendingId === clientMsgId)
         if (idx >= 0) {
           messages.value[idx] = { id: res.data.id, content: text, isMine: true, createdAt: new Date().toISOString() }
@@ -145,7 +145,7 @@ async function send() {
         }
       }
     } else {
-      const res: any = await conversationApi.send(props.conv.id, text)
+      const res: any = await conversationApi.send(props.conv.id, { content: text })
       messages.value.push({
         id: res.data.id,
         content: text,

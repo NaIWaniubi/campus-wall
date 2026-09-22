@@ -59,27 +59,102 @@ const ROLE_LABELS: Record<string, string> = {
   super_admin: '超级管理员',
 }
 
+// 二次确认弹窗：所有「写操作」（封禁/解封、重置密码、调整信誉）都先经此，确认后再走真正的表单弹窗
+// 防止管理员误点造成不可逆后果。
+type ConfirmKind = 'ban' | 'unban' | 'resetPassword' | 'adjustCredit'
+interface ConfirmState {
+  visible: boolean
+  title: string
+  body: string
+  target: any | null
+  kind: ConfirmKind | ''
+  submitting: boolean
+  meta?: Record<string, unknown>
+}
+const confirmDialog = reactive<ConfirmState>({
+  visible: false,
+  title: '',
+  body: '',
+  target: null,
+  kind: '',
+  submitting: false,
+  meta: {},
+})
+
+// 锁：防止在 onConfirm 内异步等待时再次点击「确定」
+function lockConfirm() { confirmDialog.submitting = true }
+function unlockConfirm() { confirmDialog.submitting = false }
+function openConfirm(kind: ConfirmKind, u: any, body: string, title?: string, meta?: Record<string, unknown>) {
+  confirmDialog.kind = kind
+  confirmDialog.target = u
+  confirmDialog.body = body
+  confirmDialog.title = title || (
+    kind === 'ban' ? '确认封禁该用户？' :
+    kind === 'unban' ? '确认解封该用户？' :
+    kind === 'resetPassword' ? '确认重置该用户密码？' :
+    '确认调整该用户信誉分？'
+  )
+  confirmDialog.meta = meta || {}
+  confirmDialog.submitting = false
+  confirmDialog.visible = true
+}
+function closeConfirm() {
+  confirmDialog.visible = false
+  confirmDialog.target = null
+  confirmDialog.kind = ''
+  confirmDialog.submitting = false
+  confirmDialog.meta = {}
+}
+async function onConfirm() {
+  if (confirmDialog.submitting) return
+  lockConfirm()
+  try {
+    switch (confirmDialog.kind) {
+      case 'ban':
+      case 'unban':
+        openBan(confirmDialog.target)
+        break
+      case 'resetPassword':
+        openPwd(confirmDialog.target)
+        break
+      case 'adjustCredit':
+        openCredit(confirmDialog.target)
+        break
+    }
+    closeConfirm()
+  } finally {
+    unlockConfirm()
+  }
+}
+
 // 封禁/解封弹窗
-const banModal = reactive({ visible: false, user: null as any, action: 'ban' as 'ban' | 'unban', reason: '', duration: '7' })
+const banModal = reactive({ visible: false, user: null as any, action: 'ban' as 'ban' | 'unban', reason: '', duration: '7', submitting: false })
 function openBan(u: any) {
+  if (!u) return
   banModal.user = u
   banModal.action = u.status === 'banned' ? 'unban' : 'ban'
   banModal.reason = u.ban_reason || ''
   banModal.duration = '7'
+  banModal.submitting = false
   banModal.visible = true
 }
 async function submitBan() {
+  if (banModal.submitting) return
   if (banModal.action === 'ban' && !banModal.reason.trim()) return toast.error('请输入封禁原因')
+  banModal.submitting = true
   try {
     await adminApi.banUser(banModal.user.id, { action: banModal.action, reason: banModal.reason, duration: banModal.duration })
     toast.success(banModal.action === 'ban' ? '已封禁' : '已解封')
     banModal.visible = false
     load()
-  } catch {}
+  } catch {
+  } finally {
+    banModal.submitting = false
+  }
 }
 
 // 重置密码弹窗：前端生成一次性密码，提交成功后展示给管理员转告用户
-const pwdModal = reactive({ visible: false, user: null as any, password: '', done: false })
+const pwdModal = reactive({ visible: false, user: null as any, password: '', done: false, submitting: false })
 function genPassword() {
   // crypto.getRandomValues 4 字节 → 8 位 hex（Web Crypto 等价于后端 randomBytes(4).toString('hex')）
   return [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -93,35 +168,49 @@ async function copyPwd() {
   }
 }
 function openPwd(u: any) {
+  if (!u) return
   pwdModal.user = u
   pwdModal.password = genPassword()
   pwdModal.done = false
+  pwdModal.submitting = false
   pwdModal.visible = true
 }
 async function submitPwd() {
+  if (pwdModal.submitting) return
+  pwdModal.submitting = true
   try {
     await adminApi.resetPassword(pwdModal.user.id, pwdModal.password)
     pwdModal.done = true
     toast.success('密码已重置')
-  } catch {}
+  } catch {
+  } finally {
+    pwdModal.submitting = false
+  }
 }
 
 // 信誉调整弹窗
-const creditModal = reactive({ visible: false, user: null as any, score: 0, reason: '' })
+const creditModal = reactive({ visible: false, user: null as any, score: 0, reason: '', submitting: false })
 function openCredit(u: any) {
+  if (!u) return
   creditModal.user = u
   creditModal.score = 0
   creditModal.reason = ''
+  creditModal.submitting = false
   creditModal.visible = true
 }
 async function submitCredit() {
+  if (creditModal.submitting) return
   if (!creditModal.score) return toast.error('请输入非零分值')
+  creditModal.submitting = true
   try {
     await adminApi.adjustCredit(creditModal.user.id, creditModal.score, creditModal.reason)
     toast.success('信誉分已调整')
     creditModal.visible = false
     load()
-  } catch {}
+  } catch {
+  } finally {
+    creditModal.submitting = false
+  }
 }
 
 onMounted(load)
@@ -204,14 +293,14 @@ onMounted(load)
                 <button
                   class="flex items-center gap-1 px-2 py-1 rounded text-xs"
                   :class="u.status === 'banned' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'"
-                  @click="openBan(u)"
+                  @click="openConfirm(u.status === 'banned' ? 'unban' : 'ban', u, `${u.status === 'banned' ? '解封' : '封禁'}后该用户${u.status === 'banned' ? '将恢复' : '将无法'}登录`, undefined, { reason: u.ban_reason || '', duration: '7' })"
                 >
                   <Ban class="w-3 h-3" />{{ u.status === 'banned' ? '解封' : '封禁' }}
                 </button>
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100" @click="openPwd(u)">
+                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100" @click="openConfirm('resetPassword', u, `将生成新的 8 位一次性密码并立即生效`);">
                   <KeyRound class="w-3 h-3" />重置密码
                 </button>
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-600 hover:bg-amber-100" @click="openCredit(u)">
+                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-600 hover:bg-amber-100" @click="openConfirm('adjustCredit', u, '可在下一步弹窗中输入分值与理由')">
                   <Star class="w-3 h-3" />信誉
                 </button>
               </div>
@@ -235,6 +324,53 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <!-- 二次确认弹窗（封禁/解封/重置密码/调整信誉） -->
+    <Teleport to="body">
+      <div v-if="confirmDialog.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeConfirm">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
+          <h3 class="text-lg font-semibold mb-3">{{ confirmDialog.title }}</h3>
+          <!-- 目标用户信息 -->
+          <div v-if="confirmDialog.target" class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl mb-3">
+            <div class="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+              <img v-if="confirmDialog.target.avatar" :src="confirmDialog.target.avatar" class="w-full h-full object-cover" alt="" />
+              <span v-else>{{ confirmDialog.target.nickname?.charAt(0) }}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-zinc-900 truncate">{{ confirmDialog.target.nickname }}</div>
+              <div class="text-xs text-zinc-500 truncate">学号 {{ confirmDialog.target.student_id }} · 当前信誉 {{ confirmDialog.target.credit_score }}</div>
+            </div>
+          </div>
+          <!-- 动作预览 -->
+          <div class="text-sm text-zinc-600 mb-2">{{ confirmDialog.body }}</div>
+          <ul v-if="confirmDialog.kind === 'ban'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+            <li>· 动作：封禁 7 天</li>
+            <li>· 原因：{{ (confirmDialog.meta?.reason as string) || '（下一步填写）' }}</li>
+          </ul>
+          <ul v-else-if="confirmDialog.kind === 'resetPassword'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+            <li>· 动作：重置密码</li>
+            <li>· 新密码：********（下一步生成 8 位一次性密码）</li>
+          </ul>
+          <ul v-else-if="confirmDialog.kind === 'adjustCredit'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+            <li>· 当前：{{ confirmDialog.target?.credit_score }}</li>
+            <li>· 新值：在下一步弹窗中输入</li>
+          </ul>
+          <div v-else class="mb-4"></div>
+          <p class="text-[11px] text-zinc-400 mb-3">本操作将被记录到审计日志，包含操作者、时间与原因。</p>
+          <div class="flex gap-3">
+            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="closeConfirm">取消</button>
+            <button
+              class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm"
+              :disabled="confirmDialog.submitting"
+              @click="onConfirm"
+            >
+              {{ confirmDialog.submitting ? '处理中…' : '确定' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 封禁/解封弹窗 -->
     <Teleport to="body">
@@ -265,7 +401,7 @@ onMounted(load)
           <p v-else class="text-sm text-zinc-500 mb-4">确定要解封该用户吗？</p>
           <div class="flex gap-3">
             <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="banModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitBan">确定</button>
+            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="banModal.submitting" @click="submitBan">{{ banModal.submitting ? '提交中…' : '确定' }}</button>
           </div>
         </div>
       </div>
@@ -287,7 +423,7 @@ onMounted(load)
             />
             <div class="flex gap-3">
               <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="pwdModal.visible = false">取消</button>
-              <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitPwd">确认重置</button>
+              <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="pwdModal.submitting" @click="submitPwd">{{ pwdModal.submitting ? '提交中…' : '确认重置' }}</button>
             </div>
           </template>
           <template v-else>
@@ -330,7 +466,7 @@ onMounted(load)
           />
           <div class="flex gap-3">
             <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="creditModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitCredit">确定</button>
+            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="creditModal.submitting" @click="submitCredit">{{ creditModal.submitting ? '提交中…' : '确定' }}</button>
           </div>
         </div>
       </div>

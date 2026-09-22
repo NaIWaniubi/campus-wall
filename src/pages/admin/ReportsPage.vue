@@ -81,21 +81,43 @@ const actions: Record<string, { label: string; result: string; content: string }
   resolve: { label: '核实处理', result: '已核实并处理违规内容', content: '确认该举报属实并标记处理完成？如有需要请先在帖子治理/评论管理中删除对应内容。' },
   dismiss: { label: '驳回举报', result: '举报不实，予以驳回', content: '确认驳回该举报？工单将标记为已处理且不对被举报内容做任何改动。' },
 }
-const handleDialog = reactive({ visible: false, report: null as any, action: '' })
+const handleDialog = reactive({ visible: false, report: null as any, action: '', submitting: false })
+// 提交锁：每个工单的操作都加 id 锁，防止双击重复触发
+const submittingId = ref<number | null>(null)
 function openHandle(r: any, action: string) {
   handleDialog.report = r
   handleDialog.action = action
+  handleDialog.submitting = false
   handleDialog.visible = true
 }
 async function confirmHandle() {
   const { report, action } = handleDialog
-  handleDialog.visible = false
+  if (handleDialog.submitting) return
   if (!report || !action) return
+  if (submittingId.value === report.id) return
+  handleDialog.submitting = true
+  submittingId.value = report.id
+  // 乐观移除本地列表项（不用 reload 全表）
+  const removedIdx = list.value.findIndex((x) => x.id === report.id)
+  const removedItem = removedIdx >= 0 ? list.value[removedIdx] : null
+  if (removedIdx >= 0) {
+    list.value.splice(removedIdx, 1)
+    total.value = Math.max(0, total.value - 1)
+  }
+  handleDialog.visible = false
   try {
     await adminApi.handleReport(report.id, action, actions[action].result)
     toast.success(action === 'resolve' ? '已核实处理' : '已驳回举报')
-    load()
-  } catch {}
+  } catch {
+    // 失败回滚
+    if (removedItem && removedIdx >= 0) {
+      list.value.splice(removedIdx, 0, removedItem)
+      total.value += 1
+    }
+  } finally {
+    submittingId.value = null
+    handleDialog.submitting = false
+  }
 }
 
 onMounted(load)

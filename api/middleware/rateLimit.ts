@@ -107,3 +107,11 @@ export const commentLimiter = createRateLimiter({ windowMs: 60_000, max: 30, nam
 export const uploadLimiter = createRateLimiter({ windowMs: 60_000, max: 20, name: 'upload' });
 /** AI 对话（含流式）：1 分钟 10 次 */
 export const aiLimiter = createRateLimiter({ windowMs: 60_000, max: 10, name: 'ai' });
+/** 会话/消息写端点：1 分钟 30 次 */
+export const chatLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'chat' });
+/** 关注写端点：1 分钟 60 次 */
+export const followLimiter = createRateLimiter({ windowMs: 60_000, max: 60, name: 'follow' });
+/** 公告 ack：1 分钟 30 次 */
+export const ackLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'ack' });
+/** 草稿写端点：1 分钟 30 次 */
+export const draftLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'draft' });

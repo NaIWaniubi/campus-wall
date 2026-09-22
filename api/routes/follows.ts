@@ -6,11 +6,14 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
+import { followLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
+// 仅 toggle 写端点限流；GET 关注/粉丝列表为公开接口，不限流（用户进入个人主页时高频拉取）
+
 // 关注/取消关注（toggle），返回最新状态
-router.post('/:id/follow', authRequired, (req, res) => {
+router.post('/:id/follow', authRequired, followLimiter, (req, res) => {
   const targetId = Number(req.params.id);
   const me = req.currentUser!.id;
 

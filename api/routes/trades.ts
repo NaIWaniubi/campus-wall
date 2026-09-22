@@ -113,17 +113,20 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
     throw err;
   }
 
-  // 计入信誉分（好评+2 差评-3，钳制 0-120）
+  // 计入信誉分（好评+2 差评-3，钳制 0-120）—— trade_ratings INSERT + users.credit_score UPDATE 放事务里
   const delta = creditDelta(score);
-  let newScore = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
-  if (delta !== 0) {
-    db.prepare('UPDATE users SET credit_score = MAX(?, MIN(?, credit_score + ?)) WHERE id = ?').run(
-      CREDIT_MIN, CREDIT_MAX, delta, rateeId
-    );
-    newScore = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
-  }
+  const newScore = db.transaction(() => {
+    let updated: number = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
+    if (delta !== 0) {
+      db.prepare('UPDATE users SET credit_score = MAX(?, MIN(?, credit_score + ?)) WHERE id = ?').run(
+        CREDIT_MIN, CREDIT_MAX, delta, rateeId
+      );
+      updated = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
+    }
+    return updated;
+  })();
 
-  // 通知被评人（复用通知去重工具）
+  // 通知被评人（事务外：通知失败不应回滚已落库的 trade_ratings / credit_score）
   upsertNotification(
     rateeId,
     'system',

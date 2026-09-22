@@ -1,7 +1,7 @@
 /**
  * 路由配置：用户端 + 管理后台
  */
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
 
@@ -58,8 +58,13 @@ const routes = [
 
   // 403
   { path: '/403', name: 'forbidden', component: () => import('@/pages/ForbiddenPage.vue'), meta: { title: '无权限' } },
-  { path: '/:pathMatch(.*)*', redirect: '/' } as any,
-]
+  // 404 / 兜底：命中未知路径 → ForbiddenPage（复用 403 视觉，承载"页面不存在"语义）
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'notFound',
+    component: () => import('@/pages/ForbiddenPage.vue'),
+  },
+] as RouteRecordRaw[]
 
 const router = createRouter({
   history: createWebHistory(),

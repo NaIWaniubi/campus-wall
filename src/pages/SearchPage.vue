@@ -36,6 +36,9 @@ const sortOptions: { key: SortKey; label: string }[] = [
 ]
 const activeSort = ref<SortKey>('new')
 const inputRef: Ref<HTMLInputElement | null> = ref(null)
+// 列表底部的 sentinel DOM 节点：IntersectionObserver 命中即触发 loadMore
+const sentinelRef: Ref<HTMLElement | null> = ref(null)
+let ioObserver: IntersectionObserver | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 
 const HISTORY_KEY = 'campus-search-history'
@@ -135,11 +138,8 @@ async function loadMore() {
   }
 }
 
-function onScroll() {
-  if (loading.value || loadingMore.value || !hasMore.value) return
-  const el = document.documentElement
-  if (el.scrollHeight - el.scrollTop - window.innerHeight < 200) loadMore()
-}
+// 滚动加载已切换为 IntersectionObserver sentinel（更可靠，对 sticky header / 虚拟滚动更友好）；
+// 不再使用 window.addEventListener('scroll')，避免重复触发 / 与 IO 互相干扰。
 
 function searchBy(kw: string) {
   keyword.value = kw
@@ -167,7 +167,15 @@ onMounted(async () => {
   loadHistory()
   inputRef.value?.focus()
   if (!appStore.sections.length) appStore.fetchSections()
-  window.addEventListener('scroll', onScroll)
+  // 预留 IO 观察器钩子：模板中 sentinelRef 元素触发 loadMore
+  if (sentinelRef.value && 'IntersectionObserver' in window) {
+    ioObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) loadMore()
+      }
+    }, { rootMargin: '200px' })
+    ioObserver.observe(sentinelRef.value)
+  }
   try {
     const res: any = await sectionApi.hotSearch()
     hotWords.value = (res.data || []).slice(0, 8)
@@ -176,7 +184,10 @@ onMounted(async () => {
   }
 })
 onUnmounted(() => {
-  window.removeEventListener('scroll', onScroll)
+  if (ioObserver) {
+    ioObserver.disconnect()
+    ioObserver = null
+  }
 })
 </script>
 
@@ -292,6 +303,8 @@ onUnmounted(() => {
               action-text="换个关键词"
               @action="keyword = ''; searched = false"
             />
+            <!-- IO 哨兵：有数据 + 仍有更多时挂载，IntersectionObserver 命中触发 loadMore -->
+            <div v-if="hasMore && results.length" ref="sentinelRef" class="h-1" aria-hidden="true" />
           </template>
         </div>
       </div>

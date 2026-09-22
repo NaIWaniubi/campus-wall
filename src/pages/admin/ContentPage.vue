@@ -89,28 +89,42 @@ function nextPage() {
   }
 }
 
+// 提交锁：每个帖子的 approve/reject/delete 操作都加 id 锁，防止双击触发两次
+const submittingId = ref<number | null>(null)
+
 async function approve(p: any) {
+  if (!p || submittingId.value === p.id) return
+  submittingId.value = p.id
   try {
     await adminApi.auditPost(p.id, 'approve')
     toast.success('已通过审核')
     load()
-  } catch {}
+  } catch {
+  } finally {
+    submittingId.value = null
+  }
 }
 
-const rejectModal = reactive({ visible: false, post: null as any, reason: '' })
+const rejectModal = reactive({ visible: false, post: null as any, reason: '', submitting: false })
 function openReject(p: any) {
   rejectModal.post = p
   rejectModal.reason = ''
+  rejectModal.submitting = false
   rejectModal.visible = true
 }
 async function submitReject() {
+  if (rejectModal.submitting) return
   if (!rejectModal.reason.trim()) return toast.error('请填写驳回原因')
+  rejectModal.submitting = true
   try {
     await adminApi.auditPost(rejectModal.post.id, 'reject', rejectModal.reason.trim())
     toast.success('已驳回')
     rejectModal.visible = false
     load()
-  } catch {}
+  } catch {
+  } finally {
+    rejectModal.submitting = false
+  }
 }
 
 // 置顶二选一（板块置顶 topType=section / 全局置顶 topType=global），untop 不变
@@ -150,19 +164,25 @@ async function loadSections() {
   } catch {}
 }
 
-const deleteModal = reactive({ visible: false, post: null as any })
+const deleteModal = reactive({ visible: false, post: null as any, submitting: false })
 function openDelete(p: any) {
   deleteModal.post = p
+  deleteModal.submitting = false
   deleteModal.visible = true
 }
 async function submitDelete() {
+  if (deleteModal.submitting) return
   if (!deleteModal.post) return
+  deleteModal.submitting = true
   try {
     await postApi.delete(deleteModal.post.id)
     toast.success('已删除')
     deleteModal.visible = false
     load()
-  } catch {}
+  } catch {
+  } finally {
+    deleteModal.submitting = false
+  }
 }
 
 onMounted(() => {
@@ -244,10 +264,11 @@ onMounted(() => {
               <div class="flex flex-wrap items-center gap-1 whitespace-nowrap">
                 <button
                   v-if="p.status === 'pending' || p.status === 'pending_review'"
-                  class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-green-50 text-green-600 hover:bg-green-100"
+                  class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="submittingId === p.id"
                   @click="approve(p)"
                 >
-                  <Check class="w-3 h-3" />通过
+                  <Check class="w-3 h-3" />{{ submittingId === p.id ? '处理中…' : '通过' }}
                 </button>
                 <button
                   v-if="p.status === 'pending' || p.status === 'pending_review'"
@@ -272,7 +293,8 @@ onMounted(() => {
                 </button>
                 <button
                   v-if="p.status !== 'deleted'"
-                  class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-50/60 text-red-500 hover:bg-red-100"
+                  class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-50/60 text-red-500 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="submittingId === p.id"
                   @click="openDelete(p)"
                 >
                   <Trash2 class="w-3 h-3" />删除
@@ -321,7 +343,7 @@ onMounted(() => {
           ></textarea>
           <div class="flex gap-3">
             <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="rejectModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitReject">确定驳回</button>
+            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="rejectModal.submitting" @click="submitReject">{{ rejectModal.submitting ? '提交中…' : '确定驳回' }}</button>
           </div>
         </div>
       </div>

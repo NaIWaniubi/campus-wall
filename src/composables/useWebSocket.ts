@@ -4,6 +4,8 @@
  * - 心跳 25s 发 {type:'ping'}，服务端回 pong（pong 不下发业务层）
  * - 断线指数退避重连 1s→2s→…→30s 封顶；登出断开、token 变化自动重连
  * - 多消费者：onMessage 可注册多个回调（useChatSocket 路由私信/通知帧）
+ *
+ * 仅 SPA 客户端使用：模块级状态在多实例/SSR 下不安全；本项目当前为纯 SPA，构建产物无 SSR。
  */
 import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'

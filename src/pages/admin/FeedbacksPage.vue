@@ -3,7 +3,7 @@
  * 意见反馈：open/closed 双 tab 列表（提交人/内容/联系方式/时间）
  * 契约：GET /api/admin/feedbacks?status=open|closed&page= → { list, total, page, pageSize }
  */
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { adminApi } from '@/utils/api'
 import { toast } from '@/utils/request'
@@ -39,14 +39,28 @@ function switchTab(tab: 'open' | 'closed') {
 
 // 反馈闭环：标记已处理（PUT /admin/feedbacks/:id/status {status:'closed'}）
 const closingId = ref<number | null>(null)
-async function closeFeedback(f: any) {
-  if (closingId.value) return
+// 二次确认弹窗：标记已处理需管理员明确意图，避免误关单
+const closeConfirm = reactive({ visible: false, feedback: null as any })
+function openCloseConfirm(f: any) {
+  closeConfirm.feedback = f
+  closeConfirm.visible = true
+}
+function cancelCloseConfirm() {
+  closeConfirm.visible = false
+  closeConfirm.feedback = null
+}
+async function confirmCloseFeedback() {
+  const f = closeConfirm.feedback
+  closeConfirm.visible = false
+  closeConfirm.feedback = null
+  if (!f || closingId.value === f.id) return
   closingId.value = f.id
   try {
     await adminApi.closeFeedback(f.id, 'closed')
     toast.success('已标记为已处理')
     load()
-  } catch {} finally {
+  } catch {
+  } finally {
     closingId.value = null
   }
 }
@@ -105,7 +119,7 @@ onMounted(load)
             v-if="activeTab === 'open'"
             class="px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50 whitespace-nowrap"
             :disabled="closingId === f.id"
-            @click="closeFeedback(f)"
+            @click="openCloseConfirm(f)"
           >
             {{ closingId === f.id ? '处理中...' : '标记已处理' }}
           </button>
@@ -114,6 +128,33 @@ onMounted(load)
       <EmptyState v-if="!loading && !list.length" :text="activeTab === 'open' ? '暂无待处理反馈' : '暂无已关闭反馈'" />
       <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>
     </div>
+
+    <!-- 二次确认：标记已处理 -->
+    <Teleport to="body">
+      <div v-if="closeConfirm.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="cancelCloseConfirm">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
+          <h3 class="text-lg font-semibold mb-3">标记为已处理？</h3>
+          <div v-if="closeConfirm.feedback" class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl mb-3">
+            <div class="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+              <img v-if="closeConfirm.feedback.avatar" :src="closeConfirm.feedback.avatar" class="w-full h-full object-cover" alt="" />
+              <span v-else>{{ closeConfirm.feedback.nickname?.charAt(0) }}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-zinc-900 truncate">{{ closeConfirm.feedback.nickname || '未知用户' }}</div>
+              <div class="text-xs text-zinc-500 truncate">学号 {{ closeConfirm.feedback.studentId }} · {{ formatTime(closeConfirm.feedback.createdAt) }}</div>
+            </div>
+          </div>
+          <p class="text-sm text-zinc-600 mb-4">将该条反馈从「待处理」移入「已关闭」。如有需要请先在外部与用户沟通后再操作。</p>
+          <div class="flex gap-3">
+            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="cancelCloseConfirm">取消</button>
+            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="closingId === closeConfirm.feedback?.id" @click="confirmCloseFeedback">
+              {{ closingId === closeConfirm.feedback?.id ? '提交中…' : '确定' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 分页 -->
     <div v-if="total > pageSize" class="flex items-center justify-between text-sm text-zinc-500">

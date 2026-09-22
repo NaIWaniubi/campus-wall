@@ -6,7 +6,7 @@ import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Eye, EyeOff, GraduationCap, Loader2, X } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { toast } from '@/utils/request'
+import { toast, safeRedirect } from '@/utils/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,7 +34,7 @@ async function handleSubmit() {
   try {
     await userStore.login(form.studentId.trim(), form.password)
     toast.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/'
+    const redirect = safeRedirect(route.query.redirect, '/')
     router.replace(redirect)
   } catch {
     // 错误已由拦截器 toast

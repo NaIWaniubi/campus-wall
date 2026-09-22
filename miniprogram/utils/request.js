@@ -1,6 +1,6 @@
 /**
  * 底层请求封装：基于 wx.request / wx.uploadFile
- * - 401 统一清登录态并跳登录页
+ * - 401 统一清登录态并跳登录页（保存当前路由用于登录后回跳）
  * - code === 200 才 resolve，401 触发 handleUnauthorized 后 reject
  * - silentCodes：业务码命中时静默 reject，不弹错误
  *
@@ -45,7 +45,23 @@ function toMs(v) {
   return isNaN(t) ? v : t
 }
 
-/** 401 统一处理：清登录态并跳登录页 */
+/**
+ * 安全获取当前页面路径：getCurrentPages 仅在页面级上下文可用，且必须是同步调用。
+ * 包一层 try-catch，非页面上下文（App.onLaunch 等）返回空串，由调用方兜底。
+ */
+function getCurrentRoute() {
+  try {
+    if (typeof getCurrentPages !== 'function') return ''
+    const pages = getCurrentPages()
+    if (!pages || !pages.length) return ''
+    const cur = pages[pages.length - 1]
+    return cur && cur.route ? '/' + cur.route : ''
+  } catch (e) {
+    return ''
+  }
+}
+
+/** 401 统一处理：清登录态、保存原始路由并跳登录页（登录后可回跳） */
 function handleUnauthorized() {
   showToast('登录已过期，请重新登录')
   const app = getAppSafe()
@@ -57,8 +73,20 @@ function handleUnauthorized() {
     wx.removeStorageSync('token')
     wx.removeStorageSync('userInfo')
   } catch (e) { /* storage 异常忽略 */ }
+  // 记录当前页面路径，登录页登录成功后据此回跳
+  const currentRoute = getCurrentRoute()
+  if (currentRoute && currentRoute !== '/pages/mine/profile/profile') {
+    try {
+      wx.setStorageSync('auth:redirect', currentRoute)
+    } catch (e) { /* storage 异常忽略 */ }
+  }
   setTimeout(() => {
-    wx.navigateTo({ url: '/pages/mine/profile/profile?needLogin=true' })
+    const target = '/pages/mine/profile/profile?needLogin=1'
+      + (currentRoute && currentRoute !== '/pages/mine/profile/profile'
+        ? '&redirect=' + encodeURIComponent(currentRoute)
+        : '')
+    // reLaunch 确保无论从哪跳过来，目标页都是栈底
+    wx.reLaunch({ url: target })
   }, 1200)
 }
 
@@ -127,4 +155,5 @@ module.exports = {
   getServerOrigin,
   getToken,
   getAppSafe,
+  getCurrentRoute,
 }

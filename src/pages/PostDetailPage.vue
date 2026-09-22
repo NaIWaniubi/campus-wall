@@ -278,24 +278,53 @@ async function fetchMatches() {
   }
 }
 
+// 乐观更新锁：like/favorite 独立，避免一个动作互锁另一个动作的 300ms 防抖窗口
+const likeLocked = ref(false)
+const favoriteLocked = ref(false)
+const LIKE_DEBOUNCE_MS = 300
+
 async function toggleLike() {
   if (!userStore.isLoggedIn) return router.push({ path: '/login', query: { redirect: route.fullPath } })
   if (!canInteract.value) return toast.info('帖子审核中，暂不可互动')
+  if (likeLocked.value) return
+  likeLocked.value = true
+  // 1) 快照当前状态
+  const oldLiked = !!post.value.liked
+  const oldCount = Number(post.value.likeCount) || 0
+  const newLiked = !oldLiked
+  const newCount = Math.max(0, oldCount + (newLiked ? 1 : -1))
+  // 2) 立即更新本地状态（用不可变替换，避免直接 mutate ref）
+  post.value = { ...post.value, liked: newLiked, likeCount: newCount }
   try {
     const res: any = await postApi.like(postId.value)
-    post.value.liked = res.data.liked
-    post.value.likeCount = res.data.likeCount
-  } catch {}
+    // 成功后以服务端为准再做一次不可变更新
+    post.value = { ...post.value, liked: !!res.data.liked, likeCount: res.data.likeCount }
+  } catch {
+    // 3) 失败回滚到快照
+    post.value = { ...post.value, liked: oldLiked, likeCount: oldCount }
+  } finally {
+    setTimeout(() => { likeLocked.value = false }, LIKE_DEBOUNCE_MS)
+  }
 }
 
 async function toggleFavorite() {
   if (!userStore.isLoggedIn) return router.push({ path: '/login', query: { redirect: route.fullPath } })
   if (!canInteract.value) return toast.info('帖子审核中，暂不可互动')
+  if (favoriteLocked.value) return
+  favoriteLocked.value = true
+  const oldFavorited = !!post.value.favorited
+  const oldCount = Number(post.value.favoriteCount) || 0
+  const newFavorited = !oldFavorited
+  const newCount = Math.max(0, oldCount + (newFavorited ? 1 : -1))
+  post.value = { ...post.value, favorited: newFavorited, favoriteCount: newCount }
   try {
     const res: any = await postApi.favorite(postId.value)
-    post.value.favorited = res.data.favorited
-    post.value.favoriteCount = res.data.favoriteCount
-  } catch {}
+    post.value = { ...post.value, favorited: !!res.data.favorited, favoriteCount: res.data.favoriteCount }
+  } catch {
+    post.value = { ...post.value, favorited: oldFavorited, favoriteCount: oldCount }
+  } finally {
+    setTimeout(() => { favoriteLocked.value = false }, LIKE_DEBOUNCE_MS)
+  }
 }
 
 async function toggleCommentLike(c: any) {

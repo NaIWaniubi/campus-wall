@@ -5,8 +5,11 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired, authOptional, superAdminRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
+import { ackLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
+
+// 仅写端点节流：ack、发布、停用；GET /active 与 GET / 不限流（首页登录后必拉）
 
 // 获取当前用户最新未确认的公告
 router.get('/active', authOptional, (req, res) => {
@@ -39,7 +42,7 @@ router.get('/active', authOptional, (req, res) => {
 });
 
 // 确认公告（不再向该用户展示）
-router.post('/:id/ack', authRequired, (req, res) => {
+router.post('/:id/ack', authRequired, ackLimiter, (req, res) => {
   const id = Number(req.params.id);
   // 记录确认（仅对登录用户有效）
   db.prepare(`
@@ -64,7 +67,7 @@ router.get('/', (req, res) => {
 });
 
 // 发布公告（targetUserId 选填：定向公告，仅该用户可见——展示侧 /active 已按 target_user_id 过滤）
-router.post('/', (req, res) => {
+router.post('/', ackLimiter, (req, res) => {
   const { title, content, expiresAt, targetUserId } = req.body;
   if (!title || !content) return fail(res, '标题和内容不能为空');
   let targetId: number | null = null;

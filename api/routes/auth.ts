@@ -14,6 +14,13 @@ import { success, fail, toCamel } from '../utils/response.js';
 const router = Router();
 
 /**
+ * 安全的 users 表列白名单（不包含 password 列）：
+ * 任何对外返回用户对象的 SELECT 必须走此白名单，避免 bcrypt hash 泄露到客户端。
+ * 内部校验密码请显式 SELECT password, ${SAFE_USER_COLS}，再用 toCamel 前剥离 password 字段。
+ */
+const SAFE_USER_COLS = `id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, ban_reason, ban_until, openid, created_at`;
+
+/**
  * 调用微信 jscode2session（https.get，5 秒超时）
  * 返回微信原始响应；网络失败/超时/非 JSON 统一返回空对象
  */
@@ -59,7 +66,7 @@ router.post('/wx-login', async (req, res) => {
   }
   const openid: string = session.openid;
 
-  let user = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid) as any;
+  let user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE openid = ?`).get(openid) as any;
   if (!user) {
     // 自动建号：学号 wx_+openid 前 8 位（冲突加后缀）、昵称'微信用户'+随机数、随机密码不可知
     let studentId = `wx_${openid.slice(0, 8)}`;
@@ -71,7 +78,7 @@ router.post('/wx-login', async (req, res) => {
     const result = db
       .prepare("INSERT INTO users (student_id, password, nickname, openid, role, status, credit_score) VALUES (?, ?, ?, ?, 'user', 'active', 100)")
       .run(studentId, randomPassword, nickname, openid);
-    user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as any;
+    user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(result.lastInsertRowid) as any;
   }
 
   if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
@@ -122,7 +129,7 @@ router.post('/register', authRateLimit, (req, res) => {
   const token = generateToken({ id: userId, studentId, role: 'user' });
   clearAuthFailures(req);
 
-  const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(userId) as any;
+  const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(userId) as any;
 
   success(res, { token, user: toCamel(user) }, '注册成功');
 });
@@ -135,7 +142,7 @@ router.post('/login', authRateLimit, (req, res) => {
     return fail(res, '学号和密码为必填项');
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE student_id = ?').get(studentId) as any;
+  const user = db.prepare(`SELECT password, ${SAFE_USER_COLS} FROM users WHERE student_id = ?`).get(studentId) as any;
   // 不区分「账号不存在」与「密码错误」，防账号枚举（审计 P0-3）
   if (!user) {
     recordAuthFailure(req);
@@ -157,12 +164,14 @@ router.post('/login', authRateLimit, (req, res) => {
   clearAuthFailures(req);
 
   const token = generateToken({ id: user.id, studentId: user.student_id, role: user.role });
-  success(res, { token, user: toCamel(user) }, '登录成功');
+  // 显式剥离 password 字段（白名单已不含，但此处仍防御性 toCamel 之前 drop）
+  const { password: _pw, ...safeUser } = user;
+  success(res, { token, user: toCamel(safeUser) }, '登录成功');
 });
 
 // 获取当前用户信息
 router.get('/me', authRequired, (req, res) => {
-  const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(req.currentUser!.id) as any;
+  const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(req.currentUser!.id) as any;
   if (!user) {
     return fail(res, '用户不存在', 404, 404);
   }

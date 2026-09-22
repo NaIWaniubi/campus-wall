@@ -10,6 +10,7 @@ export default {
     },
     extend: {
       colors: {
+        // Token 规范：业务色用 brand / danger / warning / accent / neutral；不要用 success 别名（与 brand 同色）。
         // 品牌色全部走 token 变量，便于主题切换
         brand: {
           50:  'var(--color-brand-50)',

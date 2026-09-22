@@ -116,9 +116,14 @@ function adaptPayload(oldUrl, method, data) {
     payload = p
   }
 
-  // 管理端举报处理：POST .../resolve -> PUT /admin/reports/:id {action}
+  // 管理端举报处理：POST .../resolve -> PUT /admin/reports/:id {action, result}
+  // 透传调用方传入的 action / result（resolve / dismiss 等），未传时默认 dismiss
   if (/^\/admin\/reports\/\d+\/resolve$/.test(oldUrl)) {
-    payload = { action: 'dismiss', result: '已处理' }
+    const incoming = (data && typeof data === 'object') ? data : {}
+    payload = {
+      action: incoming.action || 'dismiss',
+      result: incoming.result || '已处理',
+    }
   }
 
   return payload

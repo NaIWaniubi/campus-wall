@@ -69,6 +69,8 @@ router.put('/read-all', authRequired, (req, res) => {
     // 没传 ids 视为"标当前已加载但前端没传"——零回退静默，提示前端补传
     return fail(res, '请传入要标记已读的消息 id 列表 ids: number[]', 400, 400);
   }
+  // 单次上限：避免 IN (?, ?, ...) 占位符爆炸（SQLITE_MAX_VARIABLE_NUMBER 默认 32766，但每请求 100 已足够覆盖前端单屏）
+  if (ids.length > 100) return fail(res, '单次标记最多 100 条', 400, 400);
   const placeholders = ids.map(() => '?').join(',');
   const result = db.prepare(
     `UPDATE messages SET is_read = 1 WHERE user_id = ? AND is_read = 0 AND id IN (${placeholders})`

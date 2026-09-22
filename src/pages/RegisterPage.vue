@@ -6,7 +6,7 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ArrowLeft, Eye, EyeOff, Loader2, GraduationCap } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { toast } from '@/utils/request'
+import { toast, safeRedirect } from '@/utils/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -67,7 +67,7 @@ async function handleSubmit() {
     })
     toast.success('注册成功，已自动登录')
     // 回到登录前想去的页面，不再固定落首页
-    router.replace((route.query.redirect as string) || '/')
+    router.replace(safeRedirect(route.query.redirect, '/'))
   } catch {
     // 错误已由拦截器 toast
   } finally {

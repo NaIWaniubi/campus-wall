@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "失物招领",
   "usingComponents": {
+    "skeleton": "/components/skeleton/skeleton",
     "post-card": "/components/post-card/post-card",
     "empty-state": "/components/empty-state/empty-state",
     "load-more": "/components/load-more/load-more",

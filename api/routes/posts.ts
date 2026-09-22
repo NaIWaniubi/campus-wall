@@ -136,11 +136,18 @@ router.get('/', authOptional, (req, res) => {
     where += ` AND p.created_at >= datetime('now', '-' || ? || ' days')`;
     params.push(timeRange);
   }
-  // 子类型筛选（extra_fields 中的某个 key 精确匹配）
+  // 子类型筛选（extra_fields 中的某个 key 精确匹配，key 必须经过白名单避免 SQL 注入/任意 json 路径）
   if (subType) {
-    const [key, val] = subType.split(':');
-    if (key && val) {
-      where += ` AND json_extract(p.extra_fields, '$."${key}"') = ?`;
+    const SUBTYPE_WHITELIST: Record<string, string> = {
+      tradeType: 'tradeType',
+      itemType: 'itemType',
+      direction: 'direction',
+      activityType: 'activityType',
+    };
+    const [rawKey, val] = subType.split(':');
+    const safeKey = rawKey && SUBTYPE_WHITELIST[rawKey];
+    if (safeKey && val) {
+      where += ` AND json_extract(p.extra_fields, '$."${safeKey}"') = ?`;
       params.push(val);
     }
   }
@@ -460,50 +467,61 @@ router.delete('/:id', authRequired, (req, res) => {
   success(res, null, '删除成功');
 });
 
-// 点赞/取消点赞
+// 点赞/取消点赞（事务化：likes 表 INSERT/DELETE + posts.like_count UPDATE 原子完成，避免计数漂移）
 router.post('/:id/like', authRequired, (req, res) => {
   const id = Number(req.params.id);
-  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND status = \'published\'').get(id) as any;
-  if (!post) return fail(res, '帖子不存在', 404, 404);
-
-  const exist = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(req.currentUser!.id, 'post', id);
-  if (exist) {
-    db.prepare('DELETE FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').run(req.currentUser!.id, 'post', id);
-    db.prepare('UPDATE posts SET like_count = MAX(0, like_count - 1) WHERE id = ?').run(id);
-    cacheInvalidate('posts');
-    success(res, { liked: false, likeCount: post.like_count - 1 }, '已取消点赞');
-  } else {
-    db.prepare('INSERT INTO likes (user_id, target_type, target_id) VALUES (?, ?, ?)').run(req.currentUser!.id, 'post', id);
-    db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').run(id);
-    cacheInvalidate('posts');
-    // 通知作者（去重：同人对同帖 7 天内反复点赞只更新一条）
-    if (post.user_id !== req.currentUser!.id) {
-      upsertNotification(
-        post.user_id, 'like', `${req.currentUser!.nickname} 赞了你的帖子「${post.title}」`, id
-      );
+  const userId = req.currentUser!.id;
+  const result = db.transaction(() => {
+    const post = db.prepare("SELECT id, user_id, title FROM posts WHERE id = ? AND status = 'published'").get(id) as any;
+    if (!post) return { error: '帖子不存在' } as const;
+    const exist = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(userId, 'post', id);
+    let liked: boolean;
+    if (exist) {
+      db.prepare('DELETE FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').run(userId, 'post', id);
+      db.prepare('UPDATE posts SET like_count = MAX(0, like_count - 1) WHERE id = ?').run(id);
+      liked = false;
+    } else {
+      db.prepare('INSERT INTO likes (user_id, target_type, target_id) VALUES (?, ?, ?)').run(userId, 'post', id);
+      db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').run(id);
+      liked = true;
     }
-    success(res, { liked: true, likeCount: post.like_count + 1 }, '点赞成功');
+    const likeCount = (db.prepare('SELECT like_count FROM posts WHERE id = ?').get(id) as any).like_count;
+    return { liked, likeCount, post, justLiked: !exist };
+  })();
+  if ('error' in result) return fail(res, result.error, 404, 404);
+  cacheInvalidate('posts');
+  if (result.justLiked && result.post.user_id !== userId) {
+    upsertNotification(
+      result.post.user_id, 'like', `${req.currentUser!.nickname} 赞了你的帖子「${result.post.title}」`, id
+    );
   }
+  success(res, { liked: result.liked, likeCount: result.likeCount }, result.liked ? '点赞成功' : '已取消点赞');
 });
 
-// 收藏/取消收藏
+// 收藏/取消收藏（事务化：favorites 表 INSERT/DELETE + posts.favorite_count UPDATE 原子完成）
 router.post('/:id/favorite', authRequired, (req, res) => {
   const id = Number(req.params.id);
-  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND status = \'published\'').get(id) as any;
-  if (!post) return fail(res, '帖子不存在', 404, 404);
-
-  const exist = db.prepare('SELECT id FROM favorites WHERE user_id = ? AND post_id = ?').get(req.currentUser!.id, id);
-  if (exist) {
-    db.prepare('DELETE FROM favorites WHERE user_id = ? AND post_id = ?').run(req.currentUser!.id, id);
-    db.prepare('UPDATE posts SET favorite_count = MAX(0, favorite_count - 1) WHERE id = ?').run(id);
-    cacheInvalidate('posts');
-    success(res, { favorited: false, favoriteCount: post.favorite_count - 1 }, '已取消收藏');
-  } else {
-    db.prepare('INSERT INTO favorites (user_id, post_id) VALUES (?, ?)').run(req.currentUser!.id, id);
-    db.prepare('UPDATE posts SET favorite_count = favorite_count + 1 WHERE id = ?').run(id);
-    cacheInvalidate('posts');
-    success(res, { favorited: true, favoriteCount: post.favorite_count + 1 }, '收藏成功');
-  }
+  const userId = req.currentUser!.id;
+  const result = db.transaction(() => {
+    const post = db.prepare("SELECT id, user_id FROM posts WHERE id = ? AND status = 'published'").get(id) as any;
+    if (!post) return { error: '帖子不存在' } as const;
+    const exist = db.prepare('SELECT id FROM favorites WHERE user_id = ? AND post_id = ?').get(userId, id);
+    let favorited: boolean;
+    if (exist) {
+      db.prepare('DELETE FROM favorites WHERE user_id = ? AND post_id = ?').run(userId, id);
+      db.prepare('UPDATE posts SET favorite_count = MAX(0, favorite_count - 1) WHERE id = ?').run(id);
+      favorited = false;
+    } else {
+      db.prepare('INSERT INTO favorites (user_id, post_id) VALUES (?, ?)').run(userId, id);
+      db.prepare('UPDATE posts SET favorite_count = favorite_count + 1 WHERE id = ?').run(id);
+      favorited = true;
+    }
+    const favoriteCount = (db.prepare('SELECT favorite_count FROM posts WHERE id = ?').get(id) as any).favorite_count;
+    return { favorited, favoriteCount };
+  })();
+  if ('error' in result) return fail(res, result.error, 404, 404);
+  cacheInvalidate('posts');
+  success(res, { favorited: result.favorited, favoriteCount: result.favoriteCount }, result.favorited ? '收藏成功' : '已取消收藏');
 });
 
 // 举报帖子

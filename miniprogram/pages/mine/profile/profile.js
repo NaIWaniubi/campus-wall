@@ -2,6 +2,17 @@ const app = getApp()
 const { get, put, uploadFile, login, register, logout } = require('../../../utils/api')
 const { showToast, showModal } = require('../../../utils/util')
 
+// 开放重定向防护：仅允许 /pages/ 开头的相对路径，禁止协议、绝对 URL、特殊字符
+function sanitizeMiniPath(input) {
+  if (typeof input !== 'string' || !input) return ''
+  const s = input.trim()
+  if (!s.startsWith('/pages/')) return ''
+  if (s.length > 256) return ''
+  if (/[\r\n\t]/.test(s)) return ''
+  if (s.includes('//') || s.includes(':\\')) return ''
+  return s
+}
+
 Page({
   data: {
     userInfo: {},
@@ -13,18 +24,31 @@ Page({
     password: '',
     nickname: '',
     college: '',
-    authLoading: false
+    authLoading: false,
+    pendingRedirect: '' // 登录/注册成功后回跳的页面路径
   },
 
-  onLoad() {
+  onLoad(options) {
     const campusList = app.globalData.campusList
     const userInfo = app.globalData.userInfo || {}
     const campusIndex = campusList.indexOf(userInfo.campus)
+    // 401 跳过来时会带 redirect 参数；此处解码保存，登录成功后回跳
+    let pendingRedirect = ''
+    if (options && options.redirect) {
+      try {
+        pendingRedirect = decodeURIComponent(options.redirect)
+      } catch (e) {
+        pendingRedirect = options.redirect || ''
+      }
+      // 开放重定向防护：仅允许 /pages/ 开头的同包内路径，禁止绝对 URL/外部跳转
+      pendingRedirect = sanitizeMiniPath(pendingRedirect)
+    }
     this.setData({
       userInfo,
       campusList,
       campusIndex: campusIndex >= 0 ? campusIndex : 0,
-      isLoggedIn: app.checkLogin()
+      isLoggedIn: app.checkLogin(),
+      pendingRedirect
     })
   },
 
@@ -148,6 +172,17 @@ Page({
         isLoggedIn: true
       })
       showToast(authMode === 'login' ? '登录成功' : '注册成功', 'success')
+      // 登录/注册成功后回跳：优先用 onLoad 传入的 redirect，否则读 storage 中的 auth:redirect
+      let redirect = this.data.pendingRedirect || wx.getStorageSync('auth:redirect') || ''
+      // storage 来源不在本次请求链路，再次走白名单校验
+      if (redirect) redirect = sanitizeMiniPath(redirect)
+      if (redirect) {
+        try { wx.removeStorageSync('auth:redirect') } catch (e) { /* ignore */ }
+        // 兜底：防止 redirect 指回当前页造成死循环
+        if (redirect !== '/pages/mine/profile/profile') {
+          wx.reLaunch({ url: redirect })
+        }
+      }
     } catch (e) {
       // 业务错误 message 已由适配层 toast，这里兜底网络类失败
       if (!e || !e.message) showToast(authMode === 'login' ? '登录失败，请重试' : '注册失败，请重试')

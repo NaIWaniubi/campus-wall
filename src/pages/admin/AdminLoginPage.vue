@@ -6,7 +6,7 @@ import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Shield, Eye, EyeOff, Loader2 } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { toast } from '@/utils/request'
+import { toast, safeRedirect } from '@/utils/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -29,7 +29,7 @@ async function handleSubmit() {
       return
     }
     toast.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/admin'
+    const redirect = safeRedirect(route.query.redirect, '/admin')
     router.replace(redirect)
   } catch {
     // 错误已由拦截器 toast

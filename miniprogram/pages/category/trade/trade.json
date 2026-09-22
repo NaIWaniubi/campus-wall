@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "二手闲置",
   "usingComponents": {
+    "skeleton": "/components/skeleton/skeleton",
     "post-card": "/components/post-card/post-card",
     "empty-state": "/components/empty-state/empty-state",
     "load-more": "/components/load-more/load-more",

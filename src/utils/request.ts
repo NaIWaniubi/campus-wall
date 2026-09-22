@@ -33,20 +33,25 @@ request.interceptors.response.use(
     // 401：未登录或Token过期
     if (res.code === 401) {
       const userStore = useUserStore()
-      // 用 fullPath 而非 path：保留 query（如 /search?keyword=考研），避免回跳丢参
-      const currentPath = router.currentRoute.value.fullPath
+      // 在清空登录态之前，先快照原始位置（pathname + search + hash），便于登录后回跳
+      const rawLocation =
+        (typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          : '') || router.currentRoute.value.fullPath
+      const currentPath = rawLocation
       const wasAdmin = userStore.isAdmin
+      // 将回跳路径暂存到 sessionStorage，登录页可读取
+      try {
+        sessionStorage.setItem('auth:redirect-after-login', currentPath)
+      } catch {
+        /* sessionStorage 不可用时忽略 */
+      }
       // 清空登录状态
       userStore.logout()
       // 后台路由跳后台登录页，前台跳前台登录页（保留 redirect 便于回跳）
-      if (currentPath.startsWith('/admin')) {
-        if (currentPath !== '/admin/login') {
-          router.push({ path: '/admin/login', query: { redirect: currentPath } })
-        }
-      } else {
-        if (currentPath !== '/login') {
-          router.push({ path: '/login', query: { redirect: currentPath } })
-        }
+      const target = wasAdmin ? '/admin/login' : '/login'
+      if (currentPath !== target) {
+        router.push({ path: target, query: { redirect: currentPath } })
       }
       showToast(res.message || (wasAdmin ? '登录已过期，请重新登录' : '请先登录'), 'error')
       return Promise.reject(new Error(res.message || '请先登录'))
@@ -116,6 +121,22 @@ export const toast = {
   success: (msg: string) => showToast(msg, 'success'),
   error: (msg: string) => showToast(msg, 'error'),
   info: (msg: string) => showToast(msg, 'info'),
+}
+
+/**
+ * 校验回跳路径是否同源且安全：仅允许以 '/' 开头且不以 '//' / '/\' 开头的相对路径，
+ * 拒绝协议相对 URL、绝对 URL、控制字符、CRLF 等，防止开放重定向攻击。
+ * 命中非法值时回退到 '/'.
+ */
+export function safeRedirect(input: unknown, fallback = '/'): string {
+  if (typeof input !== 'string') return fallback
+  const s = input.trim()
+  if (!s) return fallback
+  if (s.length > 512) return fallback
+  if (!s.startsWith('/')) return fallback
+  if (s.startsWith('//') || s.startsWith('/\\')) return fallback
+  if (/[\r\n\t]/.test(s)) return fallback
+  return s
 }
 
 export default request

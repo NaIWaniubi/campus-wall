@@ -6,12 +6,16 @@ import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
 import { dispatchChatMessage } from '../ws/handlers/dispatcher.js';
+import { chatLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
+// 写端点限流（创建会话、发送消息等高频写操作）：仅作用于写方法，GET 列表/分页不受影响
+const writeLimiter = chatLimiter;
+
 // 统一的时间序列化（与全站一致：SQLite DATETIME → ISO）
 function toIso(v: string | null): string | null {
-  return v ? new Date(v).toISOString() : null;
+  return v ? new Date(v).toISOString() : v;
 }
 
 // 取会话并校验当前用户为参与方；返回会话与"我是否为 a 方"
@@ -59,7 +63,7 @@ router.get('/', authRequired, (req, res) => {
 });
 
 // 创建（或复用）与某用户的会话，幂等返回 {id}
-router.post('/', authRequired, (req, res) => {
+router.post('/', authRequired, writeLimiter, (req, res) => {
   const peerId = Number(req.body?.peerId);
   const me = req.currentUser!.id;
 
@@ -122,7 +126,7 @@ router.get('/:id/messages', authRequired, (req, res) => {
 });
 
 // 发送消息（≤500字）：写消息 + 更新会话摘要 + 对方未读+1 + 站内通知
-router.post('/:id/messages', authRequired, (req, res) => {
+router.post('/:id/messages', authRequired, writeLimiter, (req, res) => {
   const convId = Number(req.params.id);
   const found = getConvForUser(convId, req.currentUser!.id);
   if (!found) return fail(res, '会话不存在', 404, 404);

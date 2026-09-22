@@ -278,7 +278,8 @@ onUnmounted(() => {
 
     <!-- 悬浮发布按钮 -->
     <button
-      class="fixed right-4 bottom-6 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 active:scale-90 shadow-lg shadow-brand-500/40 flex items-center justify-center text-white transition-all duration-200 z-20"
+      class="fixed right-4 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 active:scale-90 shadow-lg shadow-brand-500/40 flex items-center justify-center text-white transition-all duration-200 z-20"
+      style="bottom: calc(1.5rem + env(safe-area-inset-bottom));"
       @click="goPublish"
     >
       <Plus class="w-7 h-7" />

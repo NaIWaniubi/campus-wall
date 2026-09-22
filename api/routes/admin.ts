@@ -141,8 +141,11 @@ router.put('/users/:id/credit', superOnly, (req, res) => {
   if (typeof score !== 'number') return fail(res, '请输入有效分值');
   const user = db.prepare('SELECT credit_score FROM users WHERE id = ?').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);
-  const newScore = Math.max(0, Math.min(120, user.credit_score + score));
-  db.prepare('UPDATE users SET credit_score = ? WHERE id = ?').run(newScore, id);
+  const newScore = db.transaction(() => {
+    const next = Math.max(0, Math.min(120, user.credit_score + score));
+    db.prepare('UPDATE users SET credit_score = ? WHERE id = ?').run(next, id);
+    return next;
+  })();
   db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
     id, 'system', `您的信誉分${score >= 0 ? '增加' : '减少'}${Math.abs(score)}分，当前信誉分：${newScore}${reason ? `，原因：${reason}` : ''}`
   );
@@ -303,7 +306,7 @@ router.get('/comments', sectionAllowed, (req, res) => {
 });
 
 // 删除违规评论
-router.delete('/comments/:id', (req, res) => {
+router.delete('/comments/:id', sectionAllowed, (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
@@ -493,7 +496,7 @@ router.post('/sections', superOnly, (req, res) => {
   success(res, { id: result.lastInsertRowid }, '板块已创建');
 });
 
-router.put('/sections/:id', (req, res) => {
+router.put('/sections/:id', superOnly, (req, res) => {
   const id = Number(req.params.id);
   const { name, icon, sort, isActive, forceAnonymous, needAudit } = req.body;
   const section = db.prepare('SELECT * FROM sections WHERE id = ?').get(id) as any;

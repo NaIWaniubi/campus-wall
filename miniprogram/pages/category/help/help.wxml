@@ -6,6 +6,7 @@
     <view class="tab-item {{activeTab === 'life' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="life"><text>生活求助</text></view>
     <view class="tab-item {{activeTab === 'other' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="other"><text>其他</text></view>
   </view>
+  <view wx:if="{{loading}}" class="skeleton-wrap"><skeleton type="post" count="4"/></view>
   <view class="post-list">
     <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
     <empty-state wx:if="{{posts.length === 0}}" text="暂无求助信息" customIcon="🆘"></empty-state>

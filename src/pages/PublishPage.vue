@@ -255,16 +255,33 @@ async function onUpload(e: Event) {
   }
   uploading.value = true
   try {
+    // 并发上传：分块（每块 ≤3 张）+ Promise.all，替代原先的串行 for-await
+    const CONCURRENCY = 3
+    const validFiles: File[] = []
     for (const file of files) {
-      if (form.images.length >= 9) break
+      if (form.images.length + validFiles.length >= 9) break
       if (file.size > 20 * 1024 * 1024) {
         toast.error(`${file.name} 超过20MB，无法上传`)
         continue
       }
-      // 大图先本地压缩再上传，服务端仍有 sharp 二次处理兜底
+      validFiles.push(file)
+    }
+    // 上传单个文件：先本地压缩再请求上传；返回 url 或抛错
+    async function uploadOne(file: File): Promise<string> {
       const payload = await compressImage(file)
       const res: any = await uploadApi.upload(payload)
-      form.images.push(res.data.url)
+      return res.data.url as string
+    }
+    // 按 CONCURRENCY 分块，块内并发、块间串行（避免一次性建太多并发连接）
+    const chunks: File[][] = []
+    for (let i = 0; i < validFiles.length; i += CONCURRENCY) {
+      chunks.push(validFiles.slice(i, i + CONCURRENCY))
+    }
+    for (const chunk of chunks) {
+      const urls = await Promise.all(chunk.map(uploadOne))
+      for (const url of urls) {
+        if (form.images.length < 9) form.images.push(url)
+      }
     }
   } catch {
     // 错误已由拦截器 toast

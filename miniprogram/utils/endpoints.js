@@ -122,8 +122,10 @@ const admin = {
   stats: () => get('/admin/stats', {}, false),
   posts: (params) => get('/admin/posts', params, false),
   reports: (params) => get('/admin/reports', params, false),
-  /** 解决举报：POST /admin/reports/:id/resolve -> PUT /admin/reports/:id */
-  resolveReport: (id) => post('/admin/reports/' + id + '/resolve', {}),
+  /** 解决举报：POST /admin/reports/:id/resolve -> PUT /admin/reports/:id
+   *  入参 payload 用于透传 action('resolve'|'dismiss') 与 result(处理说明)
+   */
+  resolveReport: (id, payload = {}) => post('/admin/reports/' + id + '/resolve', payload || {}),
   feedbacks: (params) => get('/admin/feedbacks', params, false),
   users: (params) => get('/admin/users', params, false),
 }

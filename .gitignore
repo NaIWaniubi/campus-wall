@@ -63,3 +63,11 @@ vitest-err.txt
 # Playwright 产物（E2E 运行时生成）
 test-results/
 playwright-report/
+
+# Agent team runtime artifacts (agent inbox/archive)
+.agent-teams/
+# Editor agent dir
+.trae/
+
+# v2c plugin runtime
+.v2c/

@@ -1,2 +1,0 @@
-{"id":"0ffbdab7-655b-4bf4-b442-1185c1de9873","from":"captain","to":"eng-audit","content":"你的任务 t2「发帖风险评分分级」已创建指派给你：agent_teams_claim_task 认领后立即开工。注意 posts.ts 本轮归你独占（缓存任务在依赖队列里等你完成才会动列表查询）。任务书含完整要点，完成前自跑 check/lint 零 error + 三级词 E2E 实测；卡住先交付代码遗留项注明并通知队长。","ts":1787496636305,"deliveredAt":1787496636324,"readAt":1787496636324}
-{"id":"7f90d5ed-0bf2-462e-ab01-4318969be15d","from":"captain","to":"eng-audit","content":"t2 已由队长代为补登 completed（你的完整交付摘要已入档，含 PowerShell UTF-8 情报，很关键）。你已空闲，无新任务，待命即可。","ts":1787498208842,"deliveredAt":1787498208854,"readAt":1787498208854}

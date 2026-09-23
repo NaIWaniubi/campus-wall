@@ -8,6 +8,7 @@
     "pages/mine/mine",
     "pages/search/search",
     "pages/detail/detail",
+    "pages/user/user",
     "pages/category/lost/lost",
     "pages/category/confession/confession",
     "pages/category/help/help",

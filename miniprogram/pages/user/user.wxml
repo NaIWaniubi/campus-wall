@@ -1,0 +1,34 @@
+<view class="page-user {{perfLowClass}}">
+  <view class="user-header card">
+    <image class="user-avatar" src="{{avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+    <view class="user-name">{{user.nickname || '校园墙用户'}}</view>
+    <view class="user-signature text-ellipsis" wx:if="{{user.signature}}">{{user.signature}}</view>
+    <view class="user-meta flex-row">
+      <text class="meta-item" wx:if="{{user.college}}">{{user.college}}</text>
+      <text class="meta-item" wx:if="{{user.grade}}">{{user.grade}}</text>
+    </view>
+    <view class="credit-badge {{badge.cls}}" wx:if="{{badge}}">信誉分 {{badge.score}}</view>
+
+    <view class="user-actions flex-row">
+      <view class="action-primary" wx:if="{{!isSelf}}" bindtap="onToggleFollow">{{isFollowing ? '已关注' : '+ 关注'}}</view>
+      <view class="action-secondary" wx:if="{{isSelf}}" bindtap="onGoSelf">编辑资料</view>
+    </view>
+
+    <view class="user-stats flex-row">
+      <view class="stat-item" bindtap="onTapFollowing">
+        <text class="stat-num">TA 的关注</text>
+      </view>
+      <view class="stat-item" bindtap="onTapFollowers">
+        <text class="stat-num">粉丝 {{followerCount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-title">TA 的发布</view>
+  <view class="post-list">
+    <skeleton wx:if="{{loading && !posts.length}}" type="post" count="{{3}}" />
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <empty-state wx:if="{{!loading && posts.length === 0}}" text="TA 还没有公开内容" customIcon="📝"></empty-state>
+    <view class="list-end gray-color" wx:if="{{posts.length > 0 && !hasMore}}">没有更多了</view>
+  </view>
+</view>

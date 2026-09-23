@@ -76,8 +76,10 @@ Page({
     if (this.data.hasMore && !this.data.loading) this.loadUsers(false)
   },
 
-  /** 对方主页路由暂缺，占位提示 */
-  onTapUser() {
-    wx.showToast({ title: '对方主页暂未开放', icon: 'none' })
+  /** 进入对方主页 */
+  onTapUser(e) {
+    const id = e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset.id : ''
+    if (!id) return
+    wx.navigateTo({ url: `/pages/user/user?id=` + id })
   }
 })

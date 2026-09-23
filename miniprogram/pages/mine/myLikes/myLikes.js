@@ -3,13 +3,15 @@ const { get, post } = require('../../../utils/api')
 const { buildPostShare } = require('../../../utils/share')
 
 Page({
-  data: { posts: [] },
+  data: { posts: [], loading: true },
   async onLoad() {
     try {
       const posts = await get('/user/likes', {}, false)
       this.setData({ posts })
     } catch (e) {
       this.setData({ posts: [] })
+    } finally {
+      this.setData({ loading: false })
     }
   },
   onTapPost(e) { wx.navigateTo({ url: `/pages/detail/detail?id=${e.detail.post.id}` }) },

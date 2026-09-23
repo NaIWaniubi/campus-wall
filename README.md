@@ -299,3 +299,12 @@ pm2 save && pm2 startup
 ## 📦 开源协议
 
 本项目为私有项目，仅用于校内使用。
+
+---
+
+## 📚 文档
+
+- 开发与运维文档站（VitePress，`docs/`）：
+  - `npm run docs:dev` 本地预览
+  - `npm run docs:build` 构建静态站点
+- 仓库内参考文档：`docs/ARCHITECTURE.md`（系统架构）、`docs/API-MAPPING.md`（接口映射）

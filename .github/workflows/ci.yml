@@ -72,3 +72,20 @@ jobs:
 
       - name: LHCI autorun
         run: npx --yes @lhci/cli@0.14.x autorun
+
+  # 文档站构建（VitePress）：确保 docs/ 内容可构建（D-T10）
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Build docs site
+        run: npm run docs:build

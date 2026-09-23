@@ -235,7 +235,7 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 | 机制 | 位置 | 说明 |
 |---|---|---|
 | 失物招领智能匹配 | api/utils/match.ts + posts.ts | 发布时关键词 LIKE 打分（标题2/正文1，阈值≥2，30天窗），双向站内通知；GET /api/posts/:id/matches |
-| 图片压缩管线 | api/routes/upload.ts | sharp：>1600px 重编码（jpeg q80/png）+ .thumb.webp 缩略图（q75）；**必须以 Buffer 为 sharp 输入**（路径输入会 mmap 持句柄致 Windows 覆盖写失败）；上传目录统一 <root>/public/uploads |
+| 图片压缩管线 | api/routes/upload.ts | sharp：>1600px 重编码（jpeg q80/png）+ .thumb.webp 缩略图（q75）；**必须以 Buffer 为 sharp 输入**（路径输入会 mmap 持句柄致 Windows 覆盖写失败）；上传目录统一 `<root>/public/uploads` |
 | 热度排序+冷启动 | posts.ts 列表 | sort=hot 默认：(赞×2+评×3)/(小时+2)^1.5，≤30min ×1.5；置顶优先保留 |
 | 板块订阅+每日摘要 | routes/subscriptions.ts、jobs/dailyDigest.ts | toggle/list 接口；每日 DIGEST_HOUR（默认20点）汇总新帖数+最热帖，日期标记防重发，DIGEST_NOW=1 手动触发 |
 | 二手交易互评 | routes/trades.ts、db.ts trade_ratings | 作者标记完成(extra_fields.soldAt)→双向1-5星互评→信誉分±（好评+2/差评-3，钳0-120）；GET /api/users/:id/trade-ratings |

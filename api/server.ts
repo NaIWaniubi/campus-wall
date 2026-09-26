@@ -1,6 +1,8 @@
 /**
  * local server entry file, for local development
  */
+// 必须置于其他 import 之前：ESM 先求值整个 import 图，晚加载会让业务模块读不到 .env
+import './env.js';
 import { initObservability, captureError } from './observability.js';
 import app, { reportBackup } from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';

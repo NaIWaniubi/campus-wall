@@ -1,6 +1,8 @@
 /**
  * Express 应用入口
  */
+// 必须置于其他 import 之前：ESM 先求值整个 import 图，晚加载会让业务模块读不到 .env
+import './env.js'
 import express, {
   type Request,
   type Response,
@@ -9,7 +11,6 @@ import express, {
 import cors from 'cors'
 import fs from 'fs'
 import path from 'path'
-import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 
 import './db.js'
@@ -41,8 +42,6 @@ import wxRoutes from './routes/wx.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-dotenv.config()
 
 const app: express.Application = express()
 

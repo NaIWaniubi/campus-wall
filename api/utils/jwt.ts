@@ -1,6 +1,8 @@
 /**
  * JWT 工具：生成与验证 Token
  */
+// 本模块在顶层读取 NODE_ENV / JWT_SECRET，先确保 .env 已加载，避免密钥取错
+import '../env.js';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 
 const DEV_SECRET = 'campus-wall-dev-secret-key-2026';

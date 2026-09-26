@@ -248,3 +248,72 @@ describe('补充断言：高频页组件注册与关键契约', () => {
     expect(wxml).not.toContain('私信功能即将上线');
   });
 });
+
+describe('require 路径可解析（防断链：照抄模板多一级目录 / 引用已删模块）', () => {
+  /** 去注释但保留换行，使匹配下标与真实行号仍对齐 */
+  const stripComments = (src: string) =>
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  const collectJs = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return collectJs(full);
+      return entry.name.endsWith('.js') ? [full] : [];
+    });
+
+  it('每个相对 require 都能解析到磁盘上的真实模块', () => {
+    const broken: string[] = [];
+    for (const file of collectJs(MINI)) {
+      const code = stripComments(fs.readFileSync(file, 'utf-8'));
+      for (const m of code.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+        const spec = m[1];
+        if (!spec.startsWith('.')) continue;
+        const resolved = path.resolve(path.dirname(file), spec);
+        const candidates = [resolved, `${resolved}.js`, path.join(resolved, 'index.js')];
+        if (!candidates.some((c) => fs.existsSync(c))) {
+          const line = code.slice(0, m.index).split('\n').length;
+          broken.push(`${path.relative(MINI, file).split(path.sep).join('/')}:${line} -> ${spec}`);
+        }
+      }
+    }
+    expect(broken, `断链的 require：\n${broken.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('骨架屏 loading 态接线（防「wxml 用 loading 但 js 未定义 / 永不清除」）', () => {
+  /** 取 Page 的 data 块文本（按花括号配对截取），取不到返回空串 */
+  const dataBlock = (js: string): string => {
+    const m = /data\s*:\s*\{/.exec(js);
+    if (!m) return '';
+    const open = js.indexOf('{', m.index);
+    let depth = 0;
+    for (let i = open; i < js.length; i += 1) {
+      if (js[i] === '{') depth += 1;
+      else if (js[i] === '}') {
+        depth -= 1;
+        if (depth === 0) return js.slice(open, i + 1);
+      }
+    }
+    return '';
+  };
+
+  it('引用 loading / isLoading 的页面，data 需声明且请求结束会置回 false', () => {
+    const bad: string[] = [];
+    for (const p of readJson('app.json').pages as string[]) {
+      const wxml = read(`${p}.wxml`);
+      const js = read(`${p}.js`);
+      const block = dataBlock(js);
+      for (const key of ['loading', 'isLoading']) {
+        if (!new RegExp(`\\{\\{!?${key}\\b`).test(wxml)) continue;
+        if (!new RegExp(`\\b${key}\\s*:`).test(block)) {
+          bad.push(`${p}: wxml 用了 ${key}，但 data 未声明（骨架屏永不显示）`);
+        } else if (!new RegExp(`${key}\\s*:\\s*false`).test(js)) {
+          bad.push(`${p}: ${key} 从未置为 false（骨架屏会一直显示）`);
+        }
+      }
+    }
+    expect(bad, `骨架屏接线不完整：\n${bad.join('\n')}`).toEqual([]);
+  });
+});

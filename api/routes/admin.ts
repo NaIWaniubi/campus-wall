@@ -208,7 +208,11 @@ router.get('/posts', sectionAllowed, (req, res) => {
     likeCount: p.like_count,
     commentCount: p.comment_count,
     section: { id: p.section_id, name: p.section_name },
-    author: { id: p.author_id, nickname: p.author_nickname, studentId: p.author_student_id, avatar: p.author_avatar },
+    // 匿名帖不向列表接口暴露真实作者：身份揭示只走举报队列的阈值机制（见 REPORT_REVEAL_THRESHOLD），
+    // 否则 section_admin 可直接用本接口枚举匿名作者，绕过该约束
+    author: p.is_anonymous
+      ? { id: null, nickname: '匿名用户', studentId: null, avatar: null }
+      : { id: p.author_id, nickname: p.author_nickname, studentId: p.author_student_id, avatar: p.author_avatar },
     createdAt: p.created_at ? new Date(p.created_at).toISOString() : p.created_at,
   }));
 
@@ -298,7 +302,9 @@ router.get('/comments', sectionAllowed, (req, res) => {
     likeCount: c.like_count,
     status: c.status,
     post: { id: c.post_id, title: c.post_title },
-    author: { id: c.author_id, nickname: c.author_nickname, studentId: c.author_student_id },
+    author: c.is_anonymous
+      ? { id: null, nickname: '匿名用户', studentId: null }
+      : { id: c.author_id, nickname: c.author_nickname, studentId: c.author_student_id },
     createdAt: c.created_at ? new Date(c.created_at).toISOString() : c.created_at,
   }));
 
@@ -379,6 +385,12 @@ router.put('/reports/:id', sectionAllowed, (req, res) => {
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id) as any;
   if (!report) return fail(res, '举报工单不存在', 404, 404);
 
+  // 封禁为超管专属（对齐 PUT /users/:id/ban 的 superOnly）：section_admin 可在举报队列里
+  // 删内容，但不能借举报接口封号。校验放在工单状态更新之前，避免「驳回动作却把工单标成已处理」。
+  if (action === 'ban_user' && req.currentUser!.role !== 'super_admin') {
+    return forbidden(res, '封禁用户需要超级管理员权限');
+  }
+
   db.prepare('UPDATE reports SET status = ?, handler_id = ?, handle_result = ? WHERE id = ?').run(
     'handled', req.currentUser!.id, result || action, id
   );
@@ -416,6 +428,13 @@ router.put('/reports/:id', sectionAllowed, (req, res) => {
         db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
           authorId, 'system', `您的账号因举报已被封禁，原因：${result || '违规'}`
         );
+        // 审计：与 PUT /users/:id/ban 同口径留痕
+        db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+          req.currentUser!.id, 'ban_user', 'user', authorId,
+          JSON.stringify({ reason: result || '因举报被封禁', duration: 'forever', via: 'report', reportId: id })
+        );
+        // 封禁影响信息流可见性（posts 列表按 u.status != 'banned' 过滤），需失效读缓存
+        cacheInvalidate('posts');
       }
     }
   }

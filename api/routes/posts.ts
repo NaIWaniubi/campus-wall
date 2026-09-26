@@ -194,6 +194,8 @@ router.get('/', authOptional, (req, res) => {
     `sectionId=${sectionId}`, `keyword=${keyword}`,
     `priceRange=${priceRange}`, `timeRange=${timeRange}`, `subType=${subType}`,
     `direction=${directionApplied}`,
+    // authorId 是 WHERE 条件，漏进 key 会让不同作者的主页命中同一份缓存行
+    `authorId=${authorId}`,
   ].join(':');
 
   let posts: any[];

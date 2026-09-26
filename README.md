@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/icons/icon.svg" alt="校园墙 Logo" width="96" height="96" />
+</p>
+
 # 校园墙 Campus Wall
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
@@ -63,6 +67,31 @@
 - **健康检查**：`/api/health` 返回 db/storage/ws 状态、uptime、版本与 5xx 计数
 - **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
 - 图片上传压缩管线：大图重编码 + WebP 缩略图
+
+---
+
+## 📸 演示截图
+
+> 以下截图由 `node scripts/capture-demo.mjs` 自动生成（前置 `npm run build && npm run start`，数据来自 `npm run seed`）。
+
+<table>
+  <tr>
+    <td align="center" width="50%"><b>首页信息流</b><br/>板块 Tab · 热门/最新 · 信誉徽章 · 置顶<br/><img src="captures/01-home.png" width="300" alt="首页信息流"/></td>
+    <td align="center" width="50%"><b>搜索</b><br/>热门搜索词 · 搜索历史 · 板块筛选<br/><img src="captures/02-search.png" width="300" alt="搜索页"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>帖子详情</b><br/>楼中楼回复 · 点赞/收藏/举报<br/><img src="captures/03-post-detail.png" width="300" alt="帖子详情"/></td>
+    <td align="center"><b>AI 助手</b><br/>知识库检索 · 流式回答 · 帖子引用<br/><img src="captures/04-ai-assistant.png" width="300" alt="AI 助手"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>消息中心</b><br/>通知/私信双 Tab · 未读红点 · 实时会话<br/><img src="captures/05-conversation.png" width="300" alt="消息中心"/></td>
+    <td align="center"><b>个人中心</b><br/>信誉分体系 · 我的内容聚合<br/><img src="captures/06-profile.png" width="300" alt="个人中心"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>管理后台 · 数据总览</b><br/>KPI 卡片 · 7 日趋势 · 板块/学院分布<br/><img src="captures/07-admin-dashboard.png" width="300" alt="管理后台数据总览"/></td>
+    <td align="center"><b>管理后台 · AI 配置</b><br/>知识库维护 · 模型开关 · 调用统计<br/><img src="captures/08-admin-ai.png" width="300" alt="管理后台 AI 配置"/></td>
+  </tr>
+</table>
 
 ---
 
@@ -288,23 +317,28 @@ pm2 save && pm2 startup
 
 ---
 
-## 📄 文档
+## 📚 文档
 
-- [架构与机制详解](docs/ARCHITECTURE.md)
-- [API 映射文档](docs/API-MAPPING.md)
-- [产品需求文档 PRD](.trae/documents/校园墙PRD.md)（早期版本存档）
+- **开发与运维文档站**（VitePress，`docs/`）：`npm run docs:dev` 本地预览 / `npm run docs:build` 构建静态站点
+- **架构与机制详解**：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **API 映射文档**：[docs/API-MAPPING.md](docs/API-MAPPING.md)
+- **OpenAPI 契约**：`api/openapi/`，运行时可访问 `GET /api/openapi.json`
+- **产品需求文档 PRD**：[校园墙 Web 端产品需求文档（PRD）V1.0 完整版.docx](<校园墙 Web 端产品需求文档（PRD）V1.0 完整版.docx>)
+
+---
+
+## 🤝 项目治理
+
+| 文件 | 说明 |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南：本地环境、常用命令、提交规范、PR 流程 |
+| [SECURITY.md](SECURITY.md) | 安全策略与漏洞披露渠道 |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | 贡献者行为准则（Contributor Covenant v2.1） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更日志 |
+| [LICENSE](LICENSE) | 开源许可证 |
 
 ---
 
 ## 📦 开源协议
 
-本项目为私有项目，仅用于校内使用。
-
----
-
-## 📚 文档
-
-- 开发与运维文档站（VitePress，`docs/`）：
-  - `npm run docs:dev` 本地预览
-  - `npm run docs:build` 构建静态站点
-- 仓库内参考文档：`docs/ARCHITECTURE.md`（系统架构）、`docs/API-MAPPING.md`（接口映射）
+本项目采用 [MIT License](LICENSE) 开源。

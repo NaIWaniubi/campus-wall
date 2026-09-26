@@ -45,7 +45,7 @@
 - **AI 助手配置**：官方知识库维护、模型与开关设置
 
 ### 微信小程序端
-- **原生实现**：`miniprogram/` 目录，26 个页面，与 Web 共用同一套后端契约
+- **原生实现**：`miniprogram/` 目录，28 个页面，与 Web 共用同一套后端契约
 - **五大 Tab**：首页 / 话题（八板块分类页）/ 发布 / 消息 / 我的（自定义 TabBar）
 - **登录双通道**：学号密码 JWT；wx.login 静默登录（服务端未配置 `WX_APPID`/`WX_SECRET` 时自动回退表单登录）
 - **完整能力**：私信会话、关注体系、失物招领方向双 Tab（丢失/拾获）、我的点赞/收藏、内容审核、订阅按钮
@@ -131,10 +131,10 @@
 │   ├── utils/              # 工具（api/request/helpers）
 │   ├── App.vue
 │   └── main.ts
-├── miniprogram/              # 微信小程序端（原生，26 页）
+├── miniprogram/              # 微信小程序端（原生，28 页）
 │   ├── app.json              # 页面注册 + 自定义 TabBar
 │   ├── pages/                # 五大 Tab + 八板块分类页 + 我的子页 + 审核/协议页
-│   ├── components/           # post-card/comment-item/user-row 等 7 组件
+│   ├── components/           # post-card / comment-item / conversation-item / user-row / announce-dialog / skeleton / empty-state / load-more / subscribe-btn 共 9 组件
 │   ├── utils/api.js          # API 适配层（旧路径→新契约翻译 + 响应归一化）
 │   └── utils/constants.js    # 板块 id（1-8）↔ 旧分类 key 双向映射
 ├── public/                 # 静态资源（favicon、用户上传）
@@ -150,7 +150,7 @@
 ## 🚀 快速开始
 
 ### 环境要求
-- Node.js >= 18.0.0
+- Node.js >= 20.0.0
 - npm >= 9
 
 ### 安装与启动

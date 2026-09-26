@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * 首页：板块Tab + 帖子信息流 + 下拉刷新 + 上拉加载
- * A-T3 虚拟滚动：默认 useVirtual=true 走 IntersectionObserver；可关退回 window scroll
+ * A-T3 虚拟滚动：默认 useVirtual=true，走 @tanstack/vue-virtual 真·窗口虚拟化（只渲染可视区 ± overscan）
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Bell, Plus, RefreshCw, BellRing } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
@@ -11,6 +11,7 @@ import { useUserStore } from '@/stores/user'
 import { postApi, subscriptionApi } from '@/utils/api'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
+import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -143,6 +144,30 @@ const { sentinelRef } = useVirtualList({
   rootMargin: '200px',
 })
 
+// A-T3 真·窗口虚拟化：只渲染可视区 ± overscan，DOM 节点数不随 list 无限增长。
+// 行高由 measureElement 实测（ResizeObserver），首屏用 estimateSize 估算。
+const listRef = ref<HTMLElement | null>(null)
+const scrollMargin = ref(0)
+const virtualizer = useWindowVirtualizer(
+  computed(() => ({
+    count: list.value.length,
+    estimateSize: () => 320,
+    overscan: 6,
+    scrollMargin: scrollMargin.value,
+  })),
+)
+const virtualItems = computed(() => virtualizer.value.getVirtualItems())
+const totalSize = computed(() => virtualizer.value.getTotalSize())
+
+function measureRow(el: any) {
+  if (el) virtualizer.value.measureElement(el)
+}
+function updateScrollMargin() {
+  scrollMargin.value = listRef.value
+    ? listRef.value.getBoundingClientRect().top + window.scrollY
+    : 0
+}
+
 function goPublish() {
   if (!userStore.isLoggedIn) {
     router.push({ path: '/login', query: { redirect: '/publish' } })
@@ -184,10 +209,15 @@ onMounted(() => {
   if (!appStore.sections.length) appStore.fetchSections()
   loadList(true)
   loadSubscriptions()
+  updateScrollMargin()
+  window.addEventListener('resize', updateScrollMargin)
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', updateScrollMargin)
 })
+// 列表变化后重算虚拟容器相对文档的偏移（首屏骨架卸载后才拿得到 listRef）
+watch(list, () => nextTick(updateScrollMargin))
 </script>
 
 <template>
@@ -260,7 +290,25 @@ onUnmounted(() => {
       <PostSkeleton v-if="loading" :count="4" />
 
       <template v-else>
-        <PostCard v-for="post in list" :key="post.id" :post="post" />
+        <!-- A-T3 真·窗口虚拟化容器：仅渲染可视区 ± overscan -->
+        <div ref="listRef" class="relative" :style="{ height: totalSize + 'px' }">
+          <div
+            v-for="v in virtualItems"
+            :key="v.index"
+            :ref="measureRow"
+            :data-index="v.index"
+            class="pb-3"
+            :style="{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              width: '100%',
+              transform: `translateY(${v.start - scrollMargin}px)`,
+            }"
+          >
+            <PostCard :post="list[v.index]" />
+          </div>
+        </div>
         <div v-if="loadingMore" class="py-4 text-center text-sm text-zinc-400 flex items-center justify-center gap-2">
           <RefreshCw class="w-4 h-4 animate-spin" /> 加载中...
         </div>

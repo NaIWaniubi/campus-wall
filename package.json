@@ -32,6 +32,7 @@
     "@lucide/vue": "^1.0.0",
     "@sentry/node": "^10.72.0",
     "@sentry/vue": "^10.72.0",
+    "@tanstack/vue-virtual": "^3.13.39",
     "axios": "^1.7.9",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",

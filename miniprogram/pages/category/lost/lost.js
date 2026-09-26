@@ -19,15 +19,20 @@ Page({
     loadMoreStatus: 'nomore',
     page: 1,
     pageSize: 10,
-    hasMore: false
+    hasMore: false,
+    loading: true
   },
 
-  onLoad(options) { this.loadPosts() },
+  onLoad(options) { this.loadPosts(1) },
 
-  async loadPosts() {
+  async loadPosts(targetPage) {
+    const page = targetPage || this.data.page
+    // 过期响应令牌：快速切 Tab/筛选时丢弃旧请求结果，避免旧数据覆盖新列表
+    const seq = (this.reqSeq = (this.reqSeq || 0) + 1)
+    this.setData({ loading: true })
     try {
       // direction 上抛后端 json_extract 过滤（found=捡到 / lost=丢失）
-      const params = { category: 'lost', direction: this.data.activeTab, page: this.data.page, pageSize: this.data.pageSize }
+      const params = { category: 'lost', direction: this.data.activeTab, page, pageSize: this.data.pageSize }
       if (this.data.selectedCampus && this.data.selectedCampus !== '全部') params.campus = this.data.selectedCampus
       if (this.data.selectedType && this.data.selectedType !== '全部') {
         const cat = getCategoryById('lost')
@@ -37,14 +42,19 @@ Page({
       if (this.data.selectedTime && this.data.selectedTime !== '全部') params.timeRange = this.data.selectedTime
       // 类型/时间区间筛选上抛后端，在全局数据上执行后再分页
       const result = await get('/posts', params, false)
+      if (seq !== this.reqSeq) return
       const posts = result.list || []
       this.setData({
-        posts: this.data.page === 1 ? posts : [...this.data.posts, ...posts],
+        page,
+        posts: page === 1 ? posts : [...this.data.posts, ...posts],
         hasMore: result.hasMore,
-        loadMoreStatus: result.hasMore ? 'more' : 'nomore'
+        loadMoreStatus: result.hasMore ? 'more' : 'nomore',
+        loading: false
       })
     } catch (e) {
-      this.setData({ loadMoreStatus: 'error' })
+      if (seq !== this.reqSeq) return
+      // 失败不推进 page：点重试仍请求同一页，避免整页数据被跳过
+      this.setData({ loading: false, loadMoreStatus: 'error' })
     }
   },
 
@@ -59,28 +69,28 @@ Page({
       posts: [],
       loadMoreStatus: 'nomore'
     })
-    this.loadPosts()
+    this.loadPosts(1)
   },
 
   onTypeFilter(e) {
     const index = e.detail.value
     const type = this.data.itemTypeList[index]
     this.setData({ selectedType: type === '全部' ? '' : type, page: 1, posts: [] })
-    this.loadPosts()
+    this.loadPosts(1)
   },
 
   onCampusFilter(e) {
     const index = e.detail.value
     const campus = this.data.campusList[index]
     this.setData({ selectedCampus: campus === '全部' ? '' : campus, page: 1, posts: [] })
-    this.loadPosts()
+    this.loadPosts(1)
   },
 
   onTimeFilter(e) {
     const index = e.detail.value
     const time = this.data.timeList[index]
     this.setData({ selectedTime: time === '全部' ? '' : time, page: 1, posts: [] })
-    this.loadPosts()
+    this.loadPosts(1)
   },
 
   onTapPost(e) { wx.navigateTo({ url: `/pages/detail/detail?id=${e.detail.post.id}` }) },
@@ -119,9 +129,9 @@ Page({
   },
 
   onLoadMore() {
-    if (!this.data.hasMore) return
-    this.setData({ page: this.data.page + 1, loadMoreStatus: 'loading' })
-    this.loadPosts()
+    if (!this.data.hasMore || this.data.loading) return
+    this.setData({ loadMoreStatus: 'loading' })
+    this.loadPosts(this.data.page + 1)
   },
 
   onGoPublish() {

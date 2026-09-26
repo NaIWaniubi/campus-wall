@@ -3,7 +3,6 @@ const { getCategoryList } = require('../../utils/category')
 const { get, post } = require('../../utils/api')
 const { timeAgo } = require('../../utils/util')
 const { buildPostShare } = require('../../utils/share')
-const { optimisticToggleSimple } = require('../../utils/optimistic')
 
 Page({
   data: {
@@ -211,30 +210,9 @@ Page({
   async onLikePost(e) {
     if (!app.requireLogin(null, '点赞')) return
     const id = e.detail.id
-    // 找到目标 post，先用乐观翻转，再请求接口
-    const list = this.data.posts || []
-    const idx = list.findIndex((p) => p.id === id)
-    if (idx < 0) return
-    const target = list[idx]
-    try {
-      await optimisticToggleSimple(
-        {
-          data: { liked: target.liked, likedCount: target.likeCount || target.likedCount || 0 },
-          setData: (patch) => {
-            // 同步 setData 到当前 page 与 list 项
-            const cur = this.data.posts.find((p) => p.id === id)
-            if (!cur) return
-            this.setData({ posts: this.data.posts.map((p) => p.id === id ? { ...p, ...patch } : p) })
-          },
-        },
-        'liked',
-        target.liked ? -1 : 1,
-        () => post(`/posts/${id}/like`, {}, false),
-        target.liked ? '已取消点赞' : '已点赞'
-      )
-    } catch (e) {
-      // 乐观工具已 toast
-    }
+    // 接口响应已由 legacy-adapter 归一为 isLiked/likes（post-card 渲染的字段名）
+    const updated = await post(`/posts/${id}/like`, {}, false)
+    this.setData({ posts: this.data.posts.map(item => item.id === id ? { ...item, ...updated } : item) })
   },
 
   onCommentPost(e) {

@@ -63,9 +63,12 @@ Page({
 
   async onMarkAllRead() {
     if (!app.checkLogin()) return
+    // 后端按传入 id 标记（刻意不做全库已读，避免吞掉未加载的较旧未读），单次上限 100
+    const ids = this.data.notifications.filter(n => !n.isRead).map(n => n.id).slice(0, 100)
+    if (!ids.length) return
     try {
-      await post('/notifications/read-all', {}, false)
-      const notifications = this.data.notifications.map(n => ({ ...n, isRead: true }))
+      await post('/notifications/read-all', { ids }, false)
+      const notifications = this.data.notifications.map(n => (ids.indexOf(n.id) >= 0 ? { ...n, isRead: true } : n))
       this.setData({ notifications })
     } catch (e) {
       console.error('标记已读失败', e)

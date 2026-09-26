@@ -1,6 +1,32 @@
 const { showToast, showModal } = require('../../../utils/util')
-const { clearAllCache, getCacheSize } = require('../../../utils/cache')
 const { logout } = require('../../../utils/api')
+
+/** 登录态存储键：清理缓存时必须保留，否则会把用户顺带踢下线 */
+const AUTH_KEYS = ['token', 'userInfo']
+
+/** 本地存储占用；wx 的 currentSize 单位为 KB */
+function getCacheSize() {
+  try {
+    const { currentSize = 0 } = wx.getStorageInfoSync()
+    if (!currentSize) return ''
+    return currentSize >= 1024 ? `${(currentSize / 1024).toFixed(1)}MB` : `${Math.round(currentSize)}KB`
+  } catch (e) {
+    // 存储信息不可用时静默留空，不阻塞设置页渲染
+    return ''
+  }
+}
+
+/** 清理除登录态外的全部本地缓存 */
+function clearAllCache() {
+  try {
+    const { keys = [] } = wx.getStorageInfoSync()
+    keys.forEach((key) => {
+      if (!AUTH_KEYS.includes(key)) wx.removeStorageSync(key)
+    })
+  } catch (e) {
+    console.error('[settings] 清理缓存失败', e)
+  }
+}
 
 Page({
   data: {

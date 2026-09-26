@@ -29,30 +29,4 @@ function optimisticToggle({ applyLocal, doRemote, onError } = {}) {
   })
 }
 
-/**
- * 极简签名（无 opts 对象）：适用于「翻转某个布尔字段 + 调整对应计数」的常见场景。
- * @param {Object} page      Page 实例（须有 setData）
- * @param {string} field     主字段名，如 'liked'
- * @param {number} delta     计数增量（+1 / -1）
- * @param {Function} apiCall 远程调用，返回 Promise；失败时回滚
- * @param {string} [successMsg] 成功提示（可选）
- */
-function optimisticToggleSimple(page, field, delta, apiCall, successMsg) {
-  const countField = field + 'Count'
-  const original = page.data[field]
-  const originalCount = page.data[countField] || 0
-  page.setData({
-    [field]: !original,
-    [countField]: Math.max(0, originalCount + delta),
-  })
-  return apiCall().then(res => {
-    if (typeof successMsg === 'string' && successMsg) showToast(successMsg, 'success')
-    return res
-  }).catch(err => {
-    page.setData({ [field]: original, [countField]: originalCount })
-    showToast((err && err.msg) || '操作失败', 'none')
-    throw err
-  })
-}
-
-module.exports = { optimisticToggle, optimisticToggleSimple }
+module.exports = { optimisticToggle }

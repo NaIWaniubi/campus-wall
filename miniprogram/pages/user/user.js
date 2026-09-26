@@ -1,6 +1,6 @@
 const app = getApp()
-const { users, follow: followApi, posts: postsApi, post, absUrl } = require('../../../utils/api')
-const { showToast } = require('../../../utils/util')
+const { users, follow: followApi, posts: postsApi, post, absUrl } = require('../../utils/api')
+const { showToast } = require('../../utils/util')
 
 const PAGE_SIZE = 20
 

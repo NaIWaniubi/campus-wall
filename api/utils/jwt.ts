@@ -4,6 +4,7 @@
 // 本模块在顶层读取 NODE_ENV / JWT_SECRET，先确保 .env 已加载，避免密钥取错
 import '../env.js';
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import { logger } from './logger.js';
 
 const DEV_SECRET = 'campus-wall-dev-secret-key-2026';
 
@@ -25,9 +26,7 @@ if (isProduction) {
   // 开发环境：保留默认密钥，但打印一次性安全警告
   SECRET = process.env.JWT_SECRET || DEV_SECRET;
   if (!process.env.JWT_SECRET) {
-    console.warn(
-      '[安全警告] 当前使用开发默认 JWT_SECRET，仅可用于本地开发；部署到生产环境（NODE_ENV=production 或 PRODUCTION=1）前必须配置 JWT_SECRET。'
-    );
+    logger.warn('当前使用开发默认 JWT_SECRET，仅可用于本地开发；部署到生产环境（NODE_ENV=production 或 PRODUCTION=1）前必须配置 JWT_SECRET');
   }
 }
 

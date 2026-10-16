@@ -8,6 +8,7 @@ import { authRequired, adminRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
 import { DEFAULT_MODELS } from '../utils/ai.js';
 import { aiStats, getKbWritePath } from './ai.js';
+import { logger } from '../utils/logger.js';
 
 const KB_MAX_BYTES = 64 * 1024;
 
@@ -35,7 +36,7 @@ router.put('/knowledge', (req: Request, res: Response) => {
     fs.writeFileSync(getKbWritePath(), content, 'utf-8');
     return success(res, null, '知识库已保存');
   } catch (err: any) {
-    console.error('AI knowledge write error:', err?.message);
+    logger.error('AI 知识库保存失败', { error: err?.message });
     return fail(res, '知识库保存失败，请检查服务器文件权限');
   }
 });

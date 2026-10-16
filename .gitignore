@@ -78,3 +78,6 @@ docs/.vitepress/dist/
 
 # Agent 本地草稿/计划（不入库）
 .zcode/
+
+# Coverage reports
+coverage/

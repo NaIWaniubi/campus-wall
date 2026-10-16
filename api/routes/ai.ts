@@ -11,6 +11,7 @@ import { authRequired } from '../middleware/auth.js';
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { logger } from '../utils/logger.js';
 import {
   chatWithAI,
   chatWithAIStream,
@@ -31,7 +32,8 @@ const router = Router();
 
 /** 知识库写入路径：取目录存在的第一个候选 */
 export function getKbWritePath(): string {
-  return KB_CANDIDATES.find((p) => fs.existsSync(path.dirname(p))) || KB_CANDIDATES[0];
+  const found = KB_CANDIDATES.find((p) => fs.existsSync(path.dirname(p)));
+  return found ?? KB_CANDIDATES[0]!;
 }
 
 /** 读取官网知识库内容 */
@@ -43,7 +45,7 @@ function loadKnowledge(): string {
       // 尝试下一个候选路径
     }
   }
-  console.error('AI knowledge base not found:', KB_CANDIDATES.join(' | '));
+  logger.error('AI 知识库未找到', { candidates: KB_CANDIDATES.join(' | ') });
   return '';
 }
 
@@ -270,7 +272,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
     bumpStats();
     return success(res, { reply, forums });
   } catch (err: any) {
-    console.error('AI chat error:', err?.message);
+    logger.error('AI 对话失败', { error: err?.message });
     return success(res, {
       reply: forums.length
         ? 'AI 服务暂时不可用，为你找到了以下相关论坛讨论：'
@@ -328,7 +330,7 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
     bumpStats();
     send('done', { ok: true });
   } catch (err: any) {
-    console.error('AI stream error:', err?.message);
+    logger.error('AI 流式对话失败', { error: err?.message });
     send('error', { message: fallbackReply });
   }
   res.end();

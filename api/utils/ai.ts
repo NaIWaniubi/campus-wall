@@ -1,32 +1,49 @@
 /**
- * AI 助手：OpenRouter 客户端（非流式 + SSE 流式，带免费模型回退链）
+ * AI 助手：OpenRouter / OpenAI 兼容客户端（非流式 + SSE 流式，带免费模型回退链）
  */
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+import { logger } from './logger.js';
+
+const DEFAULT_OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+export function getAiApiUrl(): string {
+  const custom = process.env.AI_BASE_URL || process.env.OPENROUTER_BASE_URL;
+  if (!custom) return DEFAULT_OPENROUTER_URL;
+  const trimmed = custom.trim().replace(/\/+$/, '');
+  return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+}
+
+export function getAiApiKey(): string {
+  return (process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
+}
 
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-/** 默认免费模型回退链（主模型限流/下架时依次尝试） */
+/** 推荐预设与备选模型回退链 */
 export const DEFAULT_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.8-flash-high',
+  'glm-5.3',
+  'MiniMax-M3',
+  'step-5-preview',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'z-ai/glm-5.2:free',
-  'nvidia/nemotron-3-nano-30b-a3b:free',
 ];
 
 /**
  * 是否已配置 AI 能力（未配置 key 时接口返回友好提示而非报错）
  */
 export function isAiEnabled(): boolean {
-  return !!process.env.OPENROUTER_API_KEY;
+  return !!getAiApiKey();
 }
 
 /**
  * 组装本次调用的模型列表：数据库设置 > 环境变量 > 默认链
  */
 export function buildModelChain(settingModel?: string | null): string[] {
-  const envModel = process.env.OPENROUTER_MODEL;
+  const envModel = process.env.AI_MODEL || process.env.OPENROUTER_MODEL;
   const primary = settingModel || envModel;
   const chain = primary
     ? [primary, ...DEFAULT_MODELS.filter((m) => m !== primary)]
@@ -39,11 +56,11 @@ export function buildModelChain(settingModel?: string | null): string[] {
 }
 
 async function toApiError(resp: Response): Promise<Error> {
-  const json: any = await resp.json().catch(() => null);
+  const json: any = await resp.json().catch((): null => null);
   return new Error(json?.error?.message || `AI 服务响应异常 (${resp.status})`);
 }
 
-/** 解析 OpenRouter SSE 流，回调内容增量；返回完整文本 */
+/** 解析 OpenRouter / OpenAI 兼容 SSE 流，回调内容增量；返回完整文本 */
 async function consumeStream(
   resp: Response,
   onDelta?: (text: string) => void
@@ -65,7 +82,8 @@ async function consumeStream(
       const payload = trimmed.slice(5).trim();
       if (payload === '[DONE]') continue;
       try {
-        const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+        const choice = JSON.parse(payload)?.choices?.[0];
+        const delta = choice?.delta?.content;
         if (typeof delta === 'string' && delta) {
           full += delta;
           onDelta?.(delta);
@@ -87,13 +105,18 @@ async function requestOnce(
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const apiKey = getAiApiKey();
+  const apiUrl = getAiApiUrl();
+
   try {
-    const resp = await fetch(OPENROUTER_URL, {
+    const resp = await fetch(apiUrl, {
       method: 'POST',
       signal: controller.signal,
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://campus-wall.local',
+        'X-Title': 'Campus Wall AI Assistant',
       },
       body: JSON.stringify({
         model,
@@ -106,8 +129,9 @@ async function requestOnce(
     if (!resp.ok) throw await toApiError(resp);
 
     if (!onDelta) {
-      const json: any = await resp.json().catch(() => null);
-      const content = json?.choices?.[0]?.message?.content;
+      const json: any = await resp.json().catch((): null => null);
+      const choice = json?.choices?.[0];
+      const content = choice?.message?.content || choice?.text;
       if (typeof content !== 'string' || !content.trim()) throw new Error('AI 未返回有效内容');
       return content.trim();
     }
@@ -132,7 +156,7 @@ export async function chatWithAI(
       return await requestOnce(model, messages, maxTokens);
     } catch (err: any) {
       lastError = err;
-      console.error(`AI model ${model} failed:`, err?.message);
+      logger.error('AI 模型调用失败', { model, error: err?.message });
     }
   }
   throw lastError;
@@ -159,7 +183,7 @@ export async function chatWithAIStream(
       });
     } catch (err: any) {
       lastError = err;
-      console.error(`AI model ${model} failed:`, err?.message);
+      logger.error('AI 流式模型调用失败', { model, error: err?.message });
       if (started) throw err;
     }
   }

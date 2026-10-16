@@ -50,12 +50,16 @@ let pulling = false
 
 function onTouchStart(e: TouchEvent) {
   if (document.documentElement.scrollTop > 0 || refreshing.value) return
-  startY = e.touches[0].clientY
+  const firstTouch = e.touches[0];
+  if (!firstTouch) return;
+  startY = firstTouch.clientY
   pulling = true
 }
 function onTouchMove(e: TouchEvent) {
   if (!pulling) return
-  const diff = e.touches[0].clientY - startY
+  const firstTouch = e.touches[0];
+  if (!firstTouch) return;
+  const diff = firstTouch.clientY - startY
   if (diff > 0) {
     pullDistance.value = Math.min(diff * 0.5, 80)
   }

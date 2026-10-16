@@ -9,10 +9,12 @@ import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
 import { upsertNotification } from '../utils/notification.js';
 import { cacheInvalidate } from '../utils/cache.js';
+import { validate, commonSchemas, commentSchemas } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-function formatComment(comment: any, currentUserId?: number) {
+function formatComment(comment: any, currentUserId?: number): any {
   let author: any;
   if (comment.is_anonymous) {
     author = { id: 0, nickname: '匿名用户', avatar: '' };
@@ -55,7 +57,7 @@ function formatComment(comment: any, currentUserId?: number) {
 }
 
 // 评论列表
-router.get('/posts/:id/comments', authOptional, (req, res) => {
+router.get('/posts/:id/comments', authOptional, validate({ params: commonSchemas.id }), (req, res) => {
   const postId = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
@@ -74,12 +76,12 @@ router.get('/posts/:id/comments', authOptional, (req, res) => {
 });
 
 // 发布评论
-router.post('/posts/:id/comments', authRequired, commentLimiter, (req, res) => {
+router.post('/posts/:id/comments', authRequired, commentLimiter, validate({ 
+  params: commonSchemas.id, 
+  body: commentSchemas.create 
+}), (req, res) => {
   const postId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
-
-  if (!content || !content.trim()) return fail(res, '评论内容不能为空');
-  if (content.length > 200) return fail(res, '评论最多200字');
 
   const post = db.prepare('SELECT * FROM posts WHERE id = ? AND status = \'published\'').get(postId) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
@@ -107,7 +109,7 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, (req, res) => {
   const result = db.prepare(`
     INSERT INTO comments (post_id, user_id, parent_id, content, is_anonymous)
     VALUES (?, ?, NULL, ?, ?)
-  `).run(postId, req.currentUser!.id, content.trim(), anonymous);
+  `).run(postId, req.currentUser!.id, content, anonymous);
 
   const commentId = result.lastInsertRowid as number;
   db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(postId);
@@ -125,16 +127,17 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, (req, res) => {
     FROM comments c LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?
   `).get(commentId) as any;
 
+  logger.info('用户发布评论', { userId: req.currentUser!.id, postId, commentId });
   success(res, formatComment(comment, req.currentUser!.id), '评论成功');
 });
 
 // 楼中楼回复
-router.post('/comments/:id/reply', authRequired, commentLimiter, (req, res) => {
+router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
+  params: commonSchemas.id,
+  body: commentSchemas.reply
+}), (req, res) => {
   const commentId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
-
-  if (!content || !content.trim()) return fail(res, '回复内容不能为空');
-  if (content.length > 150) return fail(res, '回复最多150字');
 
   const parent = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(commentId) as any;
   if (!parent) return fail(res, '评论不存在', 404, 404);
@@ -150,7 +153,7 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, (req, res) => {
   const result = db.prepare(`
     INSERT INTO comments (post_id, user_id, parent_id, content, is_anonymous)
     VALUES (?, ?, ?, ?, ?)
-  `).run(parent.post_id, req.currentUser!.id, commentId, content.trim(), anonymous);
+  `).run(parent.post_id, req.currentUser!.id, commentId, content, anonymous);
 
   const replyId = result.lastInsertRowid as number;
   cacheInvalidate('posts'); // 评论写路径统一失效（当前回复不改 comment_count，防御性保险）
@@ -167,11 +170,12 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, (req, res) => {
     FROM comments c LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?
   `).get(replyId) as any;
 
+  logger.info('用户回复评论', { userId: req.currentUser!.id, parentId: commentId, replyId });
   success(res, formatComment(reply, req.currentUser!.id), '回复成功');
 });
 
 // 删除评论
-router.delete('/comments/:id', authRequired, (req, res) => {
+router.delete('/comments/:id', authRequired, validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
@@ -186,11 +190,12 @@ router.delete('/comments/:id', authRequired, (req, res) => {
   db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
   cacheInvalidate('posts');
 
+  logger.info('用户删除评论', { userId: req.currentUser!.id, commentId: id });
   success(res, null, '删除成功');
 });
 
 // 点赞评论
-router.post('/comments/:id/like', authRequired, (req, res) => {
+router.post('/comments/:id/like', authRequired, validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
@@ -208,10 +213,13 @@ router.post('/comments/:id/like', authRequired, (req, res) => {
 });
 
 // 举报评论
-router.post('/comments/:id/report', authRequired, (req, res) => {
+router.post('/comments/:id/report', authRequired, validate({
+  params: commonSchemas.id,
+  body: commentSchemas.report
+}), (req, res) => {
   const id = Number(req.params.id);
   const { reason } = req.body;
-  if (!reason) return fail(res, '请选择举报原因');
+  
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
 
@@ -228,6 +236,8 @@ router.post('/comments/:id/report', authRequired, (req, res) => {
   db.prepare('INSERT INTO reports (reporter_id, target_type, target_id, reason, priority) VALUES (?, ?, ?, ?, ?)').run(
     req.currentUser!.id, 'comment', id, reason, priority
   );
+  
+  logger.info('用户举报评论', { userId: req.currentUser!.id, commentId: id, reason });
   success(res, null, '举报已受理');
 });
 

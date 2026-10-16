@@ -88,7 +88,9 @@ export function createRateLimiter(opts: RateLimiterOptions) {
 
     const arr = (hits.get(key) || []).filter((t) => t > windowStart);
     if (arr.length >= opts.max) {
-      const retrySec = Math.ceil((arr[0] + opts.windowMs - now) / 1000);
+      const firstHit = arr[0];
+      if (!firstHit) return next(); // 防御性检查
+      const retrySec = Math.ceil((firstHit + opts.windowMs - now) / 1000);
       const retryText = retrySec > 60 ? `${Math.ceil(retrySec / 60)} 分钟` : `${retrySec} 秒`;
       return res.status(429).json({ code: 429, message: `操作过于频繁，请 ${retryText} 后再试`, data: null });
     }
@@ -115,3 +117,5 @@ export const followLimiter = createRateLimiter({ windowMs: 60_000, max: 60, name
 export const ackLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'ack' });
 /** 草稿写端点：1 分钟 30 次 */
 export const draftLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'draft' });
+/** 读端点（列表类 GET）：1 分钟 300 次，防爬虫 */
+export const readLimiter = createRateLimiter({ windowMs: 60_000, max: 300, name: 'read' });

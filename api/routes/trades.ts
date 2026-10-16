@@ -49,6 +49,11 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
   );
   cacheInvalidate('posts'); // extra_fields 影响列表价格排序与筛选
 
+  // 已锁定的意向出价同步置为已完成（撮合闭环收口）
+  db.prepare(
+    "UPDATE trade_offers SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'accepted'"
+  ).run(postId);
+
   success(res, { postId, soldAt: extra.soldAt, soldTo: extra.soldTo ?? null }, '交易已完成');
 });
 
@@ -174,6 +179,147 @@ router.get('/users/:id/trade-ratings', authOptional, (req, res) => {
     avg: stat.avg != null ? Math.round(stat.avg * 10) / 10 : null,
     list,
   });
+});
+
+// ---------- 意向出价（闪电意向撮合闭环） ----------
+
+function getOffer(id: number): any {
+  return db.prepare('SELECT * FROM trade_offers WHERE id = ?').get(id);
+}
+
+function formatOffer(o: any): any {
+  return {
+    id: o.id,
+    postId: o.post_id,
+    buyerId: o.buyer_id,
+    sellerId: o.seller_id,
+    offerPrice: o.offer_price,
+    message: o.message || '',
+    status: o.status,
+    createdAt: o.created_at ? new Date(o.created_at).toISOString() : o.created_at,
+  };
+}
+
+// 买家发起意向出价（仅非作者；帖子已发布、未售出且无已锁定出价）
+router.post('/trades/:postId/offers', authRequired, (req, res) => {
+  const postId = Number(req.params.postId);
+  const post = getPost(postId);
+  if (!post) return fail(res, '帖子不存在', 404, 404);
+  if (post.status !== 'published') return fail(res, '帖子不可见，无法出价', 404, 404);
+  if (post.user_id === req.currentUser!.id) return fail(res, '不能对自己的帖子出价');
+
+  const extra = JSON.parse(post.extra_fields || '{}');
+  if (extra.soldAt) return fail(res, '该物品已售出');
+
+  const price = Number(req.body?.offerPrice);
+  if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
+    return fail(res, '请输入有效的出价金额');
+  }
+  const message = typeof req.body?.message === 'string' ? req.body.message.slice(0, 100) : '';
+
+  const accepted = db.prepare(
+    "SELECT id FROM trade_offers WHERE post_id = ? AND status = 'accepted'"
+  ).get(postId);
+  if (accepted) return fail(res, '卖家已与其他买家达成交易，暂时无法出价');
+
+  const myPending = db.prepare(
+    "SELECT id FROM trade_offers WHERE post_id = ? AND buyer_id = ? AND status = 'pending'"
+  ).get(postId, req.currentUser!.id);
+  if (myPending) return fail(res, '您已有一条待确认的出价，请等待卖家处理');
+
+  const result = db.prepare(`
+    INSERT INTO trade_offers (post_id, buyer_id, seller_id, offer_price, message)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(postId, req.currentUser!.id, post.user_id, price, message);
+
+  // 通知卖家（失败不影响出价落库）
+  upsertNotification(
+    post.user_id,
+    'system',
+    `您的帖子「${post.title}」收到新出价 ¥${price}`,
+    postId
+  );
+
+  const offer = getOffer(result.lastInsertRowid as number);
+  success(res, formatOffer(offer), '出价已发送，等待卖家确认');
+});
+
+// 出价列表（卖家看全部待处理，买家看自己的；返回锁定状态供前端展示）
+router.get('/trades/:postId/offers', authRequired, (req, res) => {
+  const postId = Number(req.params.postId);
+  const post = getPost(postId);
+  if (!post) return fail(res, '帖子不存在', 404, 404);
+
+  const isSeller = post.user_id === req.currentUser!.id;
+  const rows = db.prepare(`
+    SELECT o.*, u.nickname AS buyer_nickname, u.avatar AS buyer_avatar, u.credit_score AS buyer_credit
+    FROM trade_offers o
+    JOIN users u ON u.id = o.buyer_id
+    WHERE o.post_id = ?
+    ORDER BY CASE o.status WHEN 'pending' THEN 0 WHEN 'accepted' THEN 1 ELSE 2 END, o.offer_price DESC, o.created_at DESC
+  `).all(postId) as any[];
+
+  const visible = isSeller ? rows : rows.filter((r) => r.buyer_id === req.currentUser!.id || r.status === 'accepted');
+  const hasAccepted = rows.some((r) => r.status === 'accepted');
+  const myOffer = rows.find((r) => r.buyer_id === req.currentUser!.id && r.status === 'pending');
+
+  success(res, {
+    isSeller,
+    hasAccepted,
+    myOffer: myOffer ? formatOffer(myOffer) : null,
+    offers: visible.map((r) => ({
+      ...formatOffer(r),
+      buyer: isSeller || r.buyer_id === req.currentUser!.id
+        ? { id: r.buyer_id, nickname: r.buyer_nickname, avatar: r.buyer_avatar, creditScore: r.buyer_credit }
+        : undefined,
+    })),
+  });
+});
+
+// 卖家接受出价：排他锁定（同帖其他 pending 出价自动拒绝）
+router.post('/trades/offers/:offerId/accept', authRequired, (req, res) => {
+  const offer = getOffer(Number(req.params.offerId));
+  if (!offer) return fail(res, '出价不存在', 404, 404);
+  if (offer.seller_id !== req.currentUser!.id) return forbidden(res, '只有卖家可以接受出价');
+  if (offer.status !== 'pending') return fail(res, '该出价已处理');
+
+  db.transaction(() => {
+    db.prepare("UPDATE trade_offers SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(offer.id);
+    db.prepare(
+      "UPDATE trade_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'pending' AND id != ?"
+    ).run(offer.post_id, offer.id);
+  })();
+
+  upsertNotification(
+    offer.buyer_id,
+    'system',
+    '您的出价已被卖家接受，请尽快联系卖家完成交易',
+    offer.post_id
+  );
+
+  success(res, formatOffer(getOffer(offer.id)), '已接受出价，交易锁定');
+});
+
+// 卖家拒绝出价
+router.post('/trades/offers/:offerId/reject', authRequired, (req, res) => {
+  const offer = getOffer(Number(req.params.offerId));
+  if (!offer) return fail(res, '出价不存在', 404, 404);
+  if (offer.seller_id !== req.currentUser!.id) return forbidden(res, '只有卖家可以拒绝出价');
+  if (offer.status !== 'pending') return fail(res, '该出价已处理');
+
+  db.prepare("UPDATE trade_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(offer.id);
+  success(res, formatOffer(getOffer(offer.id)), '已拒绝该出价');
+});
+
+// 买家取消自己的待确认出价
+router.post('/trades/offers/:offerId/cancel', authRequired, (req, res) => {
+  const offer = getOffer(Number(req.params.offerId));
+  if (!offer) return fail(res, '出价不存在', 404, 404);
+  if (offer.buyer_id !== req.currentUser!.id) return forbidden(res, '只有出价人可以取消');
+  if (offer.status !== 'pending') return fail(res, '该出价已处理，无法取消');
+
+  db.prepare("UPDATE trade_offers SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(offer.id);
+  success(res, formatOffer(getOffer(offer.id)), '已取消出价');
 });
 
 export default router;

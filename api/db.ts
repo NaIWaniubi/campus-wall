@@ -28,6 +28,23 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 /**
+ * CJK 二元分词自定义函数（供 FTS5 触发器使用）：
+ * unicode61 分词器不切分中文（连续汉字成单 token，无法子串匹配），
+ * 这里把文本预切为「ASCII 词块 + 中文 2 字滑窗」空格分隔的 token 串再入索引。
+ * 与 utils/matching.ts 的 buildFtsQuery 查询侧滑窗一一对应。
+ */
+db.function('cjk_bigrams', (text: unknown): string => {
+  if (typeof text !== 'string' || !text) return '';
+  const ascii = text.match(/[a-zA-Z0-9]{2,}/g)?.map((w) => w.toLowerCase()) || [];
+  const chinese = text.replace(/[\s，。！？、；：,.!?;:~～"'‘’（）()\[\]{}#*a-zA-Z0-9]/g, '');
+  const bigrams: string[] = [];
+  for (let i = 0; i + 2 <= chinese.length; i++) {
+    bigrams.push(chinese.slice(i, i + 2));
+  }
+  return [...ascii, ...bigrams].join(' ');
+});
+
+/**
  * 初始化数据库表结构与初始数据
  */
 export function initDatabase() {
@@ -217,15 +234,91 @@ export function initDatabase() {
   // 常用复合索引（CREATE INDEX IF NOT EXISTS 保证幂等，重复执行无副作用）
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_posts_status_section_created ON posts (status, section_id, created_at);
-  `);
-  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_posts_user_created ON posts (user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_user_status ON posts (user_id, status);
     CREATE INDEX IF NOT EXISTS idx_comments_post_created ON comments (post_id, created_at);
-  `);
-  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_comments_user_created ON comments (user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_comments_post_parent ON comments (post_id, parent_id);
     CREATE INDEX IF NOT EXISTS idx_messages_user_read ON messages (user_id, is_read);
+    CREATE INDEX IF NOT EXISTS idx_reports_status_priority ON reports (status, priority, created_at);
+    CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON favorites (user_id, created_at);
   `);
   // likes 的 (user_id, target_type, target_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
   // favorites 的 (user_id, post_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
+
+  // ---------- FTS5 全文检索虚拟表（毫秒级分词搜索，替代 LIKE 全表扫描） ----------
+  // 独立表（非 external content）：入索引前经 cjk_bigrams 预切词，避免 external content
+  // 「列名必须与原表一致」与 unicode61 不切分中文两个坑
+  // 老库升级：若存在旧版 external content 定义的 posts_fts（查询会报 no such column），先删后重建
+  const ftsDdl = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'posts_fts'").get() as any)?.sql || '';
+  if (ftsDdl.includes("content='posts'")) {
+    db.exec('DROP TABLE IF EXISTS posts_fts;');
+  }
+  // 老库升级：旧版触发器按 external content 'delete' 命令写入，与独立表不兼容（SQL logic error），先删后重建
+  db.exec(`
+    DROP TRIGGER IF EXISTS posts_fts_insert;
+    DROP TRIGGER IF EXISTS posts_fts_update;
+    DROP TRIGGER IF EXISTS posts_fts_delete;
+  `);
+  db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+      title,
+      content,
+      extra_text,
+      tokenize='unicode61'
+    );
+  `);
+  // 双向同步触发器：业务写 posts 时 FTS 倒排索引由 SQLite 底层原子同步，业务层零心智负担
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS posts_fts_insert AFTER INSERT ON posts BEGIN
+      INSERT INTO posts_fts(rowid, title, content, extra_text)
+      VALUES (NEW.id, cjk_bigrams(NEW.title), cjk_bigrams(NEW.content), cjk_bigrams(NEW.extra_fields));
+    END;
+  `);
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS posts_fts_update AFTER UPDATE ON posts BEGIN
+      DELETE FROM posts_fts WHERE rowid = OLD.id;
+      INSERT INTO posts_fts(rowid, title, content, extra_text)
+      VALUES (NEW.id, cjk_bigrams(NEW.title), cjk_bigrams(NEW.content), cjk_bigrams(NEW.extra_fields));
+    END;
+  `);
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS posts_fts_delete AFTER DELETE ON posts BEGIN
+      DELETE FROM posts_fts WHERE rowid = OLD.id;
+    END;
+  `);
+  // 存量数据回填：FTS 为空且 posts 有数据时一次性灌入（幂等，重复执行无副作用）
+  const ftsHasRow = db.prepare('SELECT rowid FROM posts_fts LIMIT 1').get();
+  const postsCount = (db.prepare('SELECT COUNT(*) as count FROM posts').get() as { count: number }).count;
+  if (!ftsHasRow && postsCount > 0) {
+    db.exec(`
+      INSERT INTO posts_fts(rowid, title, content, extra_text)
+      SELECT id, cjk_bigrams(title), cjk_bigrams(content), cjk_bigrams(extra_fields) FROM posts;
+    `);
+  }
+
+  // ---------- 二手意向出价表（闪电意向撮合闭环） ----------
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trade_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      buyer_id INTEGER NOT NULL,
+      seller_id INTEGER NOT NULL,
+      offer_price REAL NOT NULL,
+      message TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (post_id) REFERENCES posts(id),
+      FOREIGN KEY (buyer_id) REFERENCES users(id),
+      FOREIGN KEY (seller_id) REFERENCES users(id)
+    );
+  `);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_trade_offers_post_status ON trade_offers (post_id, status);
+    CREATE INDEX IF NOT EXISTS idx_trade_offers_buyer ON trade_offers (buyer_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_trade_offers_seller ON trade_offers (seller_id, created_at);
+  `);
 
   // 初始板块数据
   const sectionCount = db.prepare('SELECT COUNT(*) as count FROM sections').get() as { count: number };

@@ -106,7 +106,9 @@ async function confirmHandle() {
   }
   handleDialog.visible = false
   try {
-    await adminApi.handleReport(report.id, action, actions[action].result)
+    const actionConfig = actions[action];
+    if (!actionConfig) return;
+    await adminApi.handleReport(report.id, action, actionConfig.result)
     toast.success(action === 'resolve' ? '已核实处理' : '已驳回举报')
   } catch {
     // 失败回滚
@@ -171,13 +173,13 @@ onMounted(load)
             class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-brand-500 hover:bg-brand-600 text-white font-medium"
             @click="openHandle(r, 'resolve')"
           >
-            <Check class="w-3 h-3" />{{ actions.resolve.label }}
+            <Check class="w-3 h-3" />{{ actions.resolve?.label }}
           </button>
           <button
             class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
             @click="openHandle(r, 'dismiss')"
           >
-            <XCircle class="w-3 h-3" />{{ actions.dismiss.label }}
+            <XCircle class="w-3 h-3" />{{ actions.dismiss?.label }}
           </button>
           <button
             v-if="r.targetType === 'post'"
@@ -208,9 +210,9 @@ onMounted(load)
 
     <ConfirmDialog
       :visible="handleDialog.visible"
-      :title="handleDialog.action ? actions[handleDialog.action].label : '提示'"
-      :content="handleDialog.report ? `${targetText(handleDialog.report)}：${handleDialog.action ? actions[handleDialog.action].content : ''}` : ''"
-      :confirm-text="handleDialog.action ? actions[handleDialog.action].label : '确定'"
+      :title="handleDialog.action && actions[handleDialog.action] ? actions[handleDialog.action]!.label : '提示'"
+      :content="handleDialog.report && handleDialog.action && actions[handleDialog.action] ? `${targetText(handleDialog.report)}：${actions[handleDialog.action]!.content}` : ''"
+      :confirm-text="handleDialog.action && actions[handleDialog.action] ? actions[handleDialog.action]!.label : '确定'"
       :danger="handleDialog.action === 'dismiss'"
       @confirm="confirmHandle"
       @cancel="handleDialog.visible = false"

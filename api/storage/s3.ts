@@ -35,7 +35,7 @@ export class S3Storage implements Storage {
     if (this.mod) return this.mod;
     // 动态 import：未装 SDK 时不抛（生产部署再装）
 
-    this.mod = await (import('@aws-sdk/client-s3' as any).catch(() => null));
+    this.mod = await (import('@aws-sdk/client-s3' as any).catch((): null => null));
     if (!this.mod) {
       throw new Error('S3 driver 需先安装 @aws-sdk/client-s3：npm i @aws-sdk/client-s3');
     }

@@ -6,6 +6,7 @@
  * - data 字段名（thing1/time2...）需与所选模板字段一致；不一致时微信返回 47003，此处仅记日志不重试
  */
 import { db } from '../db.js';
+import { logger } from './logger.js';
 
 const WX_API = 'https://api.weixin.qq.com';
 
@@ -74,9 +75,9 @@ export async function sendWxSubscribeMessage(
     });
     const json: any = await res.json();
     if (json.errcode !== 0) {
-      console.warn(`[wx-push] 发送失败 errcode=${json.errcode} errmsg=${json.errmsg}`);
+      logger.warn('微信订阅消息发送失败', { errcode: json.errcode, errmsg: json.errmsg });
     }
   } catch (err: any) {
-    console.warn('[wx-push] 推送流程异常:', err?.message);
+    logger.warn('微信推送流程异常', { error: err?.message });
   }
 }

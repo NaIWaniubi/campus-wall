@@ -6,7 +6,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi } from '@/utils/api'
+import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi, radarApi, type RadarMatchItem } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -278,6 +278,83 @@ async function fetchMatches() {
   }
 }
 
+// ---------- 智能雷达（失物招领反向匹配，FTS5+地点/时间复合评分） ----------
+const radarMatches = ref<RadarMatchItem[]>([])
+
+async function fetchRadar() {
+  try {
+    const res: any = await radarApi.matches(postId.value)
+    radarMatches.value = res.data?.matches || []
+  } catch {
+    radarMatches.value = []
+  }
+}
+
+const radarLabel = computed(() =>
+  post.value?.extraFields?.direction === 'lost' ? '招领' : '寻物'
+)
+
+// ---------- 意向出价（闪电意向撮合闭环，二手交易板块） ----------
+const isTradePost = computed(() =>
+  !!post.value && (String(post.value?.section?.name || '').includes('二手') || !!post.value?.extraFields?.price)
+)
+const offersState = ref<any>({ isSeller: false, hasAccepted: false, myOffer: null, offers: [] })
+const showOfferSheet = ref(false)
+const offerPrice = ref('')
+const offerMessage = ref('')
+const offerBusy = ref(false)
+
+const OFFER_STATUS_LABEL: Record<string, string> = {
+  pending: '待确认',
+  accepted: '已锁定',
+  rejected: '已拒绝',
+  cancelled: '已取消',
+  completed: '已完成',
+}
+
+async function fetchOffers() {
+  if (!isTradePost.value || !userStore.isLoggedIn) return
+  try {
+    const res: any = await tradeApi.offers(postId.value)
+    offersState.value = res.data || { isSeller: false, hasAccepted: false, myOffer: null, offers: [] }
+  } catch {
+    // 静默失败，出价区按空处理
+  }
+}
+
+async function submitOffer() {
+  if (!userStore.isLoggedIn) return goLogin()
+  const price = Number(offerPrice.value)
+  if (!Number.isFinite(price) || price <= 0) return toast.error('请输入有效的出价金额')
+  offerBusy.value = true
+  try {
+    await tradeApi.createOffer(postId.value, { offerPrice: price, message: offerMessage.value })
+    toast.success('出价已发送，等待卖家确认')
+    showOfferSheet.value = false
+    offerPrice.value = ''
+    offerMessage.value = ''
+    await fetchOffers()
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    offerBusy.value = false
+  }
+}
+
+async function actOnOffer(offerId: number, action: 'accept' | 'reject' | 'cancel') {
+  if (offerBusy.value) return
+  offerBusy.value = true
+  try {
+    await tradeApi[`${action}Offer`](offerId)
+    toast.success(action === 'accept' ? '已接受出价，交易锁定' : action === 'reject' ? '已拒绝该出价' : '已取消出价')
+    await fetchOffers()
+  } catch {
+    // 错误已由拦截器 toast
+  } finally {
+    offerBusy.value = false
+  }
+}
+
 // 乐观更新锁：like/favorite 独立，避免一个动作互锁另一个动作的 300ms 防抖窗口
 const likeLocked = ref(false)
 const favoriteLocked = ref(false)
@@ -458,9 +535,11 @@ function share() {
 }
 
 onMounted(async () => {
-  fetchPost()
+  await fetchPost()
   fetchComments()
   await fetchMatches()
+  await fetchRadar()
+  await fetchOffers()
   document.addEventListener('click', closeMoreMenu)
   // 匹配通知跳入：滚动定位到「可能相关」卡片并短暂高亮（自动展开候选列表）
   if (route.query.showMatches === '1' && matches.value.length) {
@@ -749,6 +828,64 @@ function closeMoreMenu(e: MouseEvent) {
         </button>
       </div>
 
+      <!-- 智能雷达（失物招领反向匹配）：发现高度相似的对向信息 -->
+      <div v-if="radarMatches.length" class="bg-white rounded-xl p-4 mb-4">
+        <h3 class="font-medium text-zinc-900">🎯 智能雷达</h3>
+        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">发现 {{ radarMatches.length }} 条高度相似的{{ radarLabel }}信息，点开看看是不是同一个</p>
+        <button
+          v-for="m in radarMatches"
+          :key="m.postId"
+          class="w-full text-left px-2 py-2.5 rounded-lg border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition"
+          @click="router.push(`/post/${m.postId}`)"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded flex-shrink-0">相似度 {{ m.score }}</span>
+            <span class="text-sm text-zinc-800 truncate flex-1">{{ m.title }}</span>
+          </div>
+          <p class="text-xs text-zinc-400 mt-0.5 truncate pl-0.5">{{ m.reasons.join(' · ') }} · {{ m.excerpt }}</p>
+        </button>
+      </div>
+
+      <!-- 意向出价（闪电意向撮合闭环，二手交易板块） -->
+      <div v-if="isTradePost && userStore.isLoggedIn && !isPending" class="bg-white rounded-xl p-4 mb-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-medium text-zinc-900">意向出价</h3>
+          <button
+            v-if="!offersState.isSeller && !offersState.myOffer && !offersState.hasAccepted && !soldAt"
+            class="text-sm text-brand-600 font-medium hover:text-brand-700 transition"
+            @click="showOfferSheet = true"
+          >
+            出个价
+          </button>
+        </div>
+        <p v-if="offersState.hasAccepted && !soldAt" class="text-xs text-emerald-600 mt-1">卖家已与买家达成交易，其余出价已冻结</p>
+        <p v-else-if="soldAt" class="text-xs text-zinc-400 mt-1">该物品已售出</p>
+        <div v-for="o in offersState.offers" :key="o.id" class="mt-2.5 px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-100">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-brand-600 font-bold">¥{{ o.offerPrice }}</span>
+            <span
+              class="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
+              :class="o.status === 'accepted' || o.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : o.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-zinc-100 text-zinc-400'"
+            >{{ OFFER_STATUS_LABEL[o.status] || o.status }}</span>
+            <span v-if="o.buyer" class="text-xs text-zinc-400 truncate">{{ o.buyer.nickname }}</span>
+            <span class="ml-auto flex-shrink-0 flex gap-1.5">
+              <template v-if="offersState.isSeller && o.status === 'pending'">
+                <button class="text-xs text-white bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded-full transition disabled:opacity-50" :disabled="offerBusy" @click="actOnOffer(o.id, 'accept')">接受</button>
+                <button class="text-xs text-zinc-500 hover:text-red-500 px-2 py-1 transition disabled:opacity-50" :disabled="offerBusy" @click="actOnOffer(o.id, 'reject')">拒绝</button>
+              </template>
+              <button
+                v-else-if="!offersState.isSeller && o.status === 'pending'"
+                class="text-xs text-zinc-500 hover:text-red-500 px-2 py-1 transition disabled:opacity-50"
+                :disabled="offerBusy"
+                @click="actOnOffer(o.id, 'cancel')"
+              >取消</button>
+            </span>
+          </div>
+          <p v-if="o.message" class="text-xs text-zinc-500 mt-1 truncate">附言：{{ o.message }}</p>
+        </div>
+        <div v-if="!offersState.offers.length && !soldAt" class="text-center text-sm text-zinc-400 py-4">还没有人出价，期待你的意向价</div>
+      </div>
+
       <!-- 评论区 -->
       <div class="bg-white rounded-xl p-4">
         <h3 class="font-medium text-zinc-900 mb-3">评论 {{ post.commentCount }}</h3>
@@ -839,6 +976,40 @@ function closeMoreMenu(e: MouseEvent) {
             </button>
           </div>
           <button class="w-full py-3 mt-2 text-center text-sm text-zinc-400 border-t border-zinc-100" @click="showReportSheet = false">取消</button>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 意向出价底部弹窗 -->
+    <Teleport to="body">
+      <div v-if="showOfferSheet" class="fixed inset-0 z-50 flex items-end" @click.self="showOfferSheet = false">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative w-full max-w-[960px] mx-auto bg-white rounded-t-2xl p-4 animate-slide-up">
+          <h4 class="text-center font-medium text-zinc-900 mb-1">向卖家发起意向出价</h4>
+          <p class="text-center text-xs text-zinc-400 mb-3">卖家确认后交易即锁定，双方可在私信里约定交付</p>
+          <div class="flex items-center gap-2 px-3 h-11 rounded-lg border border-zinc-200 focus-within:border-brand-500 transition">
+            <span class="text-brand-600 font-bold">¥</span>
+            <input
+              v-model="offerPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="输入你的出价金额"
+              class="flex-1 text-sm outline-none bg-transparent"
+            />
+          </div>
+          <input
+            v-model="offerMessage"
+            maxlength="100"
+            placeholder="附言（可选，如：可一教自提）"
+            class="w-full mt-2 px-3 h-11 rounded-lg border border-zinc-200 focus:border-brand-500 outline-none text-sm transition"
+          />
+          <button
+            class="w-full h-11 mt-3 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium transition disabled:opacity-50"
+            :disabled="offerBusy || !offerPrice"
+            @click="submitOffer"
+          >{{ offerBusy ? '发送中…' : '发送出价' }}</button>
+          <button class="w-full py-3 mt-2 text-center text-sm text-zinc-400 border-t border-zinc-100" @click="showOfferSheet = false">取消</button>
         </div>
       </div>
     </Teleport>

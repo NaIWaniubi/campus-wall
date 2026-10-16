@@ -5,6 +5,7 @@
  * - 发送失败按状态码清理失效订阅（404=不存在 / 410=Gone 用户已退订）
  */
 import { db } from '../db.js';
+import { logger } from './logger.js';
 
 export interface PushPayload {
   title: string;
@@ -35,7 +36,7 @@ async function getWebPush(): Promise<typeof import('web-push')> {
     );
     webpushModule = mod;
   }
-  return webpushModule;
+  return webpushModule!;
 }
 
 export function isPushEnabled(): boolean {
@@ -77,12 +78,12 @@ export async function sendPushToUser(userId: number, payload: PushPayload): Prom
         if (status === 404 || status === 410) {
           removeSubscription(row.endpoint);
         } else {
-          console.warn('[push] 发送失败（保留订阅）:', status ?? err?.message);
+          logger.warn('Push 发送失败（保留订阅）', { status: status ?? 'unknown', error: err?.message });
         }
       }
     }));
   } catch (err: any) {
-    console.warn('[push] 推送流程异常:', err?.message);
+    logger.warn('Push 推送流程异常', { error: err?.message });
   }
 }
 

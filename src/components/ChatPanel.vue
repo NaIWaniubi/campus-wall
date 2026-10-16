@@ -94,7 +94,8 @@ function mergeIncoming(incoming: ChatMessage[]) {
 }
 
 function lastLocalId(): number {
-  return messages.value.length ? messages.value[messages.value.length - 1].id : 0
+  const lastMessage = messages.value[messages.value.length - 1];
+  return lastMessage ? lastMessage.id : 0;
 }
 
 async function load(initial = false) {
@@ -204,9 +205,11 @@ const offIncoming = onIncoming((m) => {
 const offAck = onAck((ack) => {
   const idx = messages.value.findIndex((m) => m.pendingId && m.pendingId === ack.clientMsgId)
   if (idx < 0) return
+  const existingMessage = messages.value[idx];
+  if (!existingMessage) return;
   messages.value[idx] = {
     id: ack.messageId,
-    content: messages.value[idx].content,
+    content: existingMessage.content,
     isMine: true,
     createdAt: ack.createdAt,
   }

@@ -8,17 +8,18 @@ import app, { reportBackup } from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';
 import { runBackup, countBackups } from './jobs/backup.js';
 import { attachWebSocket } from './ws/server.js';
+import { logger } from './utils/logger.js';
 
 // Sentry 等可观测性：SENTRY_DSN 未配置时 no-op，需尽量早执行
 initObservability();
 
 // 全局未捕获异常兜底：避免单条同步/异步异常直接拖死进程
 process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err);
+  logger.error('未捕获的异常', { error: err.message, stack: err.stack });
   captureError(err);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('[unhandledRejection]', err);
+  logger.error('未处理的 Promise 拒绝', { error: err instanceof Error ? err.message : String(err) });
   captureError(err as Error);
 });
 
@@ -29,11 +30,11 @@ const PORT = process.env.PORT || 3001;
 
 // 生产环境部署安全兜底：CORS_ORIGIN 未显式设置则只放行 localhost，生产域名会被拦截
 if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
-  console.warn('[security] CORS_ORIGIN 未设置，仅允许 localhost 跨域；生产域名请求将被 CORS 拒绝，请尽快配置环境变量。');
+  logger.warn('CORS_ORIGIN 未设置，仅允许 localhost 跨域；生产域名请求将被 CORS 拒绝，请尽快配置环境变量');
 }
 
 const server = app.listen(PORT, () => {
-  console.log(`Server ready on port ${PORT}`);
+  logger.info('服务器启动成功', { port: PORT, env: process.env.NODE_ENV });
 });
 
 // 挂 WebSocket（路径 /ws）；REST 路由不受影响
@@ -60,9 +61,9 @@ setInterval(() => {
   lastDigestDate = today;
   try {
     const count = runDailyDigest();
-    console.log(`[dailyDigest] ${today} 摘要已发送给 ${count} 位订阅者`);
+    logger.info('每日摘要发送完成', { date: today, subscriberCount: count });
   } catch (err) {
-    console.error('[dailyDigest] 执行失败:', err);
+    logger.error('每日摘要执行失败', { error: err instanceof Error ? err.message : String(err) });
   }
 }, 60_000);
 
@@ -70,9 +71,9 @@ setInterval(() => {
 if (process.env.DIGEST_NOW === '1') {
   try {
     const count = runDailyDigest();
-    console.log(`[dailyDigest] 手动执行完成，发送给 ${count} 位订阅者`);
+    logger.info('每日摘要手动执行完成', { subscriberCount: count });
   } catch (err) {
-    console.error('[dailyDigest] 手动执行失败:', err);
+    logger.error('每日摘要手动执行失败', { error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -90,30 +91,39 @@ const BACKUP_INTERVAL_HOURS = (() => {
 setInterval(() => {
   runBackup()
     .then(() => reportBackup(true))
-    .catch((err) => { reportBackup(false, err); console.error('[backup] 定时备份失败:', err); });
+    .catch((err) => { 
+      reportBackup(false, err); 
+      logger.error('定时备份失败', { error: err instanceof Error ? err.message : String(err) });
+    });
 }, BACKUP_INTERVAL_HOURS * 3_600_000);
 
 // 启动基线：backups/ 为空（首次运行）时立即补一份
 if (countBackups() === 0) {
   runBackup()
     .then(() => reportBackup(true))
-    .catch((err) => { reportBackup(false, err); console.error('[backup] 启动基线备份失败:', err); });
+    .catch((err) => { 
+      reportBackup(false, err); 
+      logger.error('启动基线备份失败', { error: err instanceof Error ? err.message : String(err) });
+    });
 }
 
 // 调试用：BACKUP_NOW=1 启动时立即手动执行一次备份（不等定时时刻）
 if (process.env.BACKUP_NOW === '1') {
   runBackup()
     .then(() => reportBackup(true))
-    .catch((err) => { reportBackup(false, err); console.error('[backup] 手动执行失败:', err); });
+    .catch((err) => { 
+      reportBackup(false, err); 
+      logger.error('手动备份失败', { error: err instanceof Error ? err.message : String(err) });
+    });
 }
 
 /**
  * close server
  */
 const shutdown = (sig: string) => {
-  console.log(`${sig} signal received`);
+  logger.info('收到关闭信号，准备关闭服务器', { signal: sig });
   server.close(() => {
-    console.log('Server closed');
+    logger.info('服务器已关闭');
     process.exit(0);
   });
   // Force-exit if not closed in 10s

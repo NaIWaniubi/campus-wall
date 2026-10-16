@@ -6,6 +6,8 @@ import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail, toCamel } from '../utils/response.js';
 import { formatPost } from './posts.js';
+import { validate, userSchemas, commonSchemas } from '../utils/validation.js';
+import { logger, safeJsonParse } from '../utils/logger.js';
 
 const router = Router();
 
@@ -19,21 +21,22 @@ router.get('/lookup', authRequired, (req, res) => {
 });
 
 // 用户公开信息
-router.get('/:id', (req, res) => {
+router.get('/:id', validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const user = db.prepare('SELECT id, nickname, avatar, college, grade, signature, credit_score, created_at FROM users WHERE id = ? AND status != \'banned\'').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);
+  
+  logger.debug('查询用户信息', { userId: id });
   success(res, toCamel(user));
 });
 
 // 更新个人资料
-router.put('/profile', authRequired, (req, res) => {
+router.put('/profile', authRequired, validate({ body: userSchemas.updateProfile }), (req, res) => {
   const { nickname, avatar, signature } = req.body;
   const updates: string[] = [];
   const params: any[] = [];
 
   if (nickname !== undefined) {
-    if (!nickname.trim()) return fail(res, '昵称不能为空');
     updates.push('nickname = ?');
     params.push(nickname.trim());
   }
@@ -42,7 +45,6 @@ router.put('/profile', authRequired, (req, res) => {
     params.push(avatar);
   }
   if (signature !== undefined) {
-    if (signature.length > 100) return fail(res, '个性签名最多100字');
     updates.push('signature = ?');
     params.push(signature);
   }
@@ -53,6 +55,8 @@ router.put('/profile', authRequired, (req, res) => {
   db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
 
   const user = db.prepare('SELECT id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, created_at FROM users WHERE id = ?').get(req.currentUser!.id) as any;
+  
+  logger.info('用户更新资料', { userId: req.currentUser!.id });
   success(res, toCamel(user), '资料更新成功');
 });
 
@@ -70,7 +74,7 @@ router.get('/me/posts', authRequired, (req, res) => {
     id: p.id,
     title: p.title,
     content: p.content,
-    images: JSON.parse(p.images || '[]'),
+    images: safeJsonParse<string[]>(p.images || '[]', [], 'users.posts.images'),
     isAnonymous: !!p.is_anonymous,
     status: p.status,
     rejectReason: p.reject_reason,

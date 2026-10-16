@@ -7,18 +7,13 @@ import { db } from '../db.js';
 import { unauthorized, forbidden } from '../utils/response.js';
 import { shouldLiftBan } from '../utils/auth-helpers.js';
 
+import type { CurrentUser } from '../types/index.js';
+
 // 扩展 Request 类型，携带当前用户
 declare global {
   namespace Express {
     interface Request {
-      currentUser?: {
-        id: number;
-        studentId: string;
-        role: string;
-        nickname: string;
-        creditScore: number;
-        status: string;
-      };
+      currentUser?: CurrentUser;
     }
   }
 }
@@ -80,7 +75,7 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
 /**
  * 可选登录中间件（有 Token 则解析，无则放行）
  */
-export function authOptional(req: Request, res: Response, next: NextFunction) {
+export function authOptional(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (token) {
     const payload = verifyToken(token);

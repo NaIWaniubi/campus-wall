@@ -1,6 +1,6 @@
 <view class="page-user {{perfLowClass}}">
   <view class="user-header card">
-    <image class="user-avatar" src="{{avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+    <image class="user-avatar" src="{{avatar || '/images/default_avatar.png'}}" mode="aspectFill" lazy-load></image>
     <view class="user-name">{{user.nickname || '校园墙用户'}}</view>
     <view class="user-signature text-ellipsis" wx:if="{{user.signature}}">{{user.signature}}</view>
     <view class="user-meta flex-row">

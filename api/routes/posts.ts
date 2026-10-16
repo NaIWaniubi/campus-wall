@@ -6,12 +6,15 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { assessRisk } from '../utils/sensitive.js';
-import { postLimiter } from '../middleware/rateLimit.js';
+import { postLimiter, readLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
+import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/matching.js';
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
 import { applyDirectionFilter } from '../utils/direction-filter.js';
 import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
+import { validate, postSchemas } from '../utils/validation.js';
+import { safeJsonParse, logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -55,13 +58,16 @@ export function formatPost(
     }
   }
 
+  const images = safeJsonParse<string[]>(post.images || '[]', [], 'formatPost.images');
+  const extraFields = safeJsonParse<Record<string, any>>(post.extra_fields || '{}', {}, 'formatPost.extraFields');
+
   return {
     id: post.id,
     title: post.title,
     content: post.content,
-    images: JSON.parse(post.images || '[]'),
+    images,
     // 每张图对应的服务端缩略图地址（旧图可能不存在，前端加载失败时回退原图）
-    thumbImages: (JSON.parse(post.images || '[]') as string[]).map((u) => `${u}.thumb.webp`),
+    thumbImages: images.map((u) => `${u}.thumb.webp`),
     isAnonymous: !!post.is_anonymous,
     status: post.status,
     isTop: !!post.is_top,
@@ -71,7 +77,7 @@ export function formatPost(
     likeCount: post.like_count,
     commentCount: post.comment_count,
     favoriteCount: post.favorite_count,
-    extraFields: JSON.parse(post.extra_fields || '{}'),
+    extraFields,
     section: { id: post.section_id, name: post.section_name, icon: post.section_icon },
     author,
     // 当前用户是否为作者（匿名帖子也能正确判断，前端据此显示删除按钮）
@@ -84,7 +90,7 @@ export function formatPost(
 }
 
 // 帖子列表（支持板块筛选、分页、关键词）
-router.get('/', authOptional, (req, res) => {
+router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list }), (req, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId as string) : 0;
@@ -112,8 +118,15 @@ router.get('/', authOptional, (req, res) => {
     params.push(authorId);
   }
   if (keyword) {
-    where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
-    params.push(`%${keyword}%`, `%${keyword}%`);
+    // FTS5 全文检索：unicode61 分词 + BM25，避免 LIKE 全表扫描；空词回退 LIKE 兜底
+    const ftsQuery = buildFtsQuery(keyword, 8);
+    if (ftsQuery && ftsQuery !== '""') {
+      where += ` AND p.id IN (SELECT rowid FROM posts_fts WHERE posts_fts MATCH ?)`;
+      params.push(ftsQuery);
+    } else {
+      where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
+      params.push(`%${keyword}%`, `%${keyword}%`);
+    }
   }
   // 价格区间筛选（针对 extra_fields.price 数值字段，仅对带 price 的板块有效）
   if (priceRange) {
@@ -136,19 +149,20 @@ router.get('/', authOptional, (req, res) => {
     where += ` AND p.created_at >= datetime('now', '-' || ? || ' days')`;
     params.push(timeRange);
   }
-  // 子类型筛选（extra_fields 中的某个 key 精确匹配，key 必须经过白名单避免 SQL 注入/任意 json 路径）
+  // 子类型筛选（extra_fields 中的某个 key 精确匹配，使用安全的参数化查询）
   if (subType) {
-    const SUBTYPE_WHITELIST: Record<string, string> = {
-      tradeType: 'tradeType',
-      itemType: 'itemType',
-      direction: 'direction',
-      activityType: 'activityType',
+    const SAFE_JSON_PATHS: Record<string, string> = {
+      tradeType: '$.tradeType',
+      itemType: '$.itemType',
+      direction: '$.direction',
+      activityType: '$.activityType',
     };
     const [rawKey, val] = subType.split(':');
-    const safeKey = rawKey && SUBTYPE_WHITELIST[rawKey];
-    if (safeKey && val) {
-      where += ` AND json_extract(p.extra_fields, '$."${safeKey}"') = ?`;
-      params.push(val);
+    const safePath = rawKey && SAFE_JSON_PATHS[rawKey];
+    if (safePath && val) {
+      // 使用参数化查询，避免模板字符串拼接
+      where += ` AND json_extract(p.extra_fields, ?) = ?`;
+      params.push(safePath, val);
     }
   }
   // 失物方向筛选：仅当目标板块为失物招领类时生效（lost=丢失 / found=拾到）
@@ -268,6 +282,19 @@ router.get('/:id/matches', authOptional, (req, res) => {
   success(res, matches);
 });
 
+// 智能雷达（FTS5 + BM25 + 地点/时间复合评分）：返回反向方向的高相似失物/招领帖
+router.get('/:id/radar', authOptional, (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, '帖子不存在', 404, 404);
+
+  // 按帖子自身板块做反向匹配（findRadarMatches 内部校验方向字段）
+  const postSec = db.prepare('SELECT section_id FROM posts WHERE id = ? AND status = \'published\'').get(id) as any;
+  if (!postSec) return fail(res, '帖子不存在', 404, 404);
+
+  const matches = findRadarMatches(id, postSec.section_id, 3);
+  success(res, { threshold: MATCH_THRESHOLD, matches });
+});
+
 // 帖子详情
 router.get('/:id', authOptional, (req, res) => {
   const id = Number(req.params.id);
@@ -374,7 +401,7 @@ router.post('/', authRequired, postLimiter, (req, res) => {
         matchedCount = matches.length;
       }
     } catch (err: any) {
-      console.error('失物招领匹配失败:', err?.message);
+      logger.error('失物招领匹配失败', { error: err?.message });
     }
   }
 
@@ -490,11 +517,13 @@ router.post('/:id/like', authRequired, (req, res) => {
     const likeCount = (db.prepare('SELECT like_count FROM posts WHERE id = ?').get(id) as any).like_count;
     return { liked, likeCount, post, justLiked: !exist };
   })();
-  if ('error' in result) return fail(res, result.error, 404, 404);
+  if ('error' in result) return fail(res, result.error || '操作失败', 404, 404);
   cacheInvalidate('posts');
   if (result.justLiked && result.post.user_id !== userId) {
+    const nickname = req.currentUser?.nickname ?? '某用户';
+    const title = result.post.title ?? '该帖子';
     upsertNotification(
-      result.post.user_id, 'like', `${req.currentUser!.nickname} 赞了你的帖子「${result.post.title}」`, id
+      result.post.user_id, 'like', `${nickname} 赞了你的帖子「${title}」`, id
     );
   }
   success(res, { liked: result.liked, likeCount: result.likeCount }, result.liked ? '点赞成功' : '已取消点赞');
@@ -521,7 +550,7 @@ router.post('/:id/favorite', authRequired, (req, res) => {
     const favoriteCount = (db.prepare('SELECT favorite_count FROM posts WHERE id = ?').get(id) as any).favorite_count;
     return { favorited, favoriteCount };
   })();
-  if ('error' in result) return fail(res, result.error, 404, 404);
+  if ('error' in result) return fail(res, result.error || '操作失败', 404, 404);
   cacheInvalidate('posts');
   success(res, { favorited: result.favorited, favoriteCount: result.favoriteCount }, result.favorited ? '收藏成功' : '已取消收藏');
 });

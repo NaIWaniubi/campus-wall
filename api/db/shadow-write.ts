@@ -20,6 +20,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Database as DB } from './types.js';
+import { logger } from '../utils/logger.js';
 
 let _shadow: Kysely<DB> | null = null;
 
@@ -55,8 +56,7 @@ export async function shadowWrite<T>(
   // 异步：失败仅记录
   const sh = getShadow();
   fn(sh).catch((e: any) => {
-
-    console.error(`[shadow-write] ${table} failed:`, e?.message ?? e);
+    logger.error('影子写失败', { table, error: e?.message ?? String(e) });
   });
   return result;
 }

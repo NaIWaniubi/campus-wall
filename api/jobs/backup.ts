@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'node:url';
+import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,13 +63,13 @@ export async function runBackup(): Promise<string> {
   await db.backup(destPath);
   if (key) {
     encryptFile(destPath, `${destPath}.enc`, key);
-    console.log(`[backup] 已生成加密备份: ${destPath}.enc`);
+    logger.info('已生成加密备份', { path: `${destPath}.enc` });
     rotateBackups();
     return `${destPath}.enc`;
   }
 
   rotateBackups();
-  console.log(`[backup] 已生成备份: ${destPath}`);
+  logger.info('已生成备份', { path: destPath });
   return destPath;
 }
 
@@ -88,9 +89,9 @@ export function rotateBackups(): void {
   for (const stale of files.slice(keep)) {
     try {
       fs.unlinkSync(path.join(backupDir, stale));
-      console.log(`[backup] 轮换删除旧备份: ${stale}`);
+      logger.info('轮换删除旧备份', { file: stale });
     } catch (err) {
-      console.error(`[backup] 删除旧备份失败: ${stale}`, err);
+      logger.error('删除旧备份失败', { file: stale, error: err instanceof Error ? err.message : String(err) });
     }
   }
 }

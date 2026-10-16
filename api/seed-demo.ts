@@ -10,6 +10,7 @@
  */
 import bcrypt from 'bcryptjs';
 import { db } from './db.js';
+import { logger } from './utils/logger.js';
 
 const DEMO_SEED_KEY = 'demo_seeded';
 const DEMO_SID_LIKE = '2377%';
@@ -50,7 +51,10 @@ function cleanupDemoData(): void {
       db.prepare('DELETE FROM favorites WHERE post_id=?').run(p.id);
       db.prepare('DELETE FROM reports WHERE target_type=? AND target_id=?').run('post', p.id);
       db.prepare('DELETE FROM trade_ratings WHERE post_id=?').run(p.id);
+      db.prepare('DELETE FROM trade_offers WHERE post_id=?').run(p.id);
     }
+    // 用户作为买家/卖家的意向出价
+    db.prepare('DELETE FROM trade_offers WHERE buyer_id=? OR seller_id=?').run(id, id);
     db.prepare('DELETE FROM posts WHERE user_id=?').run(id);
     db.prepare('DELETE FROM comments WHERE user_id=?').run(id);
     db.prepare('DELETE FROM users WHERE id=?').run(id);
@@ -65,11 +69,11 @@ function cleanupDemoData(): void {
 function main(): void {
   const seeded = db.prepare('SELECT value FROM settings WHERE key=?').get(DEMO_SEED_KEY);
   if (seeded && !isForced()) {
-    console.log('[seed] 演示数据已存在，跳过。如需重种：npm run seed -- --force');
+    logger.info('演示数据已存在，跳过。如需重种：npm run seed -- --force');
     return;
   }
   if (isForced()) {
-    console.log('[seed] --force：清除旧演示数据…');
+    logger.info('--force：清除旧演示数据');
     cleanupDemoData();
     db.prepare('DELETE FROM settings WHERE key=?').run(DEMO_SEED_KEY);
   }
@@ -226,14 +230,14 @@ function main(): void {
   // ── 统计输出 ──
   const stat = (label: string, sql: string): void => {
     const row = db.prepare(sql).get() as { count: number };
-    console.log(`[seed] ${label}: ${row.count}`);
+    logger.info(`种子数据统计: ${label}`, { count: row.count });
   };
   stat('演示用户', `SELECT COUNT(*) as count FROM users WHERE student_id LIKE '${DEMO_SID_LIKE}'`);
   stat('演示帖子', `SELECT COUNT(*) as count FROM posts WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE '${DEMO_SID_LIKE}')`);
   stat('互评记录', 'SELECT COUNT(*) as count FROM trade_ratings');
   stat('待审核队列', `SELECT COUNT(*) as count FROM posts WHERE status='pending_review'`);
   stat('树洞帖举报', `SELECT COUNT(*) as count FROM reports WHERE target_id=${pid[8]} AND status='pending'`);
-  console.log('[seed] 完成。演示账号示例：23770001 / demo1234；管理员：admin / admin123');
+  logger.info('种子数据导入完成', { demoAccount: '23770001 / demo1234', adminAccount: 'admin / admin123' });
 }
 
 main();

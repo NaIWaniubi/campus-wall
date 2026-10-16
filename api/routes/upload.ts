@@ -14,6 +14,7 @@ import { uploadLimiter } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 import sharp from 'sharp';
 import { getStorage } from '../storage/factory.js';
+import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +26,7 @@ const uploadDirCandidates = [
   path.join(process.cwd(), 'tmp', 'uploads'),
 ];
 const uploadDir =
-  uploadDirCandidates.find((p) => fs.existsSync(path.dirname(p))) || uploadDirCandidates[0];
+  uploadDirCandidates.find((p) => fs.existsSync(path.dirname(p))) ?? uploadDirCandidates[0]!;
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -116,7 +117,8 @@ router.post('/', authRequired, uploadLimiter, upload.single('file'), async (req,
   }
 
   // 文件名格式 <userId>_<timestamp>.<ext>（与 app.ts UPLOAD_NAME_RE 白名单一致）
-  const filename = `${req.currentUser!.id}_${Date.now()}${ext}`;
+  const userId = req.currentUser?.id ?? 0;
+  const filename = `${userId}_${Date.now()}${ext}`;
   const filePath = path.join(uploadDir, filename);
 
   let mainBuf: Buffer = buffer;
@@ -127,7 +129,7 @@ router.post('/', authRequired, uploadLimiter, upload.single('file'), async (req,
     mainBuf = compressed.mainBuf;
     thumbBuf = compressed.thumbBuf;
   } catch (err) {
-    console.error('[upload] 压缩/缩略图生成失败，保留原图:', err);
+    logger.error('图片压缩/缩略图生成失败，保留原图', { error: err instanceof Error ? err.message : String(err) });
   }
 
   // 走 Storage 抽象：把原图 + 缩略图都 put 进去（local 时仍是同目录；s3 时推到 S3）
@@ -143,7 +145,7 @@ router.post('/', authRequired, uploadLimiter, upload.single('file'), async (req,
     }
   } catch (err: any) {
     // 写 storage 失败：local 时写回磁盘本身（路径已在），s3 时无法恢复；返回错误
-    console.error('[upload] storage.put 失败:', err);
+    logger.error('Storage 写入失败', { error: err instanceof Error ? err.message : String(err) });
     if (process.env.STORAGE_DRIVER === 's3') {
       return fail(res, '存储服务写入失败');
     }

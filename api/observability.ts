@@ -5,6 +5,7 @@
  * 需在所有业务模块导入前执行（本文件由 server.ts 首行导入）。
  */
 import * as Sentry from '@sentry/node';
+import { logger } from './utils/logger.js';
 
 export function initObservability(): void {
   const dsn = process.env.SENTRY_DSN?.trim();
@@ -15,7 +16,7 @@ export function initObservability(): void {
     // 只收错误，不开性能采样（需要时再加 tracesSampleRate）
     tracesSampleRate: 0,
   });
-  console.log('[sentry] 已启用错误上报');
+  logger.info('Sentry 错误上报已启用');
 }
 
 /** 便捷导出：错误中间件/异步任务里直接调用，未启用时静默跳过 */

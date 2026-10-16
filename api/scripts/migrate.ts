@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import type { Database as DB } from '../db/types.js';
 import { up } from '../db/migrations/0001_initial.js';
+import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,10 +39,10 @@ async function main() {
   const db = buildDb();
   try {
     await up(db);
-    console.log('[migrate] up ok');
+    logger.info('数据库迁移完成');
   } finally {
     await db.destroy();
   }
 }
 
-main().catch((e) => { console.error('[migrate] error:', e); process.exit(1); });
+main().catch((e) => { logger.error('数据库迁移失败', { error: e }); process.exit(1); });

@@ -9,9 +9,15 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
+import compression from 'compression'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+// 导入配置和日志系统
+import { config, derivedConfig } from './config.js'
+import { requestLogger, errorLogger } from './utils/logger.js'
+import { metricsMiddleware, register } from './utils/metrics.js'
 
 import './db.js'
 import { db } from './db.js'
@@ -19,6 +25,7 @@ import { getStorage } from './storage/index.js'
 import { stats as wsStats } from './ws/hub.js'
 import { buildOpenApiDocument, swaggerHtml } from './openapi/document.js'
 import { captureError } from './observability.js'
+import { cacheStats } from './utils/cache.js'
 import crypto from 'crypto'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
@@ -61,22 +68,22 @@ app.use((_req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block')
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
   res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'self'; frame-ancestors 'self'")
-  if (process.env.NODE_ENV === 'production') {
+  if (config.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains')
   }
   next()
 })
 
-// CORS 允许域（逗号分隔，默认本地前端）；生产环境通过 CORS_ORIGIN 注入真实域名白名单
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean)
+// CORS 配置（使用经过验证的配置）
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: derivedConfig.allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Authorization', 'Content-Type'],
 }))
+
+// HTTP 响应压缩
+app.use(compression())
+
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
@@ -96,14 +103,10 @@ app.get('/uploads/:file', (req: Request, res: Response) => {
 })
 
 /**
- * 简易请求日志（生产环境也保留，便于排查问题）
+ * 结构化请求日志（使用 Winston）与 Prometheus 性能度量监控
  */
-app.use((req, _res, next) => {
-  if (req.path !== '/api/health') {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`)
-  }
-  next()
-})
+app.use(requestLogger())
+app.use(metricsMiddleware())
 
 /**
  * 请求 ID：为每个请求分配 UUID 并通过响应头 X-Request-Id 回传，
@@ -177,6 +180,18 @@ app.get('/api/docs', (_req: Request, res: Response) => {
 })
 
 /**
+ * Prometheus 监控指标导出端点 (OpenMetrics / Prometheus 格式)
+ */
+app.get('/metrics', async (_req: Request, res: Response) => {
+  try {
+    res.setHeader('Content-Type', register.contentType)
+    res.send(await register.metrics())
+  } catch (err) {
+    res.status(500).send(err instanceof Error ? err.message : String(err))
+  }
+})
+
+/**
  * 健康检查（升级版）：db / storage / ws 三路探测 + uptime/version + 5xx 计数
  * - 匿名可访问（位于鉴权之前），供负载均衡 / 监控轮询
  * - db/storage 探测失败时整体 status=degraded，但不抛 500（健康检查自身必须活着）
@@ -216,6 +231,7 @@ app.use('/api/health', (_req: Request, res: Response) => {
       db: { driver: dbDriver, ok: dbOk },
       storage: { mode: storageMode, ok: storageOk },
       ws: wsStats(),
+      cache: cacheStats(),
       errors: { count5xx: error5xxCount },
       health: {
         uptimeSec: Math.round(process.uptime()),
@@ -246,15 +262,17 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 /**
+ * 错误日志中间件（使用 Winston）
+ */
+app.use(errorLogger())
+
+/**
  * 错误处理中间件
  * - MulterError：文件大小/类型错误，原属 4xx 客户端错误，必须用真 HTTP 400
  *   之前误用 res.status(200).json({code:400})，会让 axios/前端拦截器把 4xx 业务错当成功处理（guest-newbie P2-15 + admin-security P3-15 同根）
  * - 其他错误：生产环境统一返回「服务异常，请稍后重试」避免泄露堆栈/SQL/路径，细节仅进日志
  */
 app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
-  // 完整 stack 进日志，便于排查；响应只暴露安全的客户端错
-  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} Server Error:`, error)
-
   // multer 文件大小/类型错误
   if (error.name === 'MulterError') {
     const msg = (error as any).code === 'LIMIT_FILE_SIZE' ? '文件大小超过 5MB 限制' : error.message
@@ -267,8 +285,7 @@ app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
   }
 
   // 其余一律 5xx：生产环境隐藏细节，开发环境保留 message 便于调试
-  const isProd = process.env.NODE_ENV === 'production'
-  const safeMessage = isProd ? '服务异常，请稍后重试' : (error.message || '服务器内部错误')
+  const safeMessage = derivedConfig.isProduction ? '服务异常，请稍后重试' : (error.message || '服务器内部错误')
   // Sentry 已启用（SENTRY_DSN 配置）时上报服务端错误；未启用为 no-op
   captureError(error, { path: req.path, method: req.method })
   res.status(500).json({ code: 500, message: safeMessage, data: null })

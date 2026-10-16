@@ -8,6 +8,7 @@ import { db } from '../../db.js';
 import { sendTo, sendToConv } from '../hub.js';
 import { MessageAck, MessageIncoming } from '../protocol.js';
 import { upsertNotification } from '../../utils/notification.js';
+import { logger } from '../../utils/logger.js';
 
 export interface DispatchMeta {
   /** WS 发送的回执关联 id（REST 路径无此 id，跳过 ack） */
@@ -77,7 +78,7 @@ export function dispatchChatMessage(conv: ConvRow, senderId: number, content: st
     const sender = db.prepare('SELECT nickname FROM users WHERE id = ?').get(senderId) as any;
     upsertNotification(peerId, 'chat', `${sender?.nickname ?? ''}：${content}`, conv.id);
   } catch (err: any) {
-    console.error('私信通知失败:', err?.message);
+    logger.error('私信通知失败', { error: err?.message });
   }
 
   return { messageId, convId: conv.id, peerId, createdAt };

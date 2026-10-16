@@ -8,6 +8,8 @@ import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail, unauthorized, forbidden } from '../utils/response.js';
 import { cacheInvalidate } from '../utils/cache.js';
+import { validate, adminSchemas, commonSchemas } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -82,7 +84,10 @@ router.get('/users', superOnly, (req, res) => {
 });
 
 // 封禁/解封用户（duration：'1'|'7'|'30' 天数或 'forever'，空 = 永久）
-router.put('/users/:id/ban', superOnly, (req, res) => {
+router.put('/users/:id/ban', superOnly, validate({ 
+  params: commonSchemas.id,
+  body: adminSchemas.banUser 
+}), (req, res) => {
   const id = Number(req.params.id);
   const { action, reason, duration } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
@@ -98,6 +103,8 @@ router.put('/users/:id/ban', superOnly, (req, res) => {
     db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ? WHERE id = ?').run(
       'banned', reason || '违规', banUntil, id
     );
+    
+    logger.warn('用户被封禁', { targetUserId: id, adminId: req.currentUser!.id, reason, duration });
     // 通知用户
     db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
       id, 'system', `您的账号已被封禁，原因：${reason || '违规'}${banUntil ? `，解封时间：${new Date(banUntil).toLocaleString('zh-CN')}` : '，永久封禁'}`

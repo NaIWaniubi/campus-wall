@@ -214,11 +214,33 @@ export const subscriptionApi = {
   toggle: (sectionId: number) => request.post(`/subscriptions/${sectionId}`),
 }
 
-// 二手交易互评
+// 二手交易互评 + 意向出价
 export const tradeApi = {
   complete: (postId: number, buyerId?: number) => request.post(`/trades/${postId}/complete`, buyerId ? { buyerId } : {}),
   myRating: (postId: number) => request.get(`/trades/${postId}/my-rating`),
   rate: (postId: number, data: { targetUserId?: number; rating: number; comment?: string }) =>
     request.post(`/trades/${postId}/rate`, data),
   ratingsOf: (userId: number) => request.get(`/users/${userId}/trade-ratings`),
+  // 意向出价（闪电意向撮合闭环）
+  createOffer: (postId: number, data: { offerPrice: number; message?: string }) =>
+    request.post(`/trades/${postId}/offers`, data),
+  offers: (postId: number) => request.get(`/trades/${postId}/offers`),
+  acceptOffer: (offerId: number) => request.post(`/trades/offers/${offerId}/accept`),
+  rejectOffer: (offerId: number) => request.post(`/trades/offers/${offerId}/reject`),
+  cancelOffer: (offerId: number) => request.post(`/trades/offers/${offerId}/cancel`),
+}
+
+// 智能雷达（失物招领相似帖）
+export interface RadarMatchItem {
+  postId: number
+  title: string
+  excerpt: string
+  direction: string
+  score: number
+  reasons: string[]
+  createdAt: string
+}
+
+export const radarApi = {
+  matches: (postId: number) => request.get(`/posts/${postId}/radar`),
 }

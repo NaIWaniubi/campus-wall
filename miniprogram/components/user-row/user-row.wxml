@@ -1,5 +1,5 @@
 <view class="user-row">
-  <image class="avatar" src="{{user.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+  <image class="avatar" src="{{user.avatar || '/images/default_avatar.png'}}" mode="aspectFill" lazy-load></image>
   <view class="user-main">
     <view class="nickname-row">
       <text class="nickname">{{user.nickname}}</text>

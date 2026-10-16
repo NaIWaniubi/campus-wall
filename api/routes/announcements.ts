@@ -55,7 +55,7 @@ router.post('/:id/ack', authRequired, ackLimiter, (req, res) => {
 router.use(authRequired, superAdminRequired);
 
 // 公告列表
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
   const rows = db.prepare(`
     SELECT * FROM announcements ORDER BY created_at DESC LIMIT 50
   `).all() as any[];

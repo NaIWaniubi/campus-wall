@@ -3,7 +3,7 @@
     <view class="profile-bg"></view>
     <view class="profile-info card">
       <view class="profile-main flex-row">
-        <image class="profile-avatar" src="{{userInfo.avatar || '/images/default_avatar.png'}}" mode="aspectFill" bindtap="onGoProfile"></image>
+        <image class="profile-avatar" src="{{userInfo.avatar || '/images/default_avatar.png'}}" mode="aspectFill" lazy-load bindtap="onGoProfile"></image>
         <view class="profile-detail flex-1">
           <view class="profile-name-row flex-row">
             <text class="profile-name">{{userInfo.nickname || '未登录'}}</text>
@@ -50,7 +50,7 @@
       </view>
     </view>
     <view class="tr-item" wx:for="{{tradeRatings.list}}" wx:key="id" bindtap="onTapRatingPost" data-postid="{{item.postId}}">
-      <image class="tr-avatar" src="{{item.rater.avatar || '/images/default_avatar.png'}}" mode="aspectFill"></image>
+      <image class="tr-avatar" src="{{item.rater.avatar || '/images/default_avatar.png'}}" mode="aspectFill" lazy-load></image>
       <view class="tr-body flex-1">
         <view class="tr-row flex-between">
           <text class="tr-name">{{item.rater.nickname || '匿名同学'}}</text>

@@ -98,16 +98,16 @@ async function handleSubmit() {
 
       <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">学号 <span class="text-red-500">*</span></label>
-          <input v-model="form.studentId" type="text" inputmode="numeric" maxlength="12" placeholder="6-12位数字"
+          <label for="reg-student-id" class="block text-sm font-medium text-zinc-700 mb-1.5">学号 <span class="text-red-500">*</span></label>
+          <input id="reg-student-id" aria-required="true" v-model="form.studentId" autocomplete="username" type="text" inputmode="numeric" maxlength="12" placeholder="6-12位数字"
             class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
           <p v-if="errors.studentId" class="text-xs text-red-500 mt-1">{{ errors.studentId }}</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">密码 <span class="text-red-500">*</span></label>
+          <label for="reg-password" class="block text-sm font-medium text-zinc-700 mb-1.5">密码 <span class="text-red-500">*</span></label>
           <div class="relative">
-            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="至少6位"
+            <input id="reg-password" aria-required="true" v-model="form.password" autocomplete="new-password" :type="showPassword ? 'text' : 'password'" placeholder="至少6位"
               class="w-full px-4 py-2.5 pr-11 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition"
               @keyup.enter="handleSubmit" />
             <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600" @click="showPassword = !showPassword">
@@ -119,29 +119,29 @@ async function handleSubmit() {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">确认密码 <span class="text-red-500">*</span></label>
-          <input v-model="form.confirmPassword" type="password" placeholder="再次输入密码"
+          <label for="reg-confirm" class="block text-sm font-medium text-zinc-700 mb-1.5">确认密码 <span class="text-red-500">*</span></label>
+          <input id="reg-confirm" aria-required="true" v-model="form.confirmPassword" autocomplete="new-password" type="password" placeholder="再次输入密码"
             class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition"
             @keyup.enter="handleSubmit" />
           <p v-if="errors.confirmPassword" class="text-xs text-red-500 mt-1">{{ errors.confirmPassword }}</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">昵称 <span class="text-red-500">*</span></label>
-          <input v-model="form.nickname" type="text" maxlength="20" placeholder="给自己起个名字"
+          <label for="reg-nickname" class="block text-sm font-medium text-zinc-700 mb-1.5">昵称 <span class="text-red-500">*</span></label>
+          <input id="reg-nickname" aria-required="true" v-model="form.nickname" autocomplete="nickname" type="text" maxlength="20" placeholder="给自己起个名字"
             class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
           <p v-if="errors.nickname" class="text-xs text-red-500 mt-1">{{ errors.nickname }}</p>
         </div>
 
         <div>
           <label class="block text-sm font-medium text-zinc-700 mb-1.5">学院</label>
-          <input v-model="form.college" type="text" maxlength="50" placeholder="如：计算机学院"
+          <input id="reg-college" v-model="form.college" autocomplete="organization" type="text" maxlength="50" placeholder="如：计算机学院"
             class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
         </div>
 
         <div>
           <label class="block text-sm font-medium text-zinc-700 mb-1.5">年级</label>
-          <input v-model="form.grade" type="text" maxlength="20" placeholder="如：2023级"
+          <input id="reg-grade" v-model="form.grade" autocomplete="off" type="text" maxlength="20" placeholder="如：2023级"
             class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
         </div>
 

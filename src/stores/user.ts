@@ -38,6 +38,10 @@ export const useUserStore = defineStore('user', {
     },
   },
   actions: {
+    /** 替换本地 token：改密后服务端签发新 token（旧 token 已因 token_version 递增失效） */
+    setToken(token: string) {
+      this.token = token
+    },
     async login(studentId: string, password: string) {
       const res: any = await request.post('/auth/login', { studentId, password })
       this.token = res.data.token

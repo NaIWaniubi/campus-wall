@@ -189,10 +189,14 @@ async function savePassword() {
   }
   savingPassword.value = true
   try {
-    await authApi.updatePassword({
+    const res: any = await authApi.updatePassword({
       oldPassword: pwdForm.oldPassword,
       newPassword: pwdForm.newPassword,
     })
+    // 服务端改密后旧 token 立即失效（token_version 递增），必须换用返回的新 token，
+    // 否则当前设备会在下一次请求时被 401 踢下线
+    const newToken = res?.data?.token || res?.token
+    if (newToken) userStore.setToken(newToken)
     toast.success('密码已修改')
     pwdForm.oldPassword = ''
     pwdForm.newPassword = ''

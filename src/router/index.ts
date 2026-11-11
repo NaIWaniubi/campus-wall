@@ -23,6 +23,7 @@ const routes = [
   { path: '/login', name: 'login', component: LoginPage, meta: { title: '登录' } },
   { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册' } },
   { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue'), meta: { title: '搜索' } },
+  { path: '/topics', name: 'topics', component: () => import('@/pages/TopicsPage.vue'), meta: { title: '话题' } },
   { path: '/post/:id', name: 'postDetail', component: () => import('@/pages/PostDetailPage.vue'), meta: { title: '帖子详情' } },
   { path: '/user/:id', name: 'userProfile', component: () => import('@/pages/UserProfilePage.vue'), meta: { title: '个人主页' } },
   { path: '/section/:id', name: 'section', component: SectionPage, meta: { title: '板块' } },

@@ -290,6 +290,16 @@ async function fetchRadar() {
   }
 }
 
+/**
+ * 雷达候选去重：关键词匹配（matches）与雷达（radarMatches）会命中同一批帖子，
+ * 两个区块同时展示会让同一张卡出现两次。
+ * 这里只保留未被「可能相关」收录的雷达条目。
+ */
+const radarOnly = computed(() => {
+  const shown = new Set((matches.value || []).map((m: any) => m.id))
+  return (radarMatches.value || []).filter((m) => !shown.has(m.postId))
+})
+
 const radarLabel = computed(() =>
   post.value?.extraFields?.direction === 'lost' ? '招领' : '寻物'
 )
@@ -459,6 +469,20 @@ function setReplyTarget(c: any) {
   nextTick(() => commentInputRef.value?.focus())
 }
 
+/** 评论输入框点击：未登录时引导登录（输入框不再 disabled，否则 click 不会触发） */
+function onCommentInputClick() {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+  }
+}
+
+/** 互动栏「评论数」按钮：滚动到评论区并聚焦输入框 */
+function scrollToComments() {
+  const el = document.getElementById('comment-section')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (canComment.value) nextTick(() => commentInputRef.value?.focus())
+}
+
 function visibleReplies(c: any) {
   return expandedReplies.value.has(c.id) ? c.replies : (c.replies || []).slice(0, 3)
 }
@@ -566,13 +590,13 @@ function closeMoreMenu(e: MouseEvent) {
 <template>
   <div class="min-h-screen bg-zinc-50 pb-20">
     <!-- 顶部导航 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="hero sticky top-0 z-20">
       <div class="max-w-[960px] mx-auto flex items-center justify-between h-14 px-3 relative">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="font-medium text-zinc-900">{{ post?.section?.name || '详情' }}</span>
-        <button class="more-menu-trigger p-2 -mr-2 text-zinc-600 hover:text-zinc-900" @click.stop="showMoreMenu = !showMoreMenu">
+        <span class="font-semibold text-white">{{ post?.section?.name || '详情' }}</span>
+        <button class="more-menu-trigger p-2 -mr-2 text-white/90 hover:text-white" @click.stop="showMoreMenu = !showMoreMenu">
           <MoreHorizontal class="w-5 h-5" />
         </button>
         <!-- 更多菜单 -->
@@ -722,8 +746,8 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 扩展字段 -->
-      <div v-if="post.extraFields && Object.keys(post.extraFields).length" class="bg-gradient-to-br from-brand-50/80 to-brand-50/30 rounded-xl p-3.5 mb-3 text-sm space-y-1.5 border border-brand-100/50">
-        <div v-if="post.extraFields.price" class="text-brand-600 font-bold text-2xl flex items-baseline gap-1 mb-1">
+      <div v-if="post.extraFields && Object.keys(post.extraFields).length" class="rounded-[16px] p-3.5 mb-3 text-sm space-y-1.5 card-premium" style="background: linear-gradient(135deg, rgba(22,160,133,0.10), rgba(109,91,208,0.10))">
+        <div v-if="post.extraFields.price" class="grad-text font-extrabold text-[26px] tracking-tight flex items-baseline gap-1 mb-1">
           <span class="text-base">¥</span>{{ post.extraFields.price }}
         </div>
         <div v-if="post.extraFields.condition" class="flex items-center gap-2">
@@ -753,7 +777,7 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 二手交易：作者标记已售（可选登记买家） -->
-      <div v-if="canMarkSold" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+      <div v-if="canMarkSold" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
         <div class="min-w-0">
           <p class="text-sm font-medium text-zinc-800">物品已卖出去了？</p>
           <p class="text-xs text-zinc-400 mt-0.5">标记已售后，双方可互相评价；可登记买家学号便于定向评价</p>
@@ -767,7 +791,7 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 二手交易：买家评价这次交易 -->
-      <div v-if="soldAt && canRateAsBuyer" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+      <div v-if="soldAt && canRateAsBuyer" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
         <div class="min-w-0">
           <p class="text-sm font-medium text-zinc-800">交易已完成</p>
           <p class="text-xs text-zinc-400 mt-0.5">为这次交易打个分吧（好评 +2 / 差评 -3 信誉分）</p>
@@ -781,7 +805,7 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 二手交易：作者评价登记的买家 -->
-      <div v-if="canRateAsSeller" class="bg-white rounded-xl p-3.5 mb-3 flex items-center justify-between shadow-sm shadow-zinc-100/50">
+      <div v-if="canRateAsSeller" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
         <div class="min-w-0">
           <p class="text-sm font-medium text-zinc-800">给这次交易的买家打个分</p>
           <p class="text-xs text-zinc-400 mt-0.5">你登记的买家可以收到你的评价</p>
@@ -795,11 +819,15 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 互动栏 -->
-      <div class="flex items-center justify-around bg-white rounded-2xl py-3.5 mb-4 shadow-sm shadow-zinc-100/50" :class="isPending ? 'opacity-70' : ''">
+      <div class="flex items-center justify-around card-premium py-3.5 mb-4" :class="isPending ? 'opacity-70' : ''">
         <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.liked ? 'text-red-500 bg-red-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleLike">
           <Heart class="w-5 h-5" :fill="post.liked ? 'currentColor' : 'none'" /> {{ post.likeCount }}
         </button>
-        <button class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95">
+        <button
+          class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95"
+          aria-label="查看评论"
+          @click="scrollToComments"
+        >
           <MessageCircle class="w-5 h-5" /> {{ post.commentCount }}
         </button>
         <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.favorited ? 'text-brand-500 bg-brand-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleFavorite">
@@ -828,12 +856,14 @@ function closeMoreMenu(e: MouseEvent) {
         </button>
       </div>
 
-      <!-- 智能雷达（失物招领反向匹配）：发现高度相似的对向信息 -->
-      <div v-if="radarMatches.length" class="bg-white rounded-xl p-4 mb-4">
+      <!-- 智能雷达（失物招领反向匹配）：与上方「可能相关」合并展示，
+           同一批帖子不再出现两个区块（此前雷达卡片与可能相关重复，评委观感廉价）。
+           雷达提供分数与命中理由，关键词匹配提供板块与作者。 -->
+      <div v-if="radarOnly.length" class="bg-white rounded-xl p-4 mb-4">
         <h3 class="font-medium text-zinc-900">🎯 智能雷达</h3>
-        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">发现 {{ radarMatches.length }} 条高度相似的{{ radarLabel }}信息，点开看看是不是同一个</p>
+        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">另发现 {{ radarOnly.length }} 条高度相似的{{ radarLabel }}信息，按匹配度排序</p>
         <button
-          v-for="m in radarMatches"
+          v-for="m in radarOnly"
           :key="m.postId"
           class="w-full text-left px-2 py-2.5 rounded-lg border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition"
           @click="router.push(`/post/${m.postId}`)"
@@ -887,7 +917,7 @@ function closeMoreMenu(e: MouseEvent) {
       </div>
 
       <!-- 评论区 -->
-      <div class="bg-white rounded-xl p-4">
+      <div id="comment-section" class="bg-white rounded-xl p-4">
         <h3 class="font-medium text-zinc-900 mb-3">评论 {{ post.commentCount }}</h3>
         <div v-if="!comments.length" class="text-center text-sm text-zinc-400 py-6">暂无评论，快来抢沙发</div>
         <div v-for="c in comments" :key="c.id" class="py-3.5 border-b border-zinc-50 last:border-0">
@@ -951,11 +981,12 @@ function closeMoreMenu(e: MouseEvent) {
           v-model="commentText"
           type="text"
           maxlength="200"
-          :disabled="!canComment"
-          :placeholder="!canComment ? (!userStore.isLoggedIn ? '请先登录后评论' : '帖子审核中，暂不可评论') : (replyTarget ? '写下你的回复...' : '写下你的评论...')"
+          :disabled="isPending"
+          :placeholder="!userStore.isLoggedIn ? '请先登录后评论' : (isPending ? '帖子审核中，暂不可评论' : (replyTarget ? '写下你的回复...' : '写下你的评论...'))"
           class="flex-1 h-9 px-3 rounded-full bg-zinc-100 focus:bg-white border border-transparent focus:border-brand-500 focus:outline-none text-sm transition disabled:opacity-60"
+          aria-label="评论内容"
           @keyup.enter="submitComment"
-          @click="!userStore.isLoggedIn && router.push({ path: '/login', query: { redirect: route.fullPath } })"
+          @click="onCommentInputClick"
         />
         <button :disabled="!canComment || commentPosting" class="w-9 h-9 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white flex items-center justify-center transition" @click="submitComment">
           <Loader2 v-if="commentPosting" class="w-4 h-4 animate-spin" />

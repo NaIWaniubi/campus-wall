@@ -176,7 +176,7 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-zinc-50 pb-6">
     <!-- 顶部用户信息卡片 -->
-    <header class="bg-gradient-to-b from-brand-500 to-brand-600 text-white px-4 pt-8 pb-12">
+    <header class="hero text-white px-4 pt-8 pb-12">
       <div class="max-w-[960px] mx-auto">
         <div class="flex items-center gap-4">
           <!-- 头像 -->

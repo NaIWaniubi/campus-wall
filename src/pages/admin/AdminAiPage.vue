@@ -3,28 +3,9 @@
  * AI 设置：官网知识库在线编辑、模型切换、调用量统计
  */
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  LayoutDashboard, Users, FileCheck, MessageSquare, Flag, LayoutGrid,
-  Home, LogOut, Megaphone, Bot, Save, RotateCcw,
-} from '@lucide/vue'
+import { Save, RotateCcw } from '@lucide/vue'
 import { adminAiApi } from '@/utils/api'
-import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
-
-const router = useRouter()
-const userStore = useUserStore()
-
-const navItems = [
-  { name: '数据看板', path: '/admin', icon: LayoutDashboard },
-  { name: '用户管理', path: '/admin/users', icon: Users },
-  { name: '内容审核', path: '/admin/posts', icon: FileCheck },
-  { name: '评论管理', path: '/admin/comments', icon: MessageSquare },
-  { name: '举报处理', path: '/admin/reports', icon: Flag },
-  { name: '板块管理', path: '/admin/sections', icon: LayoutGrid },
-  { name: '公告管理', path: '/admin/announcements', icon: Megaphone },
-  { name: 'AI 设置', path: '/admin/ai', icon: Bot },
-]
 
 const loading = ref(true)
 const savingKb = ref(false)
@@ -91,59 +72,11 @@ async function saveModel() {
   }
 }
 
-function logout() {
-  userStore.logout()
-  router.replace('/admin/login')
-}
-
 onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 lg:flex">
-    <!-- 侧栏 -->
-    <aside class="hidden lg:flex w-52 bg-white border-r border-zinc-100 flex-col fixed inset-y-0 left-0">
-      <div class="px-4 py-5 border-b border-zinc-100">
-        <h2 class="text-base font-bold text-brand-600 flex items-center gap-2">
-          <Bot class="w-5 h-5" /> 校园墙后台
-        </h2>
-      </div>
-      <nav class="flex-1 py-2">
-        <RouterLink v-for="item in navItems" :key="item.path" :to="item.path"
-          class="flex items-center gap-2.5 mx-2 px-3 py-2.5 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50"
-          active-class="!bg-brand-50 !text-brand-600 font-medium">
-          <component :is="item.icon" class="w-4 h-4" /> {{ item.name }}
-        </RouterLink>
-      </nav>
-      <div class="p-3 border-t border-zinc-100 space-y-1">
-        <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 rounded-lg" @click="router.push('/')">
-          <Home class="w-4 h-4" /> 返回前台
-        </button>
-        <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg" @click="logout">
-          <LogOut class="w-4 h-4" /> 退出
-        </button>
-      </div>
-    </aside>
-
-    <!-- 移动端顶栏 -->
-    <header class="lg:hidden sticky top-0 z-10 bg-white border-b border-zinc-100">
-      <div class="flex items-center px-4 h-12">
-        <h2 class="font-bold text-brand-600">校园墙后台</h2>
-        <div class="ml-auto flex items-center gap-1">
-          <span class="text-sm text-zinc-500">{{ userStore.user?.nickname }}</span>
-        </div>
-      </div>
-      <nav class="flex overflow-x-auto scrollbar-hide px-2 border-t border-zinc-50">
-        <RouterLink v-for="item in navItems" :key="item.path" :to="item.path"
-          class="flex items-center gap-1 px-3 py-2 text-xs whitespace-nowrap text-zinc-600"
-          active-class="!text-brand-600 font-medium">
-          <component :is="item.icon" class="w-3.5 h-3.5" /> {{ item.name }}
-        </RouterLink>
-      </nav>
-    </header>
-
-    <main class="flex-1 lg:ml-52">
-      <div class="max-w-5xl mx-auto p-4 lg:p-6 space-y-4">
+  <div class="max-w-5xl mx-auto p-4 lg:p-6 space-y-4">
         <!-- 页头 -->
         <div>
           <h1 class="text-xl lg:text-2xl font-bold text-zinc-900">AI 设置</h1>
@@ -217,7 +150,5 @@ onMounted(load)
             </div>
           </div>
         </template>
-      </div>
-    </main>
   </div>
 </template>

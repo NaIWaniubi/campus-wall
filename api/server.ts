@@ -8,15 +8,40 @@ import app, { reportBackup } from './app.js';
 import { runDailyDigest } from './jobs/dailyDigest.js';
 import { runBackup, countBackups } from './jobs/backup.js';
 import { attachWebSocket } from './ws/server.js';
+import { db } from './db.js';
 import { logger } from './utils/logger.js';
 
 // Sentry 等可观测性：SENTRY_DSN 未配置时 no-op，需尽量早执行
 initObservability();
 
-// 全局未捕获异常兜底：避免单条同步/异步异常直接拖死进程
+/**
+ * 未捕获异常策略：
+ * Node 明确指出 uncaughtException 之后进程状态不可信，长期带病运行会积累脏状态；
+ * 但演示场景又不能因一条偶发异常直接挂掉。折中方案：
+ * - 记录 + 上报（保留可观测性）
+ * - 60s 内累计超过 3 次判定为系统性故障，走优雅退出交给进程管理器拉起
+ * - 低于阈值时继续服务
+ */
+let uncaughtCount = 0;
+let uncaughtWindowStart = Date.now();
+const UNCAUGHT_LIMIT = 3;
+const UNCAUGHT_WINDOW_MS = 60_000;
+
 process.on('uncaughtException', (err) => {
   logger.error('未捕获的异常', { error: err.message, stack: err.stack });
   captureError(err);
+
+  const now = Date.now();
+  if (now - uncaughtWindowStart > UNCAUGHT_WINDOW_MS) {
+    uncaughtWindowStart = now;
+    uncaughtCount = 0;
+  }
+  uncaughtCount++;
+
+  if (uncaughtCount > UNCAUGHT_LIMIT) {
+    logger.error('未捕获异常过于频繁，判定为系统性故障，准备退出', { count: uncaughtCount });
+    gracefulShutdown('uncaughtException', 1);
+  }
 });
 process.on('unhandledRejection', (err) => {
   logger.error('未处理的 Promise 拒绝', { error: err instanceof Error ? err.message : String(err) });
@@ -33,13 +58,15 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
   logger.warn('CORS_ORIGIN 未设置，仅允许 localhost 跨域；生产域名请求将被 CORS 拒绝，请尽快配置环境变量');
 }
 
-const server = app.listen(PORT, () => {
+// 显式绑定 0.0.0.0：云平台健康检查从容器外访问，绑 127.0.0.1 会直接 502
+const server = app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info('服务器启动成功', { port: PORT, env: process.env.NODE_ENV });
 });
 
 // 挂 WebSocket（路径 /ws）；REST 路由不受影响
+let wss: ReturnType<typeof attachWebSocket> | null = null;
 if (process.env.WS_ENABLED !== '0') {
-  attachWebSocket(server);
+  wss = attachWebSocket(server);
 }
 
 /**
@@ -118,19 +145,46 @@ if (process.env.BACKUP_NOW === '1') {
 }
 
 /**
- * close server
+ * 优雅退出：
+ * 1. 停止接受新连接（server.close）
+ * 2. 关闭所有 WebSocket（否则 keep-alive 连接会让 close 永远等不到）
+ * 3. 做一次 WAL checkpoint，把 -wal 合并回主库（否则下次启动要回放，且备份可能漏数据）
+ * 4. 关闭数据库句柄
  */
-const shutdown = (sig: string) => {
+let shuttingDown = false;
+function gracefulShutdown(sig: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   logger.info('收到关闭信号，准备关闭服务器', { signal: sig });
-  server.close(() => {
-    logger.info('服务器已关闭');
-    process.exit(0);
-  });
-  // Force-exit if not closed in 10s
-  setTimeout(() => process.exit(1), 10_000).unref();
-};
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+  try {
+    if (wss) {
+      for (const client of wss.clients) {
+        try { client.terminate(); } catch { /* noop */ }
+      }
+      wss.close();
+    }
+  } catch (e: any) {
+    logger.warn('关闭 WebSocket 失败', { error: e?.message });
+  }
+
+  server.close(() => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+      logger.info('数据库已 checkpoint 并关闭');
+    } catch (e: any) {
+      logger.warn('关闭数据库失败', { error: e?.message });
+    }
+    logger.info('服务器已关闭');
+    process.exit(exitCode);
+  });
+
+  // 兜底：10s 内没关干净就强退（避免部署卡在 stopping）
+  setTimeout(() => process.exit(exitCode || 1), 10_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

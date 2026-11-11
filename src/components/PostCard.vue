@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { MessageCircle, Heart, Eye, Bookmark } from '@lucide/vue'
 import { formatTime } from '@/utils/helpers'
 import CreditBadge from '@/components/CreditBadge.vue'
+import { sectionColor, sectionGradient } from '@/utils/sections'
 
 const props = defineProps<{
   post: any
@@ -19,6 +20,9 @@ const author = computed(() => props.post.author || {})
 const section = computed(() => props.post.section || {})
 const images = computed(() => props.post.images || [])
 const thumbs = computed(() => props.post.thumbImages || [])
+/** 分类标签配色（对齐原生小程序分类色标签） */
+const catColor = computed(() => sectionColor(section.value?.id, section.value?.name))
+const catGradient = computed(() => sectionGradient(section.value?.id, section.value?.name))
 
 // 缩略图加载失败（旧图未生成缩略图）时回退原图
 function onThumbError(e: Event, fallback: string) {
@@ -48,64 +52,79 @@ function highlight(text: string): string {
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl p-4 shadow-sm shadow-zinc-100/50 hover:shadow-md hover:shadow-zinc-200/50 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer active:bg-zinc-50/50" @click="goDetail">
-    <!-- 作者信息 -->
-    <div class="flex items-center gap-3 mb-3">
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
-        <img v-if="author.avatar" :src="author.avatar" class="w-full h-full object-cover" loading="lazy" decoding="async" alt="头像" />
-        <span v-else class="text-sm font-bold text-brand-700">{{ author.nickname?.charAt(0) || '匿' }}</span>
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-1.5">
-          <span class="text-sm font-semibold text-zinc-900 truncate">{{ author.nickname || '匿名用户' }}</span>
-          <CreditBadge v-if="!post.isAnonymous && author.creditScore != null" :score="author.creditScore" size="sm" />
-          <span v-if="post.isTop" class="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-medium border border-red-100">置顶</span>
+  <!-- 卡片主体可点击：div 必须补 role/tabindex 与 Enter/Space 处理，否则键盘用户无法打开任何帖子 -->
+  <div
+    class="card-premium p-4 cursor-pointer active:scale-[0.997] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+    role="button"
+    tabindex="0"
+    :aria-label="`查看帖子：${post.title}`"
+    @click="goDetail"
+    @keydown.enter.prevent="goDetail"
+    @keydown.space.prevent="goDetail"
+  >
+    <!-- 作者信息 + 分类标签（右对齐，对齐原生小程序 post-card 结构） -->
+    <div class="flex items-start justify-between gap-3 mb-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="avatar-ring shrink-0" :style="{ background: catGradient }">
+          <span class="w-9 h-9 bg-white flex items-center justify-center overflow-hidden">
+            <img v-if="author.avatar" :src="author.avatar" class="w-full h-full object-cover" loading="lazy" decoding="async" alt="头像" />
+            <span v-else class="text-sm font-bold" :style="{ color: catColor }">{{ author.nickname?.charAt(0) || '匿' }}</span>
+          </span>
         </div>
-        <div class="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5">
-          <span class="text-brand-600/80">{{ section.name }}</span>
-          <span class="w-0.5 h-0.5 rounded-full bg-zinc-300"></span>
-          <span>{{ formatTime(post.createdAt) }}</span>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm font-semibold text-[#1A1A2E] truncate">{{ author.nickname || '匿名用户' }}</span>
+            <CreditBadge v-if="!post.isAnonymous && author.creditScore != null" :score="author.creditScore" size="sm" />
+            <span v-if="post.isTop" class="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-medium">置顶</span>
+          </div>
+          <div class="text-[11px] text-zinc-400 mt-0.5">{{ formatTime(post.createdAt) }}</div>
         </div>
       </div>
+      <span v-if="section.name" class="cat-tag-grad mt-0.5" :style="{ background: catGradient }">{{ section.name }}</span>
     </div>
 
     <!-- 标题 -->
-    <h3 class="font-bold text-zinc-900 mb-1.5 line-clamp-1 text-[15px]" v-html="highlight(post.title)"></h3>
+    <h3 v-if="post.title" class="font-bold text-[16px] leading-[1.5] text-[#1A1A2E] mb-1.5 line-clamp-1" v-html="highlight(post.title)"></h3>
 
     <!-- 正文 -->
-    <p class="text-sm text-zinc-600 line-clamp-2 mb-3 post-content leading-relaxed" v-html="highlight(post.content)"></p>
+    <p class="text-[14px] text-[#2D3436] leading-[1.7] mb-2.5 post-content" :class="post.title ? 'line-clamp-2' : 'line-clamp-3'" v-html="highlight(post.content)"></p>
 
     <!-- 图片 -->
-    <div v-if="images.length > 0" class="grid grid-cols-3 gap-1.5 mb-3">
-      <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="aspect-square rounded-lg overflow-hidden bg-zinc-100 relative">
-        <img :src="thumbs[i] || img" class="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" alt="" @error="onThumbError($event, img)" />
-        <!-- 第三张上叠加 +N 提示还有更多图片 -->
-        <div v-if="i === 2 && images.length > 3" class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-medium text-lg">
-          +{{ images.length - 3 }}
+    <div v-if="images.length > 0" class="mb-2.5">
+      <div v-if="images.length === 1" class="rounded-lg overflow-hidden bg-zinc-100 max-h-[200px]">
+        <img :src="thumbs[0] || images[0]" class="w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, images[0])" />
+      </div>
+      <div v-else class="grid grid-cols-3 gap-1">
+        <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="h-[100px] rounded-xl overflow-hidden bg-zinc-100 relative group">
+          <img :src="thumbs[i] || img" class="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500" loading="lazy" alt="" @error="onThumbError($event, img)" />
+          <!-- 第三张上叠加 +N 提示还有更多图片 -->
+          <div v-if="i === 2 && images.length > 3" class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-medium text-lg">
+            +{{ images.length - 3 }}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 扩展字段（价格等） -->
-    <div v-if="post.extraFields?.price" class="text-brand-600 font-bold text-lg mb-2.5 flex items-baseline gap-1">
-      <span class="text-sm">¥</span>{{ post.extraFields.price }}
+    <div v-if="post.extraFields?.price" class="grad-text font-extrabold text-[19px] mb-2.5 tracking-tight">
+      ¥{{ post.extraFields.price }}
     </div>
 
     <!-- 互动数据 -->
-    <div class="flex items-center gap-4 text-xs text-zinc-400 pt-2.5 border-t border-zinc-50">
+    <div class="flex items-center gap-5 text-[12px] text-[#7B8794] pt-2.5 border-t border-zinc-100">
       <span class="flex items-center gap-1">
         <Eye class="w-3.5 h-3.5" />
         {{ post.viewCount }}
       </span>
-      <span class="flex items-center gap-1" :class="post.likeCount > 0 ? 'text-red-400' : ''">
-        <Heart class="w-3.5 h-3.5" />
+      <span class="flex items-center gap-1 transition" :style="post.likeCount > 0 ? { color: '#F43F5E' } : undefined">
+        <Heart class="w-3.5 h-3.5" :fill="post.likeCount > 0 ? '#F43F5E' : 'none'" />
         {{ post.likeCount }}
       </span>
-      <span class="flex items-center gap-1" :class="post.commentCount > 0 ? 'text-brand-400' : ''">
+      <span class="flex items-center gap-1 transition" :style="post.commentCount > 0 ? { color: '#3B82F6' } : undefined">
         <MessageCircle class="w-3.5 h-3.5" />
         {{ post.commentCount }}
       </span>
-      <span class="flex items-center gap-1 ml-auto">
+      <span class="flex items-center gap-1 ml-auto transition" :style="post.favoriteCount > 0 ? { color: '#F59E0B' } : undefined">
         <Bookmark class="w-3.5 h-3.5" />
         {{ post.favoriteCount }}
       </span>

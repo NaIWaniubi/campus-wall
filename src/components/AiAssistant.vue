@@ -247,7 +247,7 @@ function goPost(id: number) {
     <!-- 悬浮按钮 -->
     <button
       v-if="!open"
-      class="fixed bottom-24 right-4 z-40 flex items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 transition active:scale-95"
+      class="sa-fab fixed right-4 z-40 flex items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 transition active:scale-95"
       style="height: 52px; width: 52px"
       @click="toggleOpen"
     >
@@ -257,10 +257,10 @@ function goPost(id: number) {
     <!-- 聊天面板 -->
     <div
       v-else
-      class="fixed inset-x-3 bottom-3 z-50 flex max-h-[75vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-200 sm:inset-x-auto sm:right-4 sm:w-96"
+      class="fixed inset-x-3 bottom-3 z-50 flex max-h-[75vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-200 md:inset-x-auto md:right-4 md:w-96"
     >
       <!-- 头部 -->
-      <div class="flex items-center justify-between bg-emerald-500 px-4 py-3 text-white">
+      <div class="flex items-center justify-between bg-brand-500 px-4 py-3 text-white">
         <div class="flex items-center gap-2">
           <Bot class="h-5 w-5" />
           <span class="text-sm font-semibold">AI 助手</span>
@@ -302,7 +302,7 @@ function goPost(id: number) {
               class="whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed"
               :class="
                 msg.role === 'user'
-                  ? 'rounded-br-sm bg-emerald-500 text-white'
+                  ? 'rounded-br-sm bg-brand-500 text-white'
                   : 'rounded-bl-sm bg-white text-zinc-800 ring-1 ring-zinc-200'
               "
               >{{ msg.content }}<span v-if="msg.streaming && !msg.content" class="text-zinc-400">…</span></div
@@ -335,7 +335,7 @@ function goPost(id: number) {
                 <p class="mt-0.5 line-clamp-2 text-xs text-zinc-500">{{ forum.excerpt }}</p>
                 <div class="mt-1.5 flex items-center justify-between text-[11px] text-zinc-400">
                   <span>{{ forum.likeCount }} 赞 · {{ forum.commentCount }} 回复</span>
-                  <span class="flex items-center text-emerald-600">
+                  <span class="flex items-center text-brand-600">
                     去查看/回复 <ChevronRight class="h-3.5 w-3.5" />
                   </span>
                 </div>
@@ -349,7 +349,7 @@ function goPost(id: number) {
           <button
             v-for="s in suggestions"
             :key="s"
-            class="rounded-full bg-white px-3 py-1.5 text-xs text-emerald-600 ring-1 ring-emerald-200 transition active:bg-emerald-50"
+            class="rounded-full bg-white px-3 py-1.5 text-xs text-brand-600 ring-1 ring-brand-200 transition active:bg-brand-50"
             @click="send(s)"
           >
             {{ s }}
@@ -368,7 +368,7 @@ function goPost(id: number) {
           @keydown.enter="send()"
         />
         <button
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white transition active:scale-95 disabled:opacity-50"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white transition active:scale-95 disabled:opacity-50"
           :disabled="loading || !input.trim()"
           @click="send()"
         >

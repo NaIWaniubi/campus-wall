@@ -175,8 +175,12 @@ async function toggleSubscribe() {
 onMounted(() => {
   window.addEventListener('scroll', onScroll)
   loadSubscribed()
-  if (!appStore.sections.length) appStore.fetchSections().then(() => loadList(true))
-  else loadList(true)
+  if (!appStore.sections.length) {
+    // 板块元数据失败不能把列表一起拖死：列表接口本身不依赖它
+    appStore.fetchSections().catch(() => {}).finally(() => loadList(true))
+  } else {
+    loadList(true)
+  }
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
@@ -191,17 +195,17 @@ watch(sectionId, () => {
 <template>
   <div class="min-h-screen bg-zinc-50 pb-24">
     <!-- 顶部导航 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="hero sticky top-0 z-20">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-2 font-medium text-zinc-900 flex-1">{{ section?.name || '板块详情' }}</span>
+        <span class="ml-2 font-semibold text-white flex-1">{{ section?.name || '板块详情' }}</span>
         <button
           class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm transition disabled:opacity-60"
           :class="subscribed
-            ? 'border-brand-500 text-brand-600 bg-brand-50'
-            : 'border-zinc-200 text-zinc-500 hover:border-brand-300 hover:text-brand-600'"
+            ? 'border-transparent bg-white/95 text-brand-500 font-medium'
+            : 'border-white/30 text-white/90 hover:bg-white/15'"
           :disabled="subLoading"
           @click="toggleSubscribe"
         >
@@ -211,8 +215,8 @@ watch(sectionId, () => {
         </button>
       </div>
 
-      <!-- 排序 Tab -->
-      <div class="max-w-[960px] mx-auto px-3 flex items-center gap-1 h-11">
+      <!-- 排序 Tab：白底条，顶部圆角贴住渐变头 -->
+      <div class="sort-strip max-w-[960px] mx-auto px-3 flex items-center gap-6 h-11">
         <button
           v-for="opt in sortOptions"
           :key="opt.key"
@@ -225,20 +229,28 @@ watch(sectionId, () => {
         </button>
       </div>
 
-      <!-- 交易/失物筛选（上抛后端全局执行） -->
-      <div class="max-w-[960px] mx-auto px-3 flex flex-wrap items-center gap-2 pb-2 text-xs">
-        <span class="text-zinc-400">价格</span>
-        <button v-for="p in [['', '不限'], ['0-100', '0-100'], ['100-500', '100-500'], ['500-', '500+']]"
-          :key="p[0]"
-          class="px-2 py-1 rounded-full border transition"
-          :class="activePriceRange === p[0] ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-zinc-200 text-zinc-500'"
-          @click="setFilter(p[0], activeTimeRange, activeSubType)">{{ p[1] }}</button>
-        <span class="text-zinc-400 ml-1">时间</span>
-        <button v-for="t in [['', '不限'], ['1', '一天内'], ['7', '一周内'], ['30', '一月内']]"
-          :key="t[0]"
-          class="px-2 py-1 rounded-full border transition"
-          :class="activeTimeRange === t[0] ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-zinc-200 text-zinc-500'"
-          @click="setFilter(activePriceRange, t[0], activeSubType)">{{ t[1] }}</button>
+      <!-- 交易/失物筛选（上抛后端全局执行）：浅底浮岛，避免压在渐变上不好读 -->
+      <div class="max-w-[960px] mx-auto px-3 pb-3">
+        <div class="flex flex-wrap items-center gap-2 text-xs rounded-xl px-3 py-2.5" style="background: var(--color-bg)">
+          <span class="text-zinc-500">价格</span>
+          <button
+            v-for="p in [['', '不限'], ['0-100', '0-100'], ['100-500', '100-500'], ['500-', '500+']]"
+            :key="p[0]"
+            class="px-2 py-1 rounded-full border transition"
+            :class="activePriceRange === p[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
+            :style="activePriceRange === p[0] ? { background: 'linear-gradient(135deg, #16A085, #20C4A4)' } : undefined"
+            @click="setFilter(p[0], activeTimeRange, activeSubType)"
+          >{{ p[1] }}</button>
+          <span class="text-zinc-500 ml-1">时间</span>
+          <button
+            v-for="t in [['', '不限'], ['1', '一天内'], ['7', '一周内'], ['30', '一月内']]"
+            :key="t[0]"
+            class="px-2 py-1 rounded-full border transition"
+            :class="activeTimeRange === t[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
+            :style="activeTimeRange === t[0] ? { background: 'linear-gradient(135deg, #16A085, #20C4A4)' } : undefined"
+            @click="setFilter(activePriceRange, t[0], activeSubType)"
+          >{{ t[1] }}</button>
+        </div>
       </div>
     </header>
 
@@ -274,7 +286,7 @@ watch(sectionId, () => {
 
     <!-- 悬浮发布按钮 -->
     <button
-      class="fixed right-4 bottom-6 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 shadow-lg shadow-brand-500/40 flex items-center justify-center text-white transition z-20"
+      class="hidden md:flex fixed right-4 bottom-6 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 shadow-lg shadow-brand-500/40 items-center justify-center text-white transition z-20"
       @click="goPublish"
     >
       <Plus class="w-7 h-7" />

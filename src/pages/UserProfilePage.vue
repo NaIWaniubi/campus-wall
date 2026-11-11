@@ -17,6 +17,8 @@ const userId = computed(() => Number(route.params.id))
 const user = ref<any>(null)
 const loading = ref(true)
 const notFound = ref(false)
+// 网络/服务异常与「用户不存在」必须区分：前者给重试，后者才显示 404 文案
+const loadError = ref(false)
 const credit = computed(() => user.value?.creditScore || 0)
 
 // ---------- 交易互评 ----------
@@ -28,15 +30,29 @@ const postsTotal = ref(0)
 
 async function loadUser() {
   loading.value = true
+  loadError.value = false
+  notFound.value = false
   try {
     const res: any = await userApi.info(userId.value)
     user.value = res.data
-  } catch {
-    // 错误已由拦截器 toast
-    notFound.value = true
+  } catch (e: any) {
+    const status = e?.response?.status
+    const msg = String(e?.response?.data?.message || e?.message || '')
+    // 只有明确的「不存在 / 已封禁」才显示 404 态；网络抖动或 5xx 给重试入口
+    if (status === 404 || msg.includes('不存在') || msg.includes('封禁')) {
+      notFound.value = true
+    } else {
+      loadError.value = true
+    }
   } finally {
     loading.value = false
   }
+}
+
+function retryLoad() {
+  loadUser()
+  loadRatings()
+  loadPosts()
 }
 
 async function loadRatings() {
@@ -96,6 +112,12 @@ onMounted(() => {
     <!-- 用户不存在 -->
     <main v-else-if="notFound" class="max-w-[960px] mx-auto px-4 py-16 text-center text-sm text-zinc-400">
       用户不存在或已被封禁
+    </main>
+
+    <!-- 加载失败（网络/服务异常）：给重试，不伪装成「用户不存在」 -->
+    <main v-else-if="loadError" class="max-w-[960px] mx-auto px-4 py-16 text-center">
+      <p class="text-sm text-zinc-500 mb-3">加载失败，请检查网络后重试</p>
+      <button class="px-4 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="retryLoad">重新加载</button>
     </main>
 
     <main v-else-if="user" class="max-w-[960px] mx-auto px-4 py-4 space-y-4">

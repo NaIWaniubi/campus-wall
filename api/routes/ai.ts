@@ -200,6 +200,47 @@ function searchForumSources(question: string): ForumSource[] {
   return sources.slice(0, 5);
 }
 
+
+/**
+ * 无 AI Key 时的站内检索兜底：不编造答案，只用官网知识库与论坛检索结果作答。
+ * 让「AI 助手」在纯离线/未配置网关的环境也保持可用，而不是一句「暂未启用」。
+ */
+function localRetrievalAnswer(message: string, knowledge: string, forums: ForumSource[]): string {
+  const lower = message.toLowerCase();
+  const grams = new Set<string>();
+  for (const w of lower.match(/[a-z0-9]{2,}/g) ?? []) grams.add(w);
+  const cjk = message.replace(/[^一-龥]/g, '');
+  for (let i = 0; i + 2 <= cjk.length; i++) grams.add(cjk.slice(i, i + 2));
+
+  // 知识库按空行/标题切段，按「命中词数 / 段长」排序，取最相关的一段
+  const paras = knowledge
+    .split(/\n{2,}|(?=^#{1,4}\s)/m)
+    .map((t) => t.replace(/^#{1,4}\s*/gm, '').trim())
+    .filter((t) => t.length >= 12 && t.length <= 600);
+
+  let best = '';
+  let bestScore = 0;
+  for (const para of paras) {
+    let hit = 0;
+    for (const g of grams) if (para.toLowerCase().includes(g)) hit++;
+    const score = hit / Math.sqrt(para.length);
+    if (score > bestScore) { bestScore = score; best = para; }
+  }
+
+  const parts: string[] = [];
+  if (bestScore >= 0.35 && best) {
+    parts.push(`根据平台说明：${best.replace(/\s+/g, ' ').slice(0, 220)}`);
+  }
+  if (forums.length) {
+    parts.push(`站内找到 ${forums.length} 条相关讨论，已列在下方，可直接点开查看。`);
+  }
+  if (!parts.length) {
+    parts.push('这个问题我在站内资料里没有找到直接答案。建议到「互助问答」板块发帖，通常很快会有同学回复。');
+  }
+  parts.push('（当前为站内检索模式，未接入在线大模型）');
+  return parts.join('\n\n');
+}
+
 /** 组装对话消息（系统提示 + 最近历史 + 当前问题） */
 function buildMessages(message: string, history: AiMessage[], knowledge: string, forums: ForumSource[]): AiMessage[] {
   const forumContext = forums
@@ -259,9 +300,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
 
   if (!isAiEnabled()) {
     return success(res, {
-      reply: forums.length
-        ? 'AI 助手暂未启用，为你找到了以下相关论坛讨论：'
-        : 'AI 助手暂未启用，暂时无法回答该问题。',
+      reply: localRetrievalAnswer(message, loadKnowledge(), forums),
       forums,
     });
   }
@@ -274,9 +313,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
   } catch (err: any) {
     logger.error('AI 对话失败', { error: err?.message });
     return success(res, {
-      reply: forums.length
-        ? 'AI 服务暂时不可用，为你找到了以下相关论坛讨论：'
-        : 'AI 服务暂时不可用，请稍后再试。',
+      reply: localRetrievalAnswer(message, loadKnowledge(), forums),
       forums,
     });
   }
@@ -309,12 +346,11 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
   // 论坛卡片先送达，前端可立即渲染
   send('forums', forums);
 
-  const fallbackReply = forums.length
-    ? 'AI 服务暂时不可用，为你找到了以下相关论坛讨论。'
-    : 'AI 服务暂时不可用，请稍后再试。';
+  // 在线模型不可用时用站内检索兜底（与 /chat 的 catch 行为一致），不丢上下文
+  const fallbackReply = localRetrievalAnswer(message, loadKnowledge(), forums);
 
   if (!isAiEnabled()) {
-    send('delta', { t: forums.length ? 'AI 助手暂未启用，为你找到了以下相关论坛讨论：' : 'AI 助手暂未启用，暂时无法回答该问题。' });
+    send('delta', { t: localRetrievalAnswer(message, loadKnowledge(), forums) });
     send('done', { ok: true });
     return res.end();
   }

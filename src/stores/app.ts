@@ -18,13 +18,22 @@ interface Section {
 export const useAppStore = defineStore('app', {
   state: () => ({
     sections: [] as Section[],
+    /** 板块接口是否失败：发布页/板块页据此显示重试，而不是空选择器 + 假空态 */
+    sectionsError: false,
     unreadCount: 0,
     loading: false,
   }),
   actions: {
     async fetchSections() {
-      const res: any = await request.get('/sections')
-      this.sections = res.data
+      // 失败时保留 sectionsError，让发布页/板块页能给出「重试」而不是空选择器
+      try {
+        const res: any = await request.get('/sections')
+        this.sections = res.data
+        this.sectionsError = false
+      } catch (e) {
+        this.sectionsError = true
+        throw e
+      }
     },
     async fetchUnreadCount() {
       const res: any = await request.get('/messages')

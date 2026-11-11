@@ -239,7 +239,8 @@ onUnmounted(() => {
   <div class="flex flex-col h-full bg-white rounded-xl shadow-sm overflow-hidden">
     <!-- 面板头 -->
     <div class="flex items-center gap-2 px-3 h-12 border-b border-zinc-100 flex-shrink-0">
-      <button class="p-1.5 -ml-1.5 text-zinc-600 hover:text-zinc-900 sm:hidden" @click="emit('back')">
+      <!-- 返回按钮：手机端（< md）显示。原 sm:hidden 因 sm=0px 永不生效，手机上无法退回会话列表 -->
+      <button class="p-1.5 -ml-1.5 text-zinc-600 hover:text-zinc-900 md:hidden" @click="emit('back')" aria-label="返回会话列表">
         <ArrowLeft class="w-5 h-5" />
       </button>
       <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0">

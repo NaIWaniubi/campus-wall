@@ -17,7 +17,9 @@ import { logger } from '../utils/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const backupDir = path.join(__dirname, '..', 'backups');
+const backupDir = process.env.BACKUP_DIR
+  ? path.resolve(process.env.BACKUP_DIR)
+  : path.join(__dirname, '..', 'backups');
 const BACKUP_FILE_RE = /^campus-wall-\d{8}-\d{6}\.db(\.enc)?$/;
 /** 密文文件头：标识版本 + 随机 IV（12B）+ authTag（16B）+ 密文体 */
 const ENC_MAGIC = 'CWBK1';

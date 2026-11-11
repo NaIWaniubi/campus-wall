@@ -52,10 +52,11 @@ const __dirname = path.dirname(__filename)
 
 const app: express.Application = express()
 
-// 反向代理信任层数：本地开发默认 1 足够；生产部署在 nginx 后面时按上游跳数设置
-// （如单层 nginx 反代则设为 1，多层链路按真实跳数调整；错误的设置会导致
-//  req.ip / X-Forwarded-* 头解析异常，从而影响限流与审计）
-app.set('trust proxy', process.env.TRUST_PROXY ?? 1)
+// 反向代理信任层数：默认不信任任何代理（false），此时 req.ip 取对端 socket 地址，
+// 客户端伪造的 X-Forwarded-For 无效。部署在 nginx/Vercel 之后时必须显式设置
+// TRUST_PROXY 为真实上游跳数（单层 nginx = 1），否则所有请求共用同一 IP 桶。
+// 默认值若为 1，任何客户端加一个 XFF 头即可换桶绕过限流（审计 P0-3）。
+app.set('trust proxy', process.env.TRUST_PROXY === undefined ? false : Number(process.env.TRUST_PROXY) || false)
 
 // 隐藏 Express 指纹，避免暴露服务器技术栈
 app.disable('x-powered-by')
@@ -88,18 +89,30 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // 受控上传文件访问：避免目录遍历/直接列举（替换原 express.static）
-const uploadsDir = path.join(__dirname, '..', 'public', 'uploads')
-// 校验规则：filename 必须为 <userId>_<timestamp>.<ext> 或其缩略图 <原名>.thumb.webp，仅字母数字下划线点，禁止 .. 与路径分隔符
-const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+\.(jpg|jpeg|png)(\.thumb\.webp)?$/
+// 云部署通过 UPLOAD_DIR 指到持久化目录；本地仍回落到 public/uploads
+const uploadsDir = process.env.UPLOAD_DIR
+  ? path.resolve(process.env.UPLOAD_DIR)
+  : path.join(__dirname, '..', 'public', 'uploads')
+// 校验规则：filename 必须为 <userId>_<timestamp>_<rand>.<ext> 或其缩略图 <原名>.thumb.webp
+// （rand 段是后加的：同毫秒上传会撞 timestamp，用随机后缀避免覆盖；老文件名无 rand 也兼容）
+const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+(_[a-f0-9]{6})?\.(jpg|jpeg|png)(\.thumb\.webp)?$/
 app.get('/uploads/:file', (req: Request, res: Response) => {
   const file = String(req.params.file)
   if (!UPLOAD_NAME_RE.test(file) || file.includes('..') || file.includes('/') || file.includes('\\')) {
     return res.status(404).json({ code: 404, message: '文件不存在', data: null })
   }
   res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.sendFile(path.join(uploadsDir, file), (err) => {
-    if (err) res.status(404).json({ code: 404, message: '文件不存在', data: null })
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  // 用流式读取而不是 res.sendFile：Express 的 send 在含非 ASCII 字符的 Windows 路径上会误判 404
+  const fullPath = path.join(uploadsDir, file)
+  const ext = path.extname(file.replace(/\.thumb\.webp$/, '')).toLowerCase()
+  res.type(file.endsWith('.webp') ? 'image/webp' : ext === '.png' ? 'image/png' : 'image/jpeg')
+  const stream = fs.createReadStream(fullPath)
+  stream.on('error', () => {
+    if (!res.headersSent) res.status(404).json({ code: 404, message: '文件不存在', data: null })
+    else res.end()
   })
+  stream.pipe(res)
 })
 
 /**
@@ -181,13 +194,29 @@ app.get('/api/docs', (_req: Request, res: Response) => {
 
 /**
  * Prometheus 监控指标导出端点 (OpenMetrics / Prometheus 格式)
+ *
+ * 默认只暴露进程级基础指标；带 METRICS_TOKEN 且请求头匹配时才输出全量
+ * （全量含 SQL 查询分布、错误计数等内部信息，匿名可读会泄露系统结构）。
+ * 未配置 METRICS_TOKEN 时保持向后兼容（本地/内网抓取场景），
+ * 生产建议配置并由反代限制来源。
  */
-app.get('/metrics', async (_req: Request, res: Response) => {
+app.get('/metrics', async (req: Request, res: Response) => {
   try {
-    res.setHeader('Content-Type', register.contentType)
-    res.send(await register.metrics())
+    const expected = process.env.METRICS_TOKEN?.trim();
+    if (expected) {
+      const provided = String(req.headers['x-metrics-token'] || '');
+      if (provided !== expected) {
+        // 未授权：只给最基础的存活指标，不暴露业务与 SQL 细节
+        res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+        return res.send(
+          '# HELP process_up 进程存活\n# TYPE process_up gauge\nprocess_up 1\n'
+        );
+      }
+    }
+    res.setHeader('Content-Type', register.contentType);
+    res.send(await register.metrics());
   } catch (err) {
-    res.status(500).send(err instanceof Error ? err.message : String(err))
+    res.status(500).send(err instanceof Error ? err.message : String(err));
   }
 })
 

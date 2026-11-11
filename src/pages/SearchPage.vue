@@ -3,7 +3,7 @@
  * 搜索页：历史记录 + 热门搜索 + 防抖搜索 + 结果列表（分页 + 竞态防护 + 板块/排序筛选）
  */
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import type { Ref } from 'vue'
 import { ArrowLeft, Search, X, Clock, Flame, Loader2 } from '@lucide/vue'
 import { sectionApi } from '@/utils/api'
@@ -13,6 +13,7 @@ import PostSkeleton from '@/components/PostSkeleton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 const router = useRouter()
+const route = useRoute()
 const appStore = useAppStore()
 const keyword = ref('')
 const history = ref<string[]>([])
@@ -182,6 +183,12 @@ onMounted(async () => {
   } catch {
     hotWords.value = []
   }
+  // 支持 /search?keyword=xxx 直达（首页右栏热门搜索、外部分享链接）
+  const incoming = String(route.query.keyword || '').trim()
+  if (incoming) {
+    keyword.value = incoming
+    doSearch(incoming)
+  }
 })
 onUnmounted(() => {
   if (ioObserver) {
@@ -192,25 +199,25 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
+  <div class="min-h-screen" style="background: var(--color-bg)">
     <!-- 顶部搜索框 -->
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="hero sticky top-0 z-10">
       <div class="max-w-[960px] mx-auto flex items-center gap-2 h-14 px-3">
-        <button class="p-1 -ml-1 text-zinc-600 hover:text-zinc-900" @click="goBack">
+        <button class="p-1 -ml-1 text-white/90 hover:text-white" @click="goBack">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <div class="flex-1 relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
           <input
             ref="inputRef"
             v-model="keyword"
             type="text"
             placeholder="搜索帖子"
-            class="w-full h-9 pl-9 pr-9 rounded-full bg-zinc-100 focus:bg-white border border-transparent focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 text-sm transition"
+            class="w-full h-9 pl-9 pr-9 rounded-full bg-white/20 text-white placeholder-white/60 border border-white/25 focus:bg-white/30 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm transition backdrop-blur"
             @input="onInput"
             @keyup.enter="doSearch(keyword.trim())"
           />
-          <button v-if="keyword" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600" @click="keyword = ''; onInput()">
+          <button v-if="keyword" class="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white" @click="keyword = ''; onInput()">
             <X class="w-4 h-4" />
           </button>
         </div>

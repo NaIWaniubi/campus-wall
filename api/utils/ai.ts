@@ -16,6 +16,20 @@ export function getAiApiKey(): string {
   return (process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
 }
 
+/**
+ * 模型级路由：:free 后缀的模型固定走官方 OpenRouter（配 OPENROUTER_API_KEY 就用），
+ * 其余走自定义网关（AI_BASE_URL + AI_API_KEY）。
+ * 解决「自定义网关 key 失效但 OpenRouter key 有效」时整条模型链全灭的问题。
+ */
+const OPENROUTER_HOST = 'https://openrouter.ai/api/v1/chat/completions';
+
+export function routeFor(model: string): { url: string; key: string } {
+  const isFree = model.endsWith(':free');
+  const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (isFree && orKey) return { url: OPENROUTER_HOST, key: orKey };
+  return { url: getAiApiUrl(), key: getAiApiKey() };
+}
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -23,13 +37,17 @@ export interface AiMessage {
 
 /** 推荐预设与备选模型回退链 */
 export const DEFAULT_MODELS = [
+  // 主力：付费档（自定义网关配了就先用）
   'gemini-3.8-flash',
   'gemini-3.8-flash-high',
   'glm-5.3',
   'MiniMax-M3',
   'step-5-preview',
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'z-ai/glm-5.2:free',
+  // 兜底：OpenRouter 实测可用的免费档（2026-11-12 探测，见 DEFAULT_MODELS 注释）
+  'nvidia/nemotron-3.5-lightning:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'baidu/ernie-5.5-flash-preview:free',
+  'thinkingmachines/inkling-2-small:free',
 ];
 
 /**
@@ -105,8 +123,10 @@ async function requestOnce(
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const apiKey = getAiApiKey();
-  const apiUrl = getAiApiUrl();
+  // 免费档模型路由到官方 OpenRouter（key 跟模型走）
+  const route = routeFor(model);
+  const apiKey = route.key;
+  const apiUrl = route.url;
 
   try {
     const resp = await fetch(apiUrl, {
@@ -121,7 +141,9 @@ async function requestOnce(
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: maxTokens,
+        // reasoning 模型（nemotron 系）会先输出 reasoning 再出 content，
+        // 1024 常常只够 thinking，导致 content 为空被判「未返回有效内容」而整链失败
+        max_tokens: Math.max(maxTokens, 2048),
         temperature: 0.6,
         ...(onDelta ? { stream: true } : {}),
       }),

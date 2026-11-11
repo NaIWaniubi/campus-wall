@@ -198,14 +198,14 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-zinc-50 pb-6">
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="hero sticky top-0 z-10">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900 flex-1">消息</span>
+        <span class="ml-1 font-semibold text-white flex-1">消息</span>
         <button v-if="view === 'notice'"
-          class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 text-xs hover:bg-brand-100 transition"
+          class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs hover:bg-white/30 transition"
           @click="readAll">
           <CheckCheck class="w-3.5 h-3.5" /> 全部已读
         </button>
@@ -275,7 +275,7 @@ onUnmounted(() => {
     <main v-else class="max-w-[960px] mx-auto px-4 py-3">
       <div class="flex gap-3 items-stretch">
         <!-- 会话列表 -->
-        <aside class="w-full sm:w-[280px] flex-shrink-0 space-y-2" :class="activeConvId ? 'hidden sm:block' : ''">
+        <aside class="w-full md:w-[280px] flex-shrink-0 space-y-2" :class="activeConvId ? 'hidden md:block' : ''">
           <div v-if="convsLoading" class="space-y-2">
             <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-3 flex items-center gap-3">
               <div class="w-10 h-10 rounded-full skeleton"></div>
@@ -310,10 +310,10 @@ onUnmounted(() => {
         </aside>
 
         <!-- 聊天面板 -->
-        <section class="flex-1 min-w-0" :class="activeConvId ? '' : 'hidden sm:block'">
-          <div class="sm:h-[calc(100vh-11rem)] sm:min-h-[420px]">
+        <section class="flex-1 min-w-0" :class="activeConvId ? '' : 'hidden md:block'">
+          <div class="md:h-[calc(100vh-11rem)] md:min-h-[420px]">
             <ChatPanel v-if="activeConv" :key="activeConv.id" :conv="activeConv" @back="activeConvId = null" @read="onConvRead" @activity="onConvActivity" />
-            <div v-else class="hidden sm:flex h-full min-h-[420px] items-center justify-center bg-white rounded-xl shadow-sm">
+            <div v-else class="hidden md:flex h-full min-h-[420px] items-center justify-center bg-white rounded-xl shadow-sm">
               <EmptyState text="选择一个会话开始聊天" />
             </div>
           </div>

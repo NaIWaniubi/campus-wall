@@ -45,24 +45,29 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-b from-brand-50 to-white px-4 py-8">
-    <div class="w-full max-w-sm">
-      <!-- Logo + 标题 -->
-      <div class="text-center mb-8">
-        <div class="w-20 h-20 mx-auto rounded-3xl bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4">
-          <GraduationCap class="w-11 h-11 text-white" />
-        </div>
-        <h1 class="text-2xl font-bold text-zinc-900">校园墙</h1>
-        <p class="text-sm text-zinc-400 mt-1">让校园生活更有温度</p>
+  <div class="min-h-screen pb-10 relative" style="background: var(--color-bg)">
+    <div class="aurora-bg" aria-hidden="true"></div>
+    <!-- 渐变头（与首页同源，对齐原生小程序顶部导航栏 #16A085） -->
+    <div class="hero pt-12 pb-14 px-6 rounded-b-[28px] text-center">
+      <div class="w-[72px] h-[72px] mx-auto rounded-[22px] glass flex items-center justify-center shadow-lg">
+        <GraduationCap class="w-9 h-9 text-white drop-shadow" />
       </div>
+      <h1 class="mt-3 text-xl font-bold tracking-wide">校园墙</h1>
+      <p class="mt-1 text-[13px] text-white/85">让校园生活更有温度</p>
+    </div>
 
+    <div class="px-4 -mt-8 max-w-sm mx-auto">
       <!-- 表单卡片 -->
-      <div class="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+      <div class="glass rounded-[22px] px-6 pb-6 pt-10 space-y-4 shadow-[var(--shadow-lift)]">
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">学号</label>
+          <label for="login-student-id" class="block text-sm font-medium text-zinc-700 mb-1.5">学号</label>
           <input
+            id="login-student-id"
             v-model="form.studentId"
             type="text"
+            inputmode="numeric"
+            autocomplete="username"
+            aria-required="true"
             placeholder="请输入学号"
             class="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-zinc-900 placeholder-zinc-400"
             @keyup.enter="handleSubmit"
@@ -70,11 +75,14 @@ async function handleSubmit() {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">密码</label>
+          <label for="login-password" class="block text-sm font-medium text-zinc-700 mb-1.5">密码</label>
           <div class="relative">
             <input
+              id="login-password"
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              aria-required="true"
               placeholder="请输入密码"
               class="w-full px-4 py-3 pr-11 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-zinc-900 placeholder-zinc-400"
               @keyup.enter="handleSubmit"
@@ -82,6 +90,8 @@ async function handleSubmit() {
             <button
               type="button"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              :aria-pressed="showPassword"
               @click="showPassword = !showPassword"
             >
               <Eye v-if="showPassword" class="w-5 h-5" />
@@ -93,7 +103,7 @@ async function handleSubmit() {
         <button
           type="button"
           :disabled="loading"
-          class="w-full py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
+          class="btn-grad w-full py-3 flex items-center justify-center gap-2 disabled:opacity-70"
           @click="handleSubmit"
         >
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
@@ -109,11 +119,11 @@ async function handleSubmit() {
         </button>
       </div>
 
-      <p class="text-center text-sm text-zinc-500 mt-6">
+      <p class="text-center text-sm text-zinc-500 mt-5">
         没有账号？
         <router-link
           :to="{ path: '/register', query: route.query.redirect ? { redirect: route.query.redirect } : {} }"
-          class="text-brand-600 font-medium hover:text-brand-700"
+          class="text-brand-500 font-medium hover:text-brand-600"
         >去注册</router-link>
       </p>
     </div>

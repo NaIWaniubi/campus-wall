@@ -3,6 +3,7 @@
  * 官方公告弹窗：用户必须确认后才可继续浏览
  */
 import { ref, onMounted } from 'vue'
+import { Megaphone } from '@lucide/vue'
 import { announcementApi } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { useUserStore } from '@/stores/user'
@@ -40,13 +41,18 @@ onMounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in" @click.self="handleAck">
-      <div class="relative bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-scale-in shadow-2xl">
+    <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+      <div
+        class="relative bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-scale-in shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="announcement-title"
+      >
         <div class="bg-gradient-to-br from-brand-500 to-brand-600 px-6 pt-6 pb-8 text-center">
           <div class="w-14 h-14 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3">
             <Megaphone class="w-7 h-7 text-white" />
           </div>
-          <h3 class="text-lg font-bold text-white">官方公告</h3>
+          <h3 id="announcement-title" class="text-lg font-bold text-white">官方公告</h3>
         </div>
         <div class="p-6">
           <h4 class="font-semibold text-zinc-900 mb-2">{{ announcement?.title }}</h4>

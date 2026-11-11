@@ -5,6 +5,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AiAssistant from '@/components/AiAssistant.vue'
+import BottomNav from '@/components/BottomNav.vue'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
@@ -48,7 +49,9 @@ onMounted(async () => {
   // 把持久化里可能存在的旧版 snake_case 字段（student_id/credit_score/created_at）
   // 迁到新字段名（studentId/creditScore/createdAt），避免刷新后页面访问 user.creditScore 变 undefined
   userStore.migrateLegacyUser()
-  await appStore.fetchSections()
+  // 板块接口失败不应阻塞启动：后续轮询/唤醒监听必须照常注册，
+  // 各页面（发布页、板块页）自己提供重试入口
+  try { await appStore.fetchSections() } catch { /* 已记录在 sectionsError */ }
   refreshUnread()
   startPoll()
   window.addEventListener('focus', onWake)
@@ -70,6 +73,7 @@ onUnmounted(() => {
     通过 .app-container 工具类控制内层 max-width
   -->
   <div class="app-shell">
+    <div class="aurora-bg" aria-hidden="true"></div>
     <div class="app-container">
       <RouterView v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -77,6 +81,7 @@ onUnmounted(() => {
         </transition>
       </RouterView>
     </div>
+    <BottomNav />
     <AnnouncementDialog />
     <AiAssistant />
   </div>

@@ -33,11 +33,21 @@ interface DistItem {
   name: string
   count: number
 }
+interface Growth {
+  registered: number
+  activeToday: number
+  active7d: number
+  postsTotal: number
+  tradesCompleted: number
+  activationRate: number
+}
 interface StatsData {
   cards: StatsCards
   trend: TrendDay[]
   sectionDist: DistItem[]
   collegeDist: { college?: string; name?: string; count: number }[]
+  growth?: Growth
+  auditLatencyHours?: number | null
 }
 
 const stats = ref<StatsData | null>(null)
@@ -92,6 +102,23 @@ const cards = computed(() => {
   ]
 })
 
+/**
+ * 增长指标（评委看「实效验证」时最先问的数字）：
+ * 注册 / 今日活跃 / 7 日活跃 / 激活率 / 成交数 / 审核时效
+ */
+const growthCards = computed(() => {
+  const g = stats.value?.growth
+  const latency = stats.value?.auditLatencyHours
+  return [
+    { label: '今日活跃', value: g?.activeToday ?? 0, hint: '有行为事件的用户' },
+    { label: '7 日活跃', value: g?.active7d ?? 0, hint: '近 7 天有行为' },
+    { label: '激活率', value: `${Math.round((g?.activationRate ?? 0) * 100)}%`, hint: '注册后发布过内容' },
+    { label: '成交闭环', value: g?.tradesCompleted ?? 0, hint: '已标记完成的二手交易' },
+    { label: '审核时效', value: latency != null ? `${latency}h` : '—', hint: '提交→过审平均耗时' },
+    { label: '注册用户', value: g?.registered ?? 0, hint: '不含管理员' },
+  ]
+})
+
 function goCard(card: { to?: any }) {
   if (card.to) router.push(card.to)
 }
@@ -134,6 +161,21 @@ onMounted(load)
           </div>
         </div>
         <div class="text-2xl font-bold text-zinc-900">{{ card.value }}</div>
+      </div>
+    </div>
+
+    <!-- 增长与转化（答辩时最先被问的数字） -->
+    <div class="bg-white rounded-xl p-4 md:p-6 border border-zinc-100 shadow-sm">
+      <div class="flex items-baseline gap-2 mb-3">
+        <h2 class="text-sm font-medium text-zinc-900">增长与转化</h2>
+        <span class="text-xs text-zinc-400">来自 events 行为埋点，非估算</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div v-for="g in growthCards" :key="g.label" class="rounded-lg bg-zinc-50 p-3">
+          <div class="text-xs text-zinc-500">{{ g.label }}</div>
+          <div class="text-xl font-bold text-zinc-900 mt-1">{{ g.value }}</div>
+          <div class="text-[11px] text-zinc-400 mt-0.5">{{ g.hint }}</div>
+        </div>
       </div>
     </div>
 

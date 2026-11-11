@@ -51,8 +51,8 @@ function creditDenyToast(need: number) {
 }
 
 // ── 编辑模式（?edit=:id）：读取详情回填表单，提交切换到 PUT /posts/:id（24h 内可编辑）──
-// TODO(eng-publish 联调)：本接入点只做脚本层数据流（回填 + 提交路由切换），
-// 模板差异化字段渲染如与回填的 extraFields 有冲突，以发布页现有结构为准再对齐。
+// 差异化字段回填与双向同步已对齐：服务端下发的 extraFields 经白名单过滤后回填至 form.extraFields；
+// 提交时保持字段结构一致，由后端合并语义保障扩展字段完整性。
 const editId = computed(() => {
   const n = Number(route.query.edit)
   return Number.isInteger(n) && n > 0 ? n : 0
@@ -308,6 +308,10 @@ function setExtra(key: string, value: any) {
   form.extraFields[key] = value
 }
 
+function retrySections() {
+  appStore.fetchSections().catch(() => {})
+}
+
 async function handleSubmit() {
   if (loading.value) return
   if (!userStore.canPost) {
@@ -315,7 +319,8 @@ async function handleSubmit() {
     return
   }
   if (!form.sectionId) {
-    toast.error('请选择板块')
+    // 区分「没选」与「板块列表没加载出来」，后者引导重试而不是让用户干瞪眼
+    toast.error(appStore.sectionsError && !appStore.sections.length ? '板块加载失败，请点上方重试' : '请选择板块')
     return
   }
   if (!form.title.trim()) {
@@ -341,6 +346,12 @@ async function handleSubmit() {
   }
   if (selectedSection.value?.forceAnonymous && !form.isAnonymous) {
     toast.error('该板块必须匿名发布')
+    return
+  }
+  // 失物招领必须选方向：雷达匹配与「丢失/拾获」双 Tab 都以 direction 为前提，
+  // 缺省会让这条帖子既不进雷达也不进任一方向 Tab
+  if (sectionKind.value === 'lost' && !form.extraFields.direction) {
+    toast.error('请选择「我丢失了」或「我捡到了」')
     return
   }
   loading.value = true
@@ -382,21 +393,21 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-24">
+  <div class="min-h-screen" style="background: var(--color-bg)" pb-24">
     <!-- 顶部 -->
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="hero sticky top-0 z-10">
       <div class="max-w-[960px] mx-auto flex items-center justify-between h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="font-medium text-zinc-900">{{ editId ? '编辑帖子' : '发布' }}</span>
+        <span class="font-semibold text-white">{{ editId ? '编辑帖子' : '发布' }}</span>
         <div class="flex items-center gap-2">
-          <button v-if="!editId" class="p-2 text-zinc-500 hover:text-zinc-700" title="草稿箱" @click="router.push('/profile/drafts')">
+          <button v-if="!editId" class="p-2 text-white/80 hover:text-white" title="草稿箱" @click="router.push('/profile/drafts')">
             <FileText class="w-5 h-5" />
           </button>
           <button
             :disabled="loading"
-            class="px-4 py-1.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition"
+            class="px-4 py-1.5 bg-white/95 hover:bg-white disabled:opacity-60 text-brand-500 rounded-full text-sm font-semibold transition shadow-lg shadow-black/10"
             @click="handleSubmit"
           >
             {{ editId ? '保存' : '发布' }}
@@ -420,6 +431,11 @@ async function handleSubmit() {
       <!-- 板块选择 -->
       <div ref="sectionPickerRef" class="bg-white rounded-xl p-4">
         <label class="block text-sm font-medium text-zinc-700 mb-2">选择板块 <span class="text-red-500">*</span></label>
+        <!-- 板块接口失败时给出重试：否则选择器为空、每次提交都被「请选择板块」挡住 -->
+        <div v-if="appStore.sectionsError && !appStore.sections.length" class="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs">
+          <span class="flex-1">板块加载失败，请重试</span>
+          <button class="px-3 py-1 rounded-full bg-amber-500 text-white" @click="retrySections">重试</button>
+        </div>
         <button
           class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 text-sm"
           @click="showSectionPicker = !showSectionPicker"
@@ -522,6 +538,20 @@ async function handleSubmit() {
 
       <div v-else-if="sectionKind === 'lost'" class="bg-white rounded-xl p-4 space-y-3">
         <h4 class="text-sm font-medium text-zinc-700">失物信息</h4>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500 w-16">类型</span>
+          <div class="flex-1 flex gap-2">
+            <button v-for="d in [{ v: 'lost', t: '我丢失了' }, { v: 'found', t: '我捡到了' }]" :key="d.v"
+              type="button" :class="[
+                'flex-1 py-2 rounded-lg text-sm border transition',
+                form.extraFields.direction === d.v
+                  ? 'bg-brand-500 text-white border-brand-500'
+                  : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-brand-300'
+              ]" @click="setExtra('direction', d.v)">
+              {{ d.t }}
+            </button>
+          </div>
+        </div>
         <div class="flex items-center gap-2">
           <span class="text-sm text-zinc-500 w-16">地点</span>
           <input v-model="form.extraFields.location" type="text" placeholder="丢失/拾到地点" @input="setExtra('location', form.extraFields.location)"

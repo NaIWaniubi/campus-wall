@@ -34,8 +34,8 @@ const transports: winston.transport[] = [
   }),
 ];
 
-// 生产环境添加文件日志
-if (config.NODE_ENV === 'production') {
+// 生产环境添加文件日志（云部署默认关闭：容器磁盘有限，日志走 stdout 由平台收集）
+if (config.NODE_ENV === 'production' && process.env.LOG_TO_FILE === '1') {
   transports.push(
     // 错误日志单独文件
     new winston.transports.File({
@@ -55,19 +55,19 @@ if (config.NODE_ENV === 'production') {
 
 /**
  * 全局日志实例
+ * 注意：exceptionHandlers 为空数组时 winston 会接管 uncaughtException 并静默退出，
+ * 启动期的真实错误会被吞掉。因此只在需要文件日志时才注入 handler。
  */
-export const logger = winston.createLogger({
+const loggerOptions: winston.LoggerOptions = {
   level: config.LOG_LEVEL,
   format: logFormat,
   transports,
-  // 处理未捕获的异常和拒绝
-  exceptionHandlers: config.NODE_ENV === 'production'
-    ? [new winston.transports.File({ filename: 'logs/exceptions.log' })]
-    : [],
-  rejectionHandlers: config.NODE_ENV === 'production'
-    ? [new winston.transports.File({ filename: 'logs/rejections.log' })]
-    : [],
-});
+};
+if (config.NODE_ENV === 'production' && process.env.LOG_TO_FILE === '1') {
+  loggerOptions.exceptionHandlers = [new winston.transports.File({ filename: 'logs/exceptions.log' })];
+  loggerOptions.rejectionHandlers = [new winston.transports.File({ filename: 'logs/rejections.log' })];
+}
+export const logger = winston.createLogger(loggerOptions);
 
 /**
  * 请求日志中间件

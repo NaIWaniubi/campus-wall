@@ -9,11 +9,72 @@
  * 演示账号学号统一 2377xxx 段、密码 demo1234，与真实账号隔离。
  */
 import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { logger } from './utils/logger.js';
 
 const DEMO_SEED_KEY = 'demo_seeded';
 const DEMO_SID_LIKE = '2377%';
+
+// ── 演示封面素材：随包发布（api/demo-assets），首启灌种子时复制进上传目录 ──
+const __dirnameSeed = path.dirname(fileURLToPath(import.meta.url));
+const ASSET_DIRS = [
+  path.join(__dirnameSeed, 'demo-assets'),
+  path.join(process.cwd(), 'api', 'demo-assets'),
+];
+const ASSET_DIR = ASSET_DIRS.find((d) => fs.existsSync(d)) ?? ASSET_DIRS[0]!;
+
+function resolveUploadDir(): string {
+  const candidates = [
+    ...(process.env.UPLOAD_DIR ? [path.resolve(process.env.UPLOAD_DIR)] : []),
+    path.join(process.cwd(), 'public', 'uploads'),
+    path.join(__dirnameSeed, '..', 'public', 'uploads'),
+  ];
+  const dir = candidates.find((d) => fs.existsSync(path.dirname(d))) ?? candidates[0]!;
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/** 标题 -> 封面素材 id（与 api/demo-assets/cover-<id>.jpg 对应） */
+const COVER_BY_TITLE: Record<string, string> = {
+  '出九成新 iPad Air 5 蓝色 64G': 'ipad',
+  '毕业出捷安特通勤自行车': 'bike',
+  '考研数学全套资料含真题解析': 'books',
+  '捡到一张校园卡': 'card',
+  '丢失校园卡急寻': 'card',
+  '在体育馆捡到一串钥匙': 'keys',
+  '表白图书馆三楼靠窗的男生': 'confession',
+  '匿名想说谢谢': 'rain',
+  '食堂新窗口测评': 'food',
+  '高数期末怎么复习才高效': 'study',
+  '迎新晚会暨十佳歌手决赛': 'stage',
+  '动漫社秋季招新啦': 'club',
+  '周六下午回家顺风车，空 2 座': 'car',
+  '考研自习室找长期搭子': 'study',
+  '丢失雨伞一把': 'rain',
+};
+
+const coverUrlCache = new Map<string, string>();
+
+/** 把素材复制成符合 /uploads 命名规则的副本，返回可直接引用的 URL */
+function ensureCover(assetId: string): string | null {
+  const cached = coverUrlCache.get(assetId)
+  if (cached) return cached
+  const src = path.join(ASSET_DIR, `cover-${assetId}.jpg`)
+  const srcThumb = `${src}.thumb.webp`
+  if (!fs.existsSync(src)) return null
+  const dir = resolveUploadDir()
+  const rand = crypto.randomBytes(3).toString('hex')
+  const name = `demo_${Date.now()}_${rand}.jpg`
+  fs.copyFileSync(src, path.join(dir, name))
+  if (fs.existsSync(srcThumb)) fs.copyFileSync(srcThumb, path.join(dir, `${name}.thumb.webp`))
+  const url = `/uploads/${name}`
+  coverUrlCache.set(assetId, url)
+  return url
+}
 
 // 相对天数 → SQLite DATETIME 字符串（UTC，与 CURRENT_TIMESTAMP 一致）
 const ago = (days: number): string =>
@@ -161,6 +222,12 @@ function main(): void {
       s.views ?? 20, likes, 0, JSON.stringify(s.extra ?? {}), ago(s.days), ago(s.days)
     );
     pid.push(Number(r.lastInsertRowid));
+    // 演示封面：让信息流有真实配图，而不是纯色卡片
+    const coverId = COVER_BY_TITLE[s.title]
+    if (coverId) {
+      const url = ensureCover(coverId)
+      if (url) db.prepare('UPDATE posts SET images=? WHERE id=?').run(JSON.stringify([url]), Number(r.lastInsertRowid))
+    }
     for (const likerIdx of s.likesFrom ?? []) {
       db.prepare(`INSERT OR IGNORE INTO likes (user_id, target_type, target_id, created_at) VALUES (?, 'post', ?, ?)`)
         .run(uid[likerIdx], Number(r.lastInsertRowid), ago(s.days));

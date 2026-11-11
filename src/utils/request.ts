@@ -90,6 +90,10 @@ function showToast(message: string, type: ToastType = 'info') {
   if (!toastContainer) {
     toastContainer = document.createElement('div')
     toastContainer.id = 'toast-container'
+    // 读屏播报：错误/成功提示必须进入 live region，否则屏幕阅读器用户完全感知不到
+    toastContainer.setAttribute('role', 'status')
+    toastContainer.setAttribute('aria-live', 'polite')
+    toastContainer.setAttribute('aria-atomic', 'true')
     toastContainer.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;'
     document.body.appendChild(toastContainer)
   }

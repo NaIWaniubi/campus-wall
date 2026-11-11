@@ -96,7 +96,11 @@ function onLogout() {
               {{ (userStore.user?.nickname || '管')[0] }}
             </div>
             <span class="text-sm text-zinc-700 hidden sm:inline">{{ userStore.user?.nickname }}</span>
-            <span class="px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 text-xs whitespace-nowrap">{{ roleLabel }}</span>
+            <!-- 昵称恰好等于角色名时（如超管默认昵称「超级管理员」）不再重复展示角色标签 -->
+            <span
+              v-if="userStore.user?.nickname !== roleLabel"
+              class="px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 text-xs whitespace-nowrap"
+            >{{ roleLabel }}</span>
           </div>
           <router-link to="/" class="text-sm text-zinc-500 hover:text-brand-600 hidden sm:inline">返回前台</router-link>
           <button class="flex items-center gap-1 text-sm text-zinc-500 hover:text-red-500" @click="onLogout">

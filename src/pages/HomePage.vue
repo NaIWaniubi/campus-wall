@@ -5,10 +5,11 @@
  */
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Bell, Plus, RefreshCw, BellRing } from '@lucide/vue'
+import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { postApi, subscriptionApi } from '@/utils/api'
+import { postApi, subscriptionApi, announcementApi, sectionApi } from '@/utils/api'
+import { sectionGradient } from '@/utils/sections'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
@@ -208,11 +209,33 @@ function goMessage() {
   router.push('/message')
 }
 
+// 桌面端右栏数据：官方公告 + 热门搜索词（失败静默，不影响信息流）
+const announcements = ref<{ id: number; title: string; content: string }[]>([])
+const hotWords = ref<string[]>([])
+
+async function loadRailData() {
+  // 学生侧只有 /announcements/active（返回单条或 null）；/announcements 列表是超管接口，学生/游客拉会 403
+  try {
+    const res: any = await announcementApi.active()
+    const a = res?.data ?? res
+    announcements.value = a && a.title ? [a] : []
+  } catch {
+    announcements.value = []
+  }
+  try {
+    const res: any = await sectionApi.hotSearch()
+    hotWords.value = (res?.data || res || []).slice(0, 8)
+  } catch {
+    // 静默
+  }
+}
+
 onMounted(() => {
   if (!useVirtual.value) window.addEventListener('scroll', onScroll)
   if (!appStore.sections.length) appStore.fetchSections()
   loadList(true)
   loadSubscriptions()
+  loadRailData()
   updateScrollMargin()
   window.addEventListener('resize', updateScrollMargin)
 })
@@ -225,70 +248,81 @@ watch(list, () => nextTick(updateScrollMargin))
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-24">
-    <!-- 顶部导航 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-100">
-      <div class="max-w-[960px] mx-auto flex items-center gap-2 h-14 px-3">
-        <button class="flex-1 flex items-center gap-2 h-9 px-3 rounded-full bg-zinc-100 text-zinc-400 text-sm" @click="router.push('/search')">
-          <Search class="w-4 h-4" />
-          <span>搜索帖子、用户</span>
-        </button>
-        <button class="hidden sm:flex p-1.5 text-zinc-500 hover:text-brand-600 transition" title="刷新" :disabled="refreshing" @click="manualRefresh">
-          <RefreshCw class="w-5 h-5" :class="refreshing ? 'animate-spin' : ''" />
-        </button>
-        <button class="relative p-1.5 text-zinc-600 hover:text-zinc-900 transition" @click="goMessage">
-          <Bell class="w-6 h-6" />
-          <span v-if="appStore.unreadCount > 0" class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
-        <button class="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center flex-shrink-0 ring-2 ring-brand-50" @click="goProfile">
-          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="w-full h-full object-cover" alt="" />
-          <span v-else class="text-sm font-bold text-brand-700">{{ userStore.user?.nickname?.charAt(0) || '我' }}</span>
-        </button>
-      </div>
+  <div class="min-h-screen pb-24" style="background: var(--color-bg)">
+    <!-- 顶部渐变头（复刻原生小程序 pages/index/index.wxss 的 .header） -->
+    <header class="hero sticky top-0 z-20">
+      <div class="max-w-[1280px] mx-auto px-3 pt-3">
+        <div class="flex items-center gap-2.5 mb-3">
+          <!-- 校区选择（原界面就叫「📍 本校」，桌面端顺带承担品牌位） -->
+          <button class="inline-flex hero-pill font-semibold shrink-0" aria-label="切换校区">
+            <span>📍</span><span>本校</span>
+          </button>
+          <button class="inline-flex hero-pill flex-1 min-w-0 justify-start text-white/70" @click="router.push('/search')">
+            <Search class="w-4 h-4 opacity-70 shrink-0" />
+            <span class="truncate">搜索内容、话题、用户</span>
+          </button>
+          <button class="hidden md:inline-flex hero-pill !px-2.5" title="刷新" :disabled="refreshing" @click="manualRefresh">
+            <RefreshCw class="w-4 h-4" :class="refreshing ? 'animate-spin' : ''" />
+          </button>
+          <button class="hidden md:inline-flex hero-pill !px-2.5 relative" aria-label="消息中心" @click="goMessage">
+            <Bell class="w-[18px] h-[18px]" />
+            <span v-if="appStore.unreadCount > 0" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+          <button class="hidden md:inline-flex hero-pill !px-1.5 !py-1.5" aria-label="个人中心" @click="goProfile">
+            <span class="w-6 h-6 rounded-full overflow-hidden bg-white/85 flex items-center justify-center">
+              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="w-full h-full object-cover" alt="" />
+              <span v-else class="text-[11px] font-bold text-brand-500">{{ userStore.user?.nickname?.charAt(0) || '我' }}</span>
+            </span>
+          </button>
+        </div>
 
-      <!-- 板块Tab -->
-      <div class="max-w-[960px] mx-auto px-3 overflow-x-auto scrollbar-hide">
-        <div class="flex items-center gap-1 h-11">
+        <!-- 分类 chips -->
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3">
           <button
             v-for="sec in [{ id: 0, name: '全部' }, ...appStore.sections]"
             :key="sec.id"
-            class="relative px-3 py-2 text-sm whitespace-nowrap transition rounded-lg"
-            :class="activeSection === sec.id ? 'text-brand-600 font-medium bg-brand-50' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'"
+            class="hero-chip"
+            :class="{ 'is-active': activeSection === sec.id }"
+            :style="activeSection === sec.id
+              ? (sec.id === 0
+                ? { background: 'rgba(255,255,255,0.95)', color: 'var(--color-brand-500)', borderColor: 'transparent', boxShadow: '0 6px 16px -6px rgba(15,20,40,.45)' }
+                : { background: sectionGradient(sec.id, sec.name), color: '#fff', borderColor: 'transparent', boxShadow: '0 6px 16px -6px rgba(15,20,40,.45)' })
+              : undefined"
             @click="selectSection(sec.id)"
           >
             {{ sec.name }}
-            <BellRing v-if="sec.id > 0 && subscribedSectionIds.has(sec.id)" class="inline-block w-3 h-3 ml-0.5 text-brand-500" />
-            <span v-if="activeSection === sec.id" class="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-5 h-0.5 bg-brand-500 rounded-full"></span>
+            <BellRing v-if="sec.id > 0 && subscribedSectionIds.has(sec.id)" class="w-3 h-3 ml-0.5" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 白色排序条：顶部圆角贴在渐变头下沿（对齐小程序 .sort-tabs） -->
+      <div class="max-w-[1280px] mx-auto px-3">
+        <div class="sort-strip flex items-center gap-12 px-4 pt-3">
+          <button
+            v-for="opt in sortOptions"
+            :key="opt.key"
+            class="sort-strip-item"
+            :class="{ 'is-active': activeSort === opt.key }"
+            @click="selectSort(opt.key)"
+          >
+            {{ opt.label }}
           </button>
         </div>
       </div>
     </header>
 
-    <!-- 内容区 -->
+    <!-- 内容区：左信息流 + 右栏（xl 及以上显示） -->
     <main
-      class="max-w-[960px] mx-auto px-3 py-3 space-y-3"
+      class="max-w-[1280px] mx-auto px-3 py-3 flex gap-6 items-start"
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
     >
-      <!-- 下拉刷新指示器 -->
+      <div class="flex-1 min-w-0 max-w-[960px] space-y-3"><!-- 下拉刷新指示器 -->
       <div class="flex items-center justify-center text-xs text-zinc-400 transition-all overflow-hidden" :style="{ height: pullDistance + 'px' }">
         <RefreshCw v-if="refreshing" class="w-4 h-4 animate-spin mr-1" />
         {{ refreshing ? '刷新中...' : pullDistance >= pullThreshold ? '松开刷新' : '下拉刷新' }}
-      </div>
-
-      <!-- 排序切换：热门 / 最新（风格与板块 Tab 一致） -->
-      <div class="flex items-center gap-1">
-        <button
-          v-for="opt in sortOptions"
-          :key="opt.key"
-          class="relative px-3 py-2 text-sm whitespace-nowrap transition rounded-lg"
-          :class="activeSort === opt.key ? 'text-brand-600 font-medium bg-brand-50' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'"
-          @click="selectSort(opt.key)"
-        >
-          {{ opt.label }}
-          <span v-if="activeSort === opt.key" class="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-5 h-0.5 bg-brand-500 rounded-full"></span>
-        </button>
       </div>
 
       <PostSkeleton v-if="loading" :count="4" />
@@ -326,12 +360,68 @@ watch(list, () => nextTick(updateScrollMargin))
         <!-- A-T3 虚拟滚动哨兵：进入视口 → 触发 loadList(false) -->
         <div v-if="useVirtual && hasMore" ref="sentinelRef" class="h-1" aria-hidden="true" />
       </template>
+      </div>
+
+      <!-- 右栏：官方公告 / 热门搜索 / 板块直达（仅桌面端） -->
+      <aside class="hidden xl:block w-[300px] shrink-0 sticky top-[132px] space-y-3">
+        <section v-if="announcements.length" class="card-premium p-4">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
+            <Megaphone class="w-4 h-4 text-brand-500" /> 官方公告
+          </h2>
+          <div v-for="a in announcements" :key="a.id" class="pb-3 mb-3 border-b border-zinc-50 last:pb-0 last:mb-0 last:border-0">
+            <p class="text-sm text-zinc-800 font-medium leading-snug">{{ a.title }}</p>
+            <p class="mt-1 text-xs text-zinc-500 leading-relaxed line-clamp-3">{{ a.content }}</p>
+          </div>
+        </section>
+
+        <section class="card-premium p-4">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
+            <Flame class="w-4 h-4 text-orange-500" /> 热门搜索
+          </h2>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="w in hotWords"
+              :key="w"
+              class="px-2.5 py-1 rounded-full bg-zinc-50 hover:bg-brand-50 hover:text-brand-600 text-xs text-zinc-600 transition"
+              @click="router.push({ path: '/search', query: { keyword: w } })"
+            >
+              {{ w }}
+            </button>
+          </div>
+        </section>
+
+        <section class="card-premium p-4">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
+            <LayoutGrid class="w-4 h-4 text-brand-500" /> 板块直达
+          </h2>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="sec in appStore.sections"
+              :key="sec.id"
+              class="px-3 py-2 rounded-xl bg-zinc-50 hover:bg-brand-50 hover:text-brand-600 text-xs text-zinc-600 text-left transition truncate"
+              @click="router.push(`/section/${sec.id}`)"
+            >
+              {{ sec.name }}
+            </button>
+          </div>
+        </section>
+
+        <section class="rounded-[16px] p-4 text-white relative overflow-hidden" style="background: var(--grad-aurora)">
+          <span class="pointer-events-none absolute -right-6 -top-8 w-28 h-28 rounded-full bg-white/25 blur-2xl" aria-hidden="true"></span>
+          <p class="text-sm font-semibold">校园墙 · 八板块社区</p>
+          <p class="mt-1 text-xs/relaxed text-white/85">
+            二手交易 · 失物招领 · 表白墙 · 吐槽树洞 · 互助问答 · 校园活动 · 拼车 · 组队
+          </p>
+          <p class="mt-2 text-xs text-white/70">失物雷达 / 信誉分 / 匿名治理 / 实时私信</p>
+        </section>
+      </aside>
     </main>
 
     <!-- 悬浮发布按钮 -->
     <button
-      class="fixed right-4 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 active:scale-90 shadow-lg shadow-brand-500/40 flex items-center justify-center text-white transition-all duration-200 z-20"
+      class="hidden md:flex fixed right-4 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 active:scale-90 shadow-lg shadow-brand-500/40 items-center justify-center text-white transition-all duration-200 z-20"
       style="bottom: calc(1.5rem + env(safe-area-inset-bottom));"
+      aria-label="发布新内容"
       @click="goPublish"
     >
       <Plus class="w-7 h-7" />

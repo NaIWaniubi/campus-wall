@@ -612,438 +612,481 @@ function closeMoreMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-20">
-    <!-- 顶部导航 -->
-    <header class="hero sticky top-0 z-20">
-      <div class="max-w-[960px] mx-auto flex items-center justify-between h-14 px-3 relative">
-        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
-          <ArrowLeft class="w-5 h-5" />
+  <div class="min-h-screen pb-24">
+    <!-- 顶部导航：墨底常驻（返回 / 板块名 / 更多） -->
+    <header class="sticky top-0 z-20" style="background: var(--ink)">
+      <div class="max-w-[960px] mx-auto flex items-center justify-between h-12 px-3 relative">
+        <button
+          class="ds-icon-btn"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:var(--card);box-shadow:none"
+          aria-label="返回"
+          @click="router.back()"
+        >
+          <ArrowLeft class="w-[18px] h-[18px]" />
         </button>
-        <span class="font-semibold text-white">{{ post?.section?.name || '详情' }}</span>
-        <button class="more-menu-trigger p-2 -mr-2 text-white/90 hover:text-white" @click.stop="showMoreMenu = !showMoreMenu">
-          <MoreHorizontal class="w-5 h-5" />
+        <span class="ds-label" style="color: rgb(255 255 255 / 0.55)">{{ post?.section?.name || '详情' }}</span>
+        <button
+          class="more-menu-trigger ds-icon-btn"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:var(--card);box-shadow:none"
+          aria-label="更多"
+          @click.stop="showMoreMenu = !showMoreMenu"
+        >
+          <MoreHorizontal class="w-[18px] h-[18px]" />
         </button>
         <!-- 更多菜单 -->
-        <div v-if="showMoreMenu" class="more-menu-panel absolute right-2 top-12 bg-white rounded-xl shadow-lg border border-zinc-100 py-1 w-32 z-30" @click.stop>
-          <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" @click="share">
+        <div v-if="showMoreMenu" class="more-menu-panel absolute right-3 top-11 ds-card p-1 w-32 z-30" @click.stop>
+          <button class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--ink)" @click="share">
             <Share2 class="w-4 h-4" /> 分享
           </button>
-          <button v-if="!isAuthor" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" @click="openReport">
+          <button v-if="!isAuthor" class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--ink)" @click="openReport">
             <Flag class="w-4 h-4" /> 举报
           </button>
-          <button v-if="isAuthor" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50" @click="showDeleteDialog = true; showMoreMenu = false">
+          <button v-if="isAuthor" class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--coral)" @click="showDeleteDialog = true; showMoreMenu = false">
             <Trash2 class="w-4 h-4" /> 删除
           </button>
         </div>
       </div>
     </header>
 
-    <!-- 加载骨架 -->
-    <main v-if="loading && !post" class="max-w-[960px] mx-auto px-4 py-4">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-11 h-11 rounded-full skeleton"></div>
-        <div class="flex-1">
-          <div class="h-4 w-24 skeleton rounded mb-2"></div>
-          <div class="h-3 w-32 skeleton rounded"></div>
+    <!-- 墨色海报头：板块名小标签 + 标题大字 + 作者/时间行 -->
+    <section v-if="post" class="hero px-4 pt-4 pb-7 rounded-b-[20px]">
+      <div class="max-w-[960px] mx-auto">
+        <span class="ds-sticker ds-sticker--coral" style="font-size: 11.5px">{{ post.section?.name || '详情' }}</span>
+
+        <div class="mt-3 flex items-start gap-2.5">
+          <h1 class="ds-display ds-display-lg text-white flex-1 min-w-0">{{ post.title }}</h1>
+          <!-- 已售徽标：任何视角可见（对齐小程序 sold-badge） -->
+          <span v-if="soldAt" class="ds-sticker ds-sticker--sky shrink-0 mt-1">✓ 已售出</span>
+        </div>
+
+        <!-- 作者 / 时间行 -->
+        <div class="mt-3.5 flex items-center gap-3">
+          <div
+            class="flex items-center gap-2 flex-1 min-w-0"
+            :class="canViewAuthorProfile ? 'cursor-pointer' : ''"
+            @click="goAuthorProfile"
+          >
+            <div class="w-9 h-9 rounded-[10px] overflow-hidden flex items-center justify-center shrink-0"
+              style="background: var(--lime); border: 1.5px solid var(--lime)">
+              <img v-if="post.author.avatar" :src="post.author.avatar" class="w-full h-full object-cover" alt="" />
+              <span v-else class="text-[14px] font-black" style="color: var(--ink)">{{ post.author.nickname?.charAt(0) || '匿' }}</span>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[13px] font-bold text-white truncate">{{ post.author.nickname || '匿名用户' }}</span>
+                <span v-if="post.isAnonymous" class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-[6px] text-white"
+                  style="border: 1px solid rgb(255 255 255 / 0.4)">匿名</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-[11px] ds-num" style="color: rgb(255 255 255 / 0.6)">
+                <span>{{ formatTime(post.createdAt) }}</span>
+                <span>·</span>
+                <span class="flex items-center gap-0.5"><Eye class="w-3 h-3" /> {{ post.viewCount }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- 作者互动：私信 / 关注 -->
+          <div v-if="showFollowBtn || showDmBtn" class="flex items-center gap-1.5 shrink-0">
+            <button class="ds-btn ds-btn--sm" @click="toggleFollow">
+              <UserCheck v-if="followFollowing" class="w-3.5 h-3.5" />
+              <UserPlus v-else class="w-3.5 h-3.5" />
+              {{ followFollowing ? '已关注' : '关注' }}
+            </button>
+            <button class="ds-btn ds-btn--sm" style="background: var(--lime); border-color: var(--lime); color: var(--ink)" @click="startChat">
+              <MessagesSquare class="w-3.5 h-3.5" /> 私信
+            </button>
+          </div>
         </div>
       </div>
-      <div class="h-6 w-3/4 skeleton rounded mb-3"></div>
-      <div class="h-4 w-full skeleton rounded mb-1"></div>
-      <div class="h-4 w-5/6 skeleton rounded mb-1"></div>
-      <div class="h-4 w-2/3 skeleton rounded mb-4"></div>
-      <div class="flex justify-center py-8">
-        <Loader2 class="w-6 h-6 text-brand-400 animate-spin" />
+    </section>
+
+    <!-- 加载骨架 -->
+    <main v-if="loading && !post" class="max-w-[960px] mx-auto px-3 pt-3 space-y-3">
+      <section class="ds-card p-4">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-11 h-11 rounded-[12px] skeleton"></div>
+          <div class="flex-1">
+            <div class="h-4 w-24 skeleton rounded mb-2"></div>
+            <div class="h-3 w-32 skeleton rounded"></div>
+          </div>
+        </div>
+        <div class="h-6 w-3/4 skeleton rounded mb-3"></div>
+        <div class="h-4 w-full skeleton rounded mb-1"></div>
+        <div class="h-4 w-5/6 skeleton rounded mb-1"></div>
+        <div class="h-4 w-2/3 skeleton rounded"></div>
+      </section>
+      <div class="flex justify-center py-5">
+        <Loader2 class="w-6 h-6 animate-spin" style="color: var(--ink-mute)" />
       </div>
     </main>
 
     <!-- 加载失败（非 404 留在原页给重试按钮；404 已在 fetchPost 内强制回首页） -->
-    <main v-else-if="loadError" class="max-w-[960px] mx-auto px-4 py-16 text-center">
-      <div class="w-14 h-14 mx-auto rounded-full bg-zinc-100 flex items-center justify-center mb-3">
-        <Loader2 class="w-7 h-7 text-zinc-400" />
-      </div>
-      <p class="text-sm text-zinc-600 mb-1">
-        {{ loadError === 'timeout' ? '请求超时，请检查网络后重试' : '网络异常，请检查网络后重试' }}
-      </p>
-      <p class="text-xs text-zinc-400 mb-4">该帖子可能仍存在，只是当前无法加载</p>
-      <button
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 active:scale-95 transition"
-        @click="fetchPost"
-      >
-        <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
-        重新加载
-      </button>
+    <main v-else-if="loadError" class="max-w-[960px] mx-auto px-3 pt-3">
+      <section class="ds-card p-5 text-center">
+        <div class="w-12 h-12 mx-auto rounded-[12px] flex items-center justify-center mb-3"
+          style="background: var(--paper); border: 1.5px solid var(--ink)">
+          <Loader2 class="w-6 h-6" style="color: var(--ink-mute)" />
+        </div>
+        <p class="text-[13px] font-bold mb-1" style="color: var(--ink)">
+          {{ loadError === 'timeout' ? '请求超时，请检查网络后重试' : '网络异常，请检查网络后重试' }}
+        </p>
+        <p class="ds-sub mb-4">该帖子可能仍存在，只是当前无法加载</p>
+        <button class="ds-btn ds-btn--primary ds-btn--sm" @click="fetchPost">
+          <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
+          重新加载
+        </button>
+      </section>
     </main>
 
-    <main v-if="post" class="max-w-[960px] mx-auto px-4 py-4">
-      <!-- 作者信息（非匿名可点击跳转他人主页） -->
-      <div class="flex items-center gap-3 mb-4">
-        <div
-          class="flex items-center gap-3 flex-1 min-w-0"
-          :class="canViewAuthorProfile ? 'cursor-pointer group' : ''"
-          @click="goAuthorProfile"
-        >
-          <div class="w-11 h-11 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
-            <img v-if="post.author.avatar" :src="post.author.avatar" class="w-full h-full object-cover" alt="" />
-            <span v-else class="text-base font-bold text-brand-700">{{ post.author.nickname?.charAt(0) || '匿' }}</span>
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="font-medium text-zinc-900 truncate transition-colors" :class="canViewAuthorProfile ? 'group-hover:text-brand-600' : ''">{{ post.author.nickname || '匿名用户' }}</span>
-              <span v-if="post.isAnonymous" class="text-xs bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">匿名</span>
-            </div>
-            <div class="text-xs text-zinc-400 flex items-center gap-2">
-              <span>{{ formatTime(post.createdAt) }}</span>
-              <span>·</span>
-              <span class="flex items-center gap-0.5"><Eye class="w-3 h-3" /> {{ post.viewCount }}</span>
-            </div>
-          </div>
-        </div>
-        <!-- 作者互动：私信 / 关注 -->
-        <div v-if="showFollowBtn || showDmBtn" class="flex items-center gap-1.5 flex-shrink-0">
-          <button
-            class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs border transition active:scale-95"
-            :class="followFollowing ? 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200' : 'bg-brand-50 text-brand-600 border-brand-100 hover:bg-brand-100'"
-            @click="toggleFollow">
-            <UserCheck v-if="followFollowing" class="w-3.5 h-3.5" />
-            <UserPlus v-else class="w-3.5 h-3.5" />
-            {{ followFollowing ? '已关注' : '关注' }}
-          </button>
-          <button
-            class="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs bg-brand-500 text-white hover:bg-brand-600 transition active:scale-95"
-            @click="startChat">
-            <MessagesSquare class="w-3.5 h-3.5" /> 私信
-          </button>
-        </div>
-      </div>
+    <main v-if="post" class="max-w-[960px] mx-auto px-3 pt-3 space-y-3">
 
       <!-- 审核状态提示 -->
-      <div v-if="isPending" class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-3 text-sm text-amber-700 flex items-center gap-2">
-        <span class="font-medium">审核中</span>
-        <span class="text-amber-600/80">帖子正在审核，审核通过后方可互动</span>
+      <div v-if="isPending" class="ds-card p-3.5 flex items-center gap-2.5 text-[13px]">
+        <span class="ds-sticker ds-sticker--sky shrink-0">审核中</span>
+        <span style="color: var(--ink-soft)">帖子正在审核，审核通过后方可互动</span>
       </div>
 
       <!-- 被驳回状态条：仅作者可见，附驳回原因 + 去修改入口（衔接 24h 编辑窗口） -->
-      <div v-if="isRejected && isAuthor" class="bg-red-50 border border-red-100 rounded-xl p-3 mb-3 text-sm text-red-600">
-        <div class="flex items-center gap-2 mb-1">
-          <span class="font-medium">已驳回</span>
-          <span class="text-red-500/80">该帖子未通过审核</span>
+      <div v-if="isRejected && isAuthor" class="ds-card p-3.5 text-[13px]">
+        <div class="flex items-center gap-2.5 mb-1.5">
+          <span class="ds-sticker ds-sticker--coral shrink-0">已驳回</span>
+          <span style="color: var(--ink-soft)">该帖子未通过审核</span>
         </div>
-        <p v-if="post.rejectReason || post.reason" class="text-xs text-red-500/90 leading-relaxed">
+        <p v-if="post.rejectReason || post.reason" class="text-[12px] leading-relaxed" style="color: var(--coral)">
           驳回原因：{{ post.rejectReason || post.reason }}
         </p>
         <div class="mt-2.5 flex items-center gap-2">
-          <button
-            v-if="canEdit"
-            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-red-200 text-red-600 text-xs font-medium hover:bg-red-100 active:scale-95 transition"
-            @click="goEdit"
-          >
-            去修改
-          </button>
-          <span v-else class="text-xs text-red-500/70">已超过 24 小时修改窗口，请删除后重新发布</span>
+          <button v-if="canEdit" class="ds-btn ds-btn--sm" @click="goEdit">去修改</button>
+          <span v-else class="text-[12px]" style="color: var(--ink-mute)">已超过 24 小时修改窗口，请删除后重新发布</span>
         </div>
       </div>
 
       <!-- 已下架状态条（兜底） -->
-      <div v-else-if="isOffline && isAuthor" class="bg-zinc-100 border border-zinc-200 rounded-xl p-3 mb-3 text-sm text-zinc-600">
-        <div class="flex items-center gap-2">
-          <span class="font-medium">已下架</span>
-          <span class="text-zinc-500/80">该帖子已被管理员下架</span>
+      <div v-else-if="isOffline && isAuthor" class="ds-card p-3.5 text-[13px]">
+        <div class="flex items-center gap-2.5">
+          <span class="ds-sticker ds-sticker--sky shrink-0">已下架</span>
+          <span style="color: var(--ink-soft)">该帖子已被管理员下架</span>
         </div>
-        <p v-if="post.rejectReason || post.reason" class="text-xs text-zinc-500 mt-1">原因：{{ post.rejectReason || post.reason }}</p>
+        <p v-if="post.rejectReason || post.reason" class="text-[12px] mt-1" style="color: var(--ink-mute)">原因：{{ post.rejectReason || post.reason }}</p>
       </div>
 
-      <!-- 标题与正文 -->
-      <div class="flex items-center gap-2 mb-2">
-        <h1 class="text-xl font-bold text-zinc-900 flex-1 min-w-0">{{ post.title }}</h1>
-        <!-- 已售徽标：任何视角可见（对齐小程序 sold-badge） -->
-        <span v-if="soldAt" class="flex-shrink-0 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-medium border border-emerald-100">
-          ✓ 已售出
-        </span>
-      </div>
-      <p class="text-sm text-zinc-700 leading-relaxed post-content mb-3">{{ post.content }}</p>
+      <!-- 正文卡：正文 15.5px / 行高 1.85 + 图片墨线圆角 + 扩展字段 -->
+      <section class="ds-card p-4">
+        <p class="detail-body post-content">{{ post.content }}</p>
 
-      <!-- 图片九宫格 -->
-      <div v-if="post.images?.length" class="grid grid-cols-3 gap-1.5 mb-3">
-        <div v-for="(img, i) in gridImages" :key="i" class="aspect-square rounded-lg overflow-hidden bg-zinc-100 cursor-pointer" @click="previewIndex = Number(i)">
-          <img :src="img" class="w-full h-full object-cover" loading="lazy" alt="" @error="onThumbError($event, post.images[i])" />
+        <!-- 图片九宫格 -->
+        <div v-if="post.images?.length" class="grid grid-cols-3 gap-2 mt-3.5">
+          <div v-for="(img, i) in gridImages" :key="i" class="aspect-square rounded-[12px] overflow-hidden cursor-pointer"
+            style="border: 1.5px solid var(--ink); background: var(--card)" @click="previewIndex = Number(i)">
+            <img :src="img" class="w-full h-full object-cover" loading="lazy" alt="" @error="onThumbError($event, post.images[i])" />
+          </div>
         </div>
-      </div>
 
-      <!-- 扩展字段 -->
-      <div v-if="post.extraFields && Object.keys(post.extraFields).length" class="rounded-[16px] p-3.5 mb-3 text-sm space-y-1.5 card-premium" style="background: linear-gradient(135deg, rgba(22,160,133,0.10), rgba(109,91,208,0.10))">
-        <div v-if="post.extraFields.price" class="grad-text font-extrabold text-[26px] tracking-tight flex items-baseline gap-1 mb-1">
-          <span class="text-base">¥</span>{{ post.extraFields.price }}
-        </div>
-        <div v-if="post.extraFields.condition" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">新旧</span>
-          <span class="text-zinc-700">{{ post.extraFields.condition }}</span>
-        </div>
-        <div v-if="post.extraFields.contact" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">联系</span>
-          <span class="text-zinc-700">{{ post.extraFields.contact }}</span>
-        </div>
-        <div v-if="post.extraFields.location" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">地点</span>
-          <span class="text-zinc-700">{{ post.extraFields.location }}</span>
-        </div>
-        <div v-if="post.extraFields.time" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">时间</span>
-          <span class="text-zinc-700">{{ post.extraFields.time }}</span>
-        </div>
-        <div v-if="post.extraFields.itemType" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">物品</span>
-          <span class="text-zinc-700">{{ post.extraFields.itemType }}</span>
-        </div>
-        <div v-if="post.extraFields.organizer" class="flex items-center gap-2">
-          <span class="text-zinc-500 w-14">主办方</span>
-          <span class="text-zinc-700">{{ post.extraFields.organizer }}</span>
-        </div>
-      </div>
+        <!-- 扩展字段 -->
+        <template v-if="post.extraFields && Object.keys(post.extraFields).length">
+          <div class="ds-rule my-3.5"></div>
+          <div class="text-[13px] space-y-1.5">
+            <div v-if="post.extraFields.price" class="ds-display text-[26px] flex items-baseline gap-1 mb-1" style="color: var(--ink)">
+              <span class="text-[15px]">¥</span><span class="ds-marker">{{ post.extraFields.price }}</span>
+            </div>
+            <div v-if="post.extraFields.condition" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">新旧</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.condition }}</span>
+            </div>
+            <div v-if="post.extraFields.contact" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">联系</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.contact }}</span>
+            </div>
+            <div v-if="post.extraFields.location" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">地点</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.location }}</span>
+            </div>
+            <div v-if="post.extraFields.time" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">时间</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.time }}</span>
+            </div>
+            <div v-if="post.extraFields.itemType" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">物品</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.itemType }}</span>
+            </div>
+            <div v-if="post.extraFields.organizer" class="flex items-center gap-2">
+              <span class="ds-label w-14 shrink-0">主办方</span>
+              <span class="truncate" style="color: var(--ink-soft)">{{ post.extraFields.organizer }}</span>
+            </div>
+          </div>
+        </template>
+      </section>
 
       <!-- 二手交易：作者标记已售（可选登记买家） -->
-      <div v-if="canMarkSold" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
+      <section v-if="canMarkSold" class="ds-card p-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-zinc-800">物品已卖出去了？</p>
-          <p class="text-xs text-zinc-400 mt-0.5">标记已售后，双方可互相评价；可登记买家学号便于定向评价</p>
+          <p class="text-[13px] font-bold" style="color: var(--ink)">物品已卖出去了？</p>
+          <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--ink-mute)">标记已售后，双方可互相评价；可登记买家学号便于定向评价</p>
         </div>
         <button
-          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition active:scale-95"
+          class="ds-btn ds-btn--primary ds-btn--sm shrink-0"
           @click="showMarkSold = true; buyerStudentId = ''; buyerPreview = null"
         >
           标记已售
         </button>
-      </div>
+      </section>
 
       <!-- 二手交易：买家评价这次交易 -->
-      <div v-if="soldAt && canRateAsBuyer" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
+      <section v-if="soldAt && canRateAsBuyer" class="ds-card p-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-zinc-800">交易已完成</p>
-          <p class="text-xs text-zinc-400 mt-0.5">为这次交易打个分吧（好评 +2 / 差评 -3 信誉分）</p>
+          <p class="text-[13px] font-bold" style="color: var(--ink)">交易已完成</p>
+          <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--ink-mute)">为这次交易打个分吧（好评 +2 / 差评 -3 信誉分）</p>
         </div>
-        <button
-          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-amber-400 text-white text-sm font-medium hover:bg-amber-500 transition active:scale-95"
-          @click="openRateDialog"
-        >
+        <button class="ds-btn ds-btn--accent ds-btn--sm shrink-0" @click="openRateDialog">
           评价这次交易
         </button>
-      </div>
+      </section>
 
       <!-- 二手交易：作者评价登记的买家 -->
-      <div v-if="canRateAsSeller" class="card-premium rounded-[16px] p-3.5 mb-3 flex items-center justify-between">
+      <section v-if="canRateAsSeller" class="ds-card p-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-zinc-800">给这次交易的买家打个分</p>
-          <p class="text-xs text-zinc-400 mt-0.5">你登记的买家可以收到你的评价</p>
+          <p class="text-[13px] font-bold" style="color: var(--ink)">给这次交易的买家打个分</p>
+          <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--ink-mute)">你登记的买家可以收到你的评价</p>
         </div>
-        <button
-          class="flex-shrink-0 ml-3 px-4 py-2 rounded-full bg-amber-400 text-white text-sm font-medium hover:bg-amber-500 transition active:scale-95"
-          @click="openRateDialog"
-        >
+        <button class="ds-btn ds-btn--accent ds-btn--sm shrink-0" @click="openRateDialog">
           评价买家
         </button>
-      </div>
+      </section>
 
       <!-- AI 划重点（V3）：一句话读懂帖子 + 交易风险提示 -->
-      <div class="card-premium rounded-[16px] mb-3 overflow-hidden ai-trail">
+      <section class="ds-card ai-trail overflow-hidden">
         <button
-          class="w-full flex items-center gap-2 px-4 py-3 text-left"
+          class="w-full flex items-center gap-2.5 px-4 py-3.5 text-left"
           :aria-expanded="aiSummaryOpen"
           @click="loadAiSummary"
         >
-          <span class="w-6 h-6 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-            style="background: var(--grad-brand)">
-            <Sparkles class="w-3.5 h-3.5" />
+          <span class="ds-sticker ds-sticker--violet shrink-0">
+            <Sparkles class="w-3 h-3" /> AI
           </span>
-          <span class="text-sm font-semibold text-zinc-800">AI 划重点</span>
-          <span class="text-[11px] text-zinc-400">要点 + 风险提示</span>
-          <Loader2 v-if="aiSummaryLoading" class="w-4 h-4 ml-auto animate-spin text-brand-500" />
-          <ChevronDown v-else-if="aiSummary" class="w-4 h-4 ml-auto text-zinc-400 transition-transform"
-            :class="aiSummaryOpen ? 'rotate-180' : ''" />
+          <span class="text-[14px] font-bold shrink-0" style="color: var(--ink)">AI 划重点</span>
+          <span class="text-[11px] truncate" style="color: var(--ink-mute)">要点 + 风险提示</span>
+          <Loader2 v-if="aiSummaryLoading" class="w-4 h-4 ml-auto shrink-0 animate-spin" style="color: var(--ink-mute)" />
+          <ChevronDown v-else-if="aiSummary" class="w-4 h-4 ml-auto shrink-0 transition-transform"
+            :class="aiSummaryOpen ? 'rotate-180' : ''" style="color: var(--ink-mute)" />
         </button>
 
-        <div v-if="aiSummaryOpen" class="px-4 pb-3.5">
+        <div v-if="aiSummaryOpen" class="px-4 pb-4">
           <div v-if="aiSummaryLoading" class="space-y-2" aria-live="polite">
-            <div class="h-3 rounded bg-zinc-100 animate-pulse"></div>
-            <div class="h-3 rounded bg-zinc-100 animate-pulse w-5/6"></div>
-            <div class="h-3 rounded bg-zinc-100 animate-pulse w-2/3"></div>
+            <div class="h-3 rounded skeleton"></div>
+            <div class="h-3 rounded skeleton w-5/6"></div>
+            <div class="h-3 rounded skeleton w-2/3"></div>
           </div>
           <template v-else-if="aiSummary">
             <ul class="space-y-1.5">
-              <li v-for="(pt, i) in aiSummary.points" :key="i" class="flex gap-2 text-[13px] text-zinc-700 leading-relaxed">
-                <span class="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" :style="{ background: 'var(--grad-brand)' }"></span>
+              <li v-for="(pt, i) in aiSummary.points" :key="i" class="flex gap-2 text-[13px] leading-relaxed" style="color: var(--ink-soft)">
+                <span class="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--violet)"></span>
                 <span>{{ pt }}</span>
               </li>
             </ul>
             <div
               v-if="aiSummary.risk !== 'low' && aiSummary.riskNote"
-              class="mt-2.5 flex items-start gap-1.5 px-2.5 py-2 rounded-lg"
-              :class="aiSummary.risk === 'high' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
+              class="mt-2.5 flex items-start gap-2 px-3 py-2 rounded-[10px] text-white"
+              :style="{ background: aiSummary.risk === 'high' ? 'var(--coral)' : 'var(--violet)' }"
             >
-              <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span class="text-xs leading-relaxed">{{ aiSummary.riskNote }}</span>
+              <ShieldAlert class="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span class="text-[12px] leading-relaxed">{{ aiSummary.riskNote }}</span>
             </div>
-            <p class="mt-2 text-[11px] text-zinc-400">
+            <p class="mt-2 text-[11px]" style="color: var(--ink-mute)">
               {{ aiSummary.offline ? '站内摘要模式' : 'AI 生成' }} · 仅供参考，交易请当面验货
             </p>
           </template>
         </div>
-      </div>
+      </section>
 
-      <!-- 互动栏 -->
-      <div class="flex items-center justify-around card-premium py-3.5 mb-4" :class="isPending ? 'opacity-70' : ''">
-        <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.liked ? 'text-red-500 bg-red-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleLike">
-          <Heart class="w-5 h-5" :fill="post.liked ? 'currentColor' : 'none'" /> {{ post.likeCount }}
+      <!-- 互动栏：四颗等宽 ds-chip（图标 + 数字同行；激活态墨底荧光） -->
+      <section class="ds-card p-2.5 flex items-center gap-1.5" :class="isPending ? 'opacity-70' : ''">
+        <button
+          class="ds-chip flex-1 !justify-center !py-2"
+          :class="{ 'is-active': post.liked }"
+          :disabled="isPending"
+          :aria-pressed="!!post.liked"
+          @click="toggleLike"
+        >
+          <Heart class="w-[17px] h-[17px]" :fill="post.liked ? 'currentColor' : 'none'" />
+          <span class="ds-num">{{ post.likeCount }}</span>
+        </button>
+        <button class="ds-chip flex-1 !justify-center !py-2" aria-label="查看评论" @click="scrollToComments">
+          <MessageCircle class="w-[17px] h-[17px]" />
+          <span class="ds-num">{{ post.commentCount }}</span>
         </button>
         <button
-          class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95"
-          aria-label="查看评论"
-          @click="scrollToComments"
+          class="ds-chip flex-1 !justify-center !py-2"
+          :class="{ 'is-active': post.favorited }"
+          :disabled="isPending"
+          :aria-pressed="!!post.favorited"
+          @click="toggleFavorite"
         >
-          <MessageCircle class="w-5 h-5" /> {{ post.commentCount }}
+          <Bookmark class="w-[17px] h-[17px]" :fill="post.favorited ? 'currentColor' : 'none'" />
+          <span class="ds-num">{{ post.favoriteCount }}</span>
         </button>
-        <button class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full transition active:scale-95 disabled:cursor-not-allowed" :class="post.favorited ? 'text-brand-500 bg-brand-50' : 'text-zinc-500 hover:bg-zinc-50'" :disabled="isPending" @click="toggleFavorite">
-          <Bookmark class="w-5 h-5" :fill="post.favorited ? 'currentColor' : 'none'" /> {{ post.favoriteCount }}
+        <button v-if="!isAuthor" class="ds-chip flex-1 !justify-center !py-2" aria-label="举报" @click="openReport">
+          <Flag class="w-[17px] h-[17px]" />
+          <span class="text-[11px]">举报</span>
         </button>
-        <button v-if="!isAuthor" class="flex items-center gap-1.5 text-sm text-zinc-500 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition active:scale-95" @click="openReport">
-          <Flag class="w-5 h-5" /> 举报
-        </button>
-      </div>
+      </section>
 
       <!-- 可能相关（失物招领智能匹配）：从匹配通知跳入时定位并高亮 -->
-      <div v-if="matches.length" ref="matchesCardRef" class="bg-white rounded-xl p-4 mb-4 transition-shadow duration-500" :class="matchesHighlighted ? 'ring-2 ring-brand-300 shadow-lg' : ''">
-        <h3 class="font-medium text-zinc-900">可能相关</h3>
-        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">以下帖子与本帖内容相似，或许正是你在找的</p>
+      <section v-if="matches.length" ref="matchesCardRef" class="ds-card p-4"
+        :style="matchesHighlighted ? { boxShadow: 'var(--shadow-hard-lg)' } : {}">
+        <div class="ds-section-head mb-3">
+          <span class="ds-section-head__num">01</span>
+          <h3 class="ds-title">可能相关</h3>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <p class="ds-sub mb-1.5">以下帖子与本帖内容相似，或许正是你在找的</p>
         <button
           v-for="m in matches"
           :key="m.id"
-          class="w-full text-left px-2 py-2.5 rounded-lg border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition"
+          class="row-link hover-paper w-full text-left px-1.5 py-2.5 rounded-[10px] transition"
           @click="router.push(`/post/${m.id}`)"
         >
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs bg-brand-50 text-brand-600 px-1.5 py-0.5 rounded flex-shrink-0">{{ m.section }}</span>
-            <span class="text-sm text-zinc-800 truncate flex-1">{{ m.title }}</span>
+            <span class="ds-tag shrink-0"><span class="ds-tag-dot" style="background: var(--sky)"></span>{{ m.section }}</span>
+            <span class="text-[14px] truncate flex-1" style="color: var(--ink)">{{ m.title }}</span>
           </div>
-          <p class="text-xs text-zinc-400 mt-0.5 truncate pl-0.5">{{ m.author }} · {{ m.excerpt }}</p>
+          <p class="text-[12px] mt-0.5 truncate pl-0.5" style="color: var(--ink-mute)">{{ m.author }} · {{ m.excerpt }}</p>
         </button>
-      </div>
+      </section>
 
       <!-- 智能雷达（失物招领反向匹配）：与上方「可能相关」合并展示，
            同一批帖子不再出现两个区块（此前雷达卡片与可能相关重复，评委观感廉价）。
            雷达提供分数与命中理由，关键词匹配提供板块与作者。 -->
-      <div v-if="radarOnly.length" class="bg-white rounded-xl p-4 mb-4">
-        <h3 class="font-medium text-zinc-900">🎯 智能雷达</h3>
-        <p class="text-xs text-zinc-400 mt-0.5 mb-1.5">另发现 {{ radarOnly.length }} 条高度相似的{{ radarLabel }}信息，按匹配度排序</p>
+      <section v-if="radarOnly.length" class="ds-card p-4">
+        <div class="ds-section-head mb-3">
+          <span class="ds-section-head__num">02</span>
+          <h3 class="ds-title">🎯 智能雷达</h3>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <p class="ds-sub mb-1.5">另发现 {{ radarOnly.length }} 条高度相似的{{ radarLabel }}信息，按匹配度排序</p>
         <button
           v-for="m in radarOnly"
           :key="m.postId"
-          class="w-full text-left px-2 py-2.5 rounded-lg border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition"
+          class="row-link hover-paper w-full text-left px-1.5 py-2.5 rounded-[10px] transition"
           @click="router.push(`/post/${m.postId}`)"
         >
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded flex-shrink-0">相似度 {{ m.score }}</span>
-            <span class="text-sm text-zinc-800 truncate flex-1">{{ m.title }}</span>
+            <span class="ds-tag shrink-0"><span class="ds-tag-dot" style="background: var(--lime)"></span>相似度 {{ m.score }}</span>
+            <span class="text-[14px] truncate flex-1" style="color: var(--ink)">{{ m.title }}</span>
           </div>
-          <p class="text-xs text-zinc-400 mt-0.5 truncate pl-0.5">{{ m.reasons.join(' · ') }} · {{ m.excerpt }}</p>
+          <p class="text-[12px] mt-0.5 truncate pl-0.5" style="color: var(--ink-mute)">{{ m.reasons.join(' · ') }} · {{ m.excerpt }}</p>
         </button>
-      </div>
+      </section>
 
       <!-- 意向出价（闪电意向撮合闭环，二手交易板块） -->
-      <div v-if="isTradePost && userStore.isLoggedIn && !isPending" class="bg-white rounded-xl p-4 mb-4">
-        <div class="flex items-center justify-between">
-          <h3 class="font-medium text-zinc-900">意向出价</h3>
+      <section v-if="isTradePost && userStore.isLoggedIn && !isPending" class="ds-card p-4">
+        <div class="ds-section-head mb-3">
+          <span class="ds-section-head__num">03</span>
+          <h3 class="ds-title">意向出价</h3>
+          <span class="ds-section-head__line"></span>
           <button
             v-if="!offersState.isSeller && !offersState.myOffer && !offersState.hasAccepted && !soldAt"
-            class="text-sm text-brand-600 font-medium hover:text-brand-700 transition"
+            class="ds-btn ds-btn--sm shrink-0"
             @click="showOfferSheet = true"
           >
             出个价
           </button>
         </div>
-        <p v-if="offersState.hasAccepted && !soldAt" class="text-xs text-emerald-600 mt-1">卖家已与买家达成交易，其余出价已冻结</p>
-        <p v-else-if="soldAt" class="text-xs text-zinc-400 mt-1">该物品已售出</p>
-        <div v-for="o in offersState.offers" :key="o.id" class="mt-2.5 px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-100">
+        <p v-if="offersState.hasAccepted && !soldAt" class="text-[12px]" style="color: var(--violet)">卖家已与买家达成交易，其余出价已冻结</p>
+        <p v-else-if="soldAt" class="text-[12px]" style="color: var(--ink-mute)">该物品已售出</p>
+        <div v-for="o in offersState.offers" :key="o.id" class="mt-2.5 px-3 py-2.5 rounded-[12px]"
+          style="background: var(--paper); border: 1.5px solid var(--ink)">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-brand-600 font-bold">¥{{ o.offerPrice }}</span>
+            <span class="ds-num font-black" style="color: var(--violet)">¥{{ o.offerPrice }}</span>
             <span
-              class="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
-              :class="o.status === 'accepted' || o.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : o.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-zinc-100 text-zinc-400'"
+              class="shrink-0 text-[11px] font-bold px-1.5 py-0.5 rounded-[6px]"
+              :style="{
+                background: (o.status === 'accepted' || o.status === 'completed') ? 'var(--violet)' : (o.status === 'pending' ? 'var(--sky)' : 'var(--paper)'),
+                color: (o.status === 'accepted' || o.status === 'completed') ? 'var(--card)' : 'var(--ink-mute)',
+              }"
             >{{ OFFER_STATUS_LABEL[o.status] || o.status }}</span>
-            <span v-if="o.buyer" class="text-xs text-zinc-400 truncate">{{ o.buyer.nickname }}</span>
-            <span class="ml-auto flex-shrink-0 flex gap-1.5">
+            <span v-if="o.buyer" class="text-[12px] truncate" style="color: var(--ink-mute)">{{ o.buyer.nickname }}</span>
+            <span class="ml-auto shrink-0 flex items-center gap-1.5" style="color: var(--ink-mute)">
               <template v-if="offersState.isSeller && o.status === 'pending'">
-                <button class="text-xs text-white bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded-full transition disabled:opacity-50" :disabled="offerBusy" @click="actOnOffer(o.id, 'accept')">接受</button>
-                <button class="text-xs text-zinc-500 hover:text-red-500 px-2 py-1 transition disabled:opacity-50" :disabled="offerBusy" @click="actOnOffer(o.id, 'reject')">拒绝</button>
+                <button class="ds-btn ds-btn--primary ds-btn--sm" :disabled="offerBusy" @click="actOnOffer(o.id, 'accept')">接受</button>
+                <button class="act-like text-[12px] px-2 py-1 rounded-[8px] transition" :disabled="offerBusy" @click="actOnOffer(o.id, 'reject')">拒绝</button>
               </template>
               <button
                 v-else-if="!offersState.isSeller && o.status === 'pending'"
-                class="text-xs text-zinc-500 hover:text-red-500 px-2 py-1 transition disabled:opacity-50"
+                class="act-like text-[12px] px-2 py-1 rounded-[8px] transition"
                 :disabled="offerBusy"
                 @click="actOnOffer(o.id, 'cancel')"
               >取消</button>
             </span>
           </div>
-          <p v-if="o.message" class="text-xs text-zinc-500 mt-1 truncate">附言：{{ o.message }}</p>
+          <p v-if="o.message" class="text-[12px] mt-1 truncate" style="color: var(--ink-mute)">附言：{{ o.message }}</p>
         </div>
-        <div v-if="!offersState.offers.length && !soldAt" class="text-center text-sm text-zinc-400 py-4">还没有人出价，期待你的意向价</div>
-      </div>
+        <div v-if="!offersState.offers.length && !soldAt" class="text-center text-[13px] py-4" style="color: var(--ink-mute)">还没有人出价，期待你的意向价</div>
+      </section>
 
-      <!-- 评论区 -->
-      <div id="comment-section" class="bg-white rounded-xl p-4">
-        <h3 class="font-medium text-zinc-900 mb-3">评论 {{ post.commentCount }}</h3>
-        <div v-if="!comments.length" class="text-center text-sm text-zinc-400 py-6">暂无评论，快来抢沙发</div>
-        <div v-for="c in comments" :key="c.id" class="py-3.5 border-b border-zinc-50 last:border-0">
+      <!-- 评论区：方形头像贴纸 + 墨色分隔线 -->
+      <section id="comment-section" class="ds-card p-4">
+        <div class="ds-section-head mb-3">
+          <span class="ds-section-head__num">04</span>
+          <h3 class="ds-title">评论 {{ post.commentCount }}</h3>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <div v-if="!comments.length" class="text-center text-[13px] py-6" style="color: var(--ink-mute)">暂无评论，快来抢沙发</div>
+        <div v-for="c in comments" :key="c.id" class="cmt py-3.5">
           <div class="flex items-start gap-2.5">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-brand-50">
+            <div class="w-9 h-9 rounded-[10px] overflow-hidden flex items-center justify-center shrink-0"
+              style="background: var(--sky); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm)">
               <img v-if="c.author.avatar" :src="c.author.avatar" class="w-full h-full object-cover" alt="" />
-              <span v-else class="text-xs font-bold text-brand-700">{{ c.author.nickname?.charAt(0) || '匿' }}</span>
+              <span v-else class="text-[13px] font-black" style="color: var(--ink)">{{ c.author.nickname?.charAt(0) || '匿' }}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5">
-                <span class="text-sm font-semibold text-zinc-900">{{ c.author.nickname || '匿名用户' }}</span>
-                <span v-if="c.likeCount >= 10" class="flex items-center gap-0.5 text-[10px] bg-orange-50 text-orange-500 px-1.5 py-0.5 rounded-full font-medium border border-orange-100">
+                <span class="text-[13px] font-bold" style="color: var(--ink)">{{ c.author.nickname || '匿名用户' }}</span>
+                <span v-if="c.likeCount >= 10" class="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-[6px] shrink-0"
+                  style="background: var(--coral); color: var(--card)">
                   <Flame class="w-3 h-3" /> 热门
                 </span>
               </div>
-              <p class="text-sm text-zinc-700 mt-1 post-content leading-relaxed">{{ c.content }}</p>
-              <div class="flex items-center gap-5 mt-2 text-xs text-zinc-400">
-                <span>{{ formatTime(c.createdAt) }}</span>
-                <button class="flex items-center gap-1 hover:text-red-500 transition-colors" :class="c.liked ? 'text-red-500' : ''" @click="toggleCommentLike(c)">
+              <p class="cmt-body post-content mt-1">{{ c.content }}</p>
+              <div class="flex items-center gap-5 mt-2 text-[11px]" style="color: var(--ink-mute)">
+                <span class="ds-num">{{ formatTime(c.createdAt) }}</span>
+                <button class="act-like flex items-center gap-1 transition-colors" :class="c.liked ? 'act-liked' : ''" @click="toggleCommentLike(c)">
                   <Heart class="w-3.5 h-3.5" :fill="c.liked ? 'currentColor' : 'none'" /> {{ c.likeCount }}
                 </button>
-                <button class="hover:text-brand-600 transition-colors" @click="setReplyTarget(c)">回复</button>
-                <button v-if="c.isMine || isAuthor" class="hover:text-red-500 transition-colors" @click="openDeleteComment(c)">删除</button>
+                <button class="act-link transition-colors" @click="setReplyTarget(c)">回复</button>
+                <button v-if="c.isMine || isAuthor" class="act-like transition-colors" @click="openDeleteComment(c)">删除</button>
               </div>
               <!-- 楼中楼回复 -->
-              <div v-if="c.replies?.length" class="mt-2.5 bg-zinc-50 rounded-xl p-3 space-y-2.5">
-                <div v-for="r in visibleReplies(c)" :key="r.id" class="text-sm leading-relaxed">
+              <div v-if="c.replies?.length" class="mt-2.5 p-3 rounded-[12px] space-y-2.5" style="background: var(--paper)">
+                <div v-for="r in visibleReplies(c)" :key="r.id" class="text-[13px] leading-relaxed">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="font-semibold text-brand-700">{{ r.author.nickname || '匿名用户' }}</span>
-                    <span class="text-zinc-600">{{ r.content }}</span>
+                    <span class="font-bold" style="color: var(--violet)">{{ r.author.nickname || '匿名用户' }}</span>
+                    <span style="color: var(--ink-soft)">{{ r.content }}</span>
                   </div>
-                  <div class="flex items-center gap-4 mt-1 text-[11px] text-zinc-400">
-                    <span>{{ formatTime(r.createdAt) }}</span>
-                    <button class="flex items-center gap-0.5 hover:text-red-500 transition-colors" :class="r.liked ? 'text-red-500' : ''" @click="toggleCommentLike(r)">
+                  <div class="flex items-center gap-4 mt-1 text-[11px]" style="color: var(--ink-mute)">
+                    <span class="ds-num">{{ formatTime(r.createdAt) }}</span>
+                    <button class="act-like flex items-center gap-0.5 transition-colors" :class="r.liked ? 'act-liked' : ''" @click="toggleCommentLike(r)">
                       <Heart class="w-3 h-3" :fill="r.liked ? 'currentColor' : 'none'" /> {{ r.likeCount }}
                     </button>
-                    <button class="hover:text-brand-600 transition-colors" @click="setReplyTarget(r)">回复</button>
-                    <button v-if="r.isMine || isAuthor" class="hover:text-red-500 transition-colors" @click="openDeleteComment(r)">删除</button>
+                    <button class="act-link transition-colors" @click="setReplyTarget(r)">回复</button>
+                    <button v-if="r.isMine || isAuthor" class="act-like transition-colors" @click="openDeleteComment(r)">删除</button>
                   </div>
                 </div>
-                <button v-if="c.replies.length > 3" class="text-xs text-brand-600 hover:text-brand-700 font-medium" @click="toggleExpand(c)">
+                <button v-if="c.replies.length > 3" class="act-link text-[12px] font-bold underline underline-offset-2 transition-colors" @click="toggleExpand(c)">
                   {{ expandedReplies.has(c.id) ? '收起' : `查看更多回复(${c.replies.length})` }}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </main>
 
     <!-- 底部评论输入 -->
-    <div v-if="post" class="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 z-20" style="padding-bottom: env(safe-area-inset-bottom);">
+    <div v-if="post" class="fixed bottom-0 left-0 right-0 z-20"
+      style="padding-bottom: env(safe-area-inset-bottom); background: var(--paper); border-top: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center gap-2 px-3 py-2">
-        <div v-if="replyTarget" class="flex items-center gap-1 text-xs text-zinc-500">
-          <span>回复 @{{ replyTarget.author.nickname || '匿名' }}</span>
-          <button class="text-zinc-400 hover:text-zinc-600" @click="replyTarget = null"><X class="w-3 h-3" /></button>
+        <div v-if="replyTarget" class="flex items-center gap-1 text-[12px] shrink-0" style="color: var(--ink-mute)">
+          <span class="truncate max-w-[120px]">回复 @{{ replyTarget.author.nickname || '匿名' }}</span>
+          <button class="act-like transition-colors" @click="replyTarget = null"><X class="w-3 h-3" /></button>
         </div>
         <input
           id="commentInput"
@@ -1053,12 +1096,13 @@ function closeMoreMenu(e: MouseEvent) {
           maxlength="200"
           :disabled="isPending"
           :placeholder="!userStore.isLoggedIn ? '请先登录后评论' : (isPending ? '帖子审核中，暂不可评论' : (replyTarget ? '写下你的回复...' : '写下你的评论...'))"
-          class="flex-1 h-9 px-3 rounded-full bg-zinc-100 focus:bg-white border border-transparent focus:border-brand-500 focus:outline-none text-sm transition disabled:opacity-60"
+          class="ds-input flex-1 min-w-0"
           aria-label="评论内容"
           @keyup.enter="submitComment"
           @click="onCommentInputClick"
         />
-        <button :disabled="!canComment || commentPosting" class="w-9 h-9 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white flex items-center justify-center transition" @click="submitComment">
+        <button :disabled="!canComment || commentPosting" class="ds-icon-btn shrink-0 disabled:opacity-50"
+          style="background: var(--ink); border-color: var(--ink); color: var(--lime)" @click="submitComment">
           <Loader2 v-if="commentPosting" class="w-4 h-4 animate-spin" />
           <Send v-else class="w-4 h-4" />
         </button>
@@ -1069,14 +1113,14 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showReportSheet" class="fixed inset-0 z-50 flex items-end" @click.self="showReportSheet = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative w-full max-w-[960px] mx-auto bg-white rounded-t-2xl p-4 animate-slide-up">
-          <h4 class="text-center font-medium text-zinc-900 mb-3">选择举报原因</h4>
+        <div class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
+          <h4 class="ds-title text-center mb-3">选择举报原因</h4>
           <div class="space-y-1">
-            <button v-for="r in reportReasons" :key="r" class="w-full py-3 text-center text-sm text-zinc-700 hover:bg-zinc-50 rounded-lg" @click="submitReport(r)">
+            <button v-for="r in reportReasons" :key="r" class="hover-paper w-full py-3 text-center text-[13px] rounded-[10px]" style="color: var(--ink)" @click="submitReport(r)">
               {{ r }}
             </button>
           </div>
-          <button class="w-full py-3 mt-2 text-center text-sm text-zinc-400 border-t border-zinc-100" @click="showReportSheet = false">取消</button>
+          <button class="w-full py-3 mt-2 text-center text-[12px]" style="color: var(--ink-mute); border-top: 1px solid var(--hairline)" @click="showReportSheet = false">取消</button>
         </div>
       </div>
     </Teleport>
@@ -1085,32 +1129,32 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showOfferSheet" class="fixed inset-0 z-50 flex items-end" @click.self="showOfferSheet = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative w-full max-w-[960px] mx-auto bg-white rounded-t-2xl p-4 animate-slide-up">
-          <h4 class="text-center font-medium text-zinc-900 mb-1">向卖家发起意向出价</h4>
-          <p class="text-center text-xs text-zinc-400 mb-3">卖家确认后交易即锁定，双方可在私信里约定交付</p>
-          <div class="flex items-center gap-2 px-3 h-11 rounded-lg border border-zinc-200 focus-within:border-brand-500 transition">
-            <span class="text-brand-600 font-bold">¥</span>
+        <div class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
+          <h4 class="ds-title text-center mb-1">向卖家发起意向出价</h4>
+          <p class="ds-sub text-center mb-3">卖家确认后交易即锁定，双方可在私信里约定交付</p>
+          <div class="ds-input flex items-center gap-2">
+            <span class="font-black" style="color: var(--violet)">¥</span>
             <input
               v-model="offerPrice"
               type="number"
               min="0"
               step="0.01"
               placeholder="输入你的出价金额"
-              class="flex-1 text-sm outline-none bg-transparent"
+              class="flex-1 min-w-0 text-[13px] outline-none bg-transparent"
             />
           </div>
           <input
             v-model="offerMessage"
             maxlength="100"
             placeholder="附言（可选，如：可一教自提）"
-            class="w-full mt-2 px-3 h-11 rounded-lg border border-zinc-200 focus:border-brand-500 outline-none text-sm transition"
+            class="ds-input mt-2"
           />
           <button
-            class="w-full h-11 mt-3 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium transition disabled:opacity-50"
+            class="ds-btn ds-btn--primary w-full mt-3"
             :disabled="offerBusy || !offerPrice"
             @click="submitOffer"
           >{{ offerBusy ? '发送中…' : '发送出价' }}</button>
-          <button class="w-full py-3 mt-2 text-center text-sm text-zinc-400 border-t border-zinc-100" @click="showOfferSheet = false">取消</button>
+          <button class="w-full py-3 mt-2 text-center text-[12px]" style="color: var(--ink-mute); border-top: 1px solid var(--hairline)" @click="showOfferSheet = false">取消</button>
         </div>
       </div>
     </Teleport>
@@ -1141,22 +1185,22 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showMarkSold" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showMarkSold = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative w-full max-w-sm bg-white rounded-2xl p-5">
-          <h4 class="text-center font-medium text-zinc-900">标记交易完成</h4>
-          <p class="text-center text-xs text-zinc-400 mt-1">可选登记买家学号，便于你之后定向评价对方</p>
+        <div class="ds-card relative w-full max-w-sm p-5">
+          <h4 class="ds-title text-center">标记交易完成</h4>
+          <p class="ds-sub text-center mt-1">可选登记买家学号，便于你之后定向评价对方</p>
           <input
             v-model="buyerStudentId"
             placeholder="买家学号（选填）"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm mt-4"
+            class="ds-input mt-4"
             @input="resolveBuyer"
           />
-          <p v-if="buyerPreview" class="text-xs text-green-600 mt-1.5">✓ 找到买家：{{ buyerPreview.nickname }}</p>
-          <p v-else-if="buyerStudentId.trim() && !resolvingBuyer" class="text-xs text-zinc-400 mt-1.5">未找到该学号，可留空直接标记</p>
+          <p v-if="buyerPreview" class="text-[12px] mt-1.5" style="color: var(--violet)">✓ 找到买家：{{ buyerPreview.nickname }}</p>
+          <p v-else-if="buyerStudentId.trim() && !resolvingBuyer" class="text-[12px] mt-1.5" style="color: var(--ink-mute)">未找到该学号，可留空直接标记</p>
           <div class="flex gap-2 mt-4">
-            <button class="flex-1 py-2.5 rounded-full bg-zinc-100 text-zinc-600 text-sm font-medium hover:bg-zinc-200 transition" @click="showMarkSold = false">取消</button>
+            <button class="ds-btn flex-1" @click="showMarkSold = false">取消</button>
             <button
               :disabled="markingSold || (buyerStudentId.trim() !== '' && !buyerPreview)"
-              class="flex-1 py-2.5 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition flex items-center justify-center gap-1.5"
+              class="ds-btn ds-btn--primary flex-1"
               @click="markSold"
             >
               <Loader2 v-if="markingSold" class="w-4 h-4 animate-spin" />
@@ -1171,12 +1215,13 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showRateDialog" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showRateDialog = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative w-full max-w-sm bg-white rounded-2xl p-5">
-          <h4 class="text-center font-medium text-zinc-900">评价这次交易</h4>
-          <p class="text-center text-xs text-zinc-400 mt-1">仅对方可见你的评分，评价提交后不可修改</p>
+        <div class="ds-card relative w-full max-w-sm p-5">
+          <h4 class="ds-title text-center">评价这次交易</h4>
+          <p class="ds-sub text-center mt-1">仅对方可见你的评分，评价提交后不可修改</p>
           <div class="flex justify-center gap-2 my-5">
             <button v-for="i in 5" :key="i" class="p-0.5 active:scale-90 transition" @click="rateScore = i">
-              <Star class="w-8 h-8 transition-colors" :class="i <= rateScore ? 'text-amber-400 fill-amber-400' : 'text-zinc-200 hover:text-amber-200'" />
+              <Star class="w-8 h-8 transition-colors"
+                :style="{ color: i <= rateScore ? 'var(--coral)' : 'var(--hairline)', fill: i <= rateScore ? 'var(--coral)' : 'none' }" />
             </button>
           </div>
           <textarea
@@ -1184,13 +1229,13 @@ function closeMoreMenu(e: MouseEvent) {
             maxlength="200"
             rows="3"
             placeholder="说说这次交易的体验（选填，200 字内）"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition resize-none text-sm post-content"
+            class="ds-input post-content resize-none"
           ></textarea>
           <div class="flex gap-2 mt-4">
-            <button class="flex-1 py-2.5 rounded-full bg-zinc-100 text-zinc-600 text-sm font-medium hover:bg-zinc-200 transition" @click="showRateDialog = false">取消</button>
+            <button class="ds-btn flex-1" @click="showRateDialog = false">取消</button>
             <button
               :disabled="!rateScore || rateSubmitting"
-              class="flex-1 py-2.5 rounded-full bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 disabled:bg-brand-300 transition flex items-center justify-center gap-1.5"
+              class="ds-btn ds-btn--primary flex-1"
               @click="submitRate"
             >
               <Loader2 v-if="rateSubmitting" class="w-4 h-4 animate-spin" />
@@ -1202,4 +1247,18 @@ function closeMoreMenu(e: MouseEvent) {
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+/* 详情页专属排版与分隔线：颜色/阴影全部走 token，无自定义色值 */
+.detail-body { font-size: 15.5px; line-height: 1.85; color: var(--ink-soft); }
+.cmt-body { font-size: 14px; line-height: 1.7; color: var(--ink-soft); }
+.cmt + .cmt { border-top: 1.5px solid var(--ink); }
+.row-link { border-bottom: 1px solid var(--hairline); }
+.row-link:last-child { border-bottom: 0; }
+.row-link:hover,
+.hover-paper:hover { background: var(--paper); }
+.act-liked,
+.act-like:hover { color: var(--coral); }
+.act-link:hover { color: var(--violet); }
+</style>
 

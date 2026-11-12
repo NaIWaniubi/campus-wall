@@ -58,7 +58,7 @@ onMounted(load)
 <template>
   <div class="min-h-screen bg-zinc-50">
     <!-- 顶部 -->
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center px-4 h-12">
         <button class="p-1.5 -ml-1.5 hover:bg-zinc-100 rounded-full" @click="router.back()">
           <ArrowLeft class="w-5 h-5 text-zinc-700" />
@@ -71,7 +71,7 @@ onMounted(load)
     <!-- 列表 -->
     <main class="max-w-[960px] mx-auto px-4 py-3">
       <!-- 云端草稿上限：后端 LIMIT 10、FIFO 驱逐最早一条 -->
-      <p v-if="!loading" class="text-xs text-zinc-400 px-1 pb-2">云端最多保存 10 条草稿，已存 {{ drafts.length }}/10 条，超出后自动删除最早的一条</p>
+      <p v-if="!loading" class="text-xs ds-sub px-1 pb-2">云端最多保存 10 条草稿，已存 {{ drafts.length }}/10 条，超出后自动删除最早的一条</p>
       <SkeletonList v-if="loading" :count="3" :show-media="false">
         <template #item>
           <div
@@ -87,21 +87,21 @@ onMounted(load)
         <div
           v-for="d in drafts"
           :key="d.id"
-          class="bg-white rounded-xl p-3.5 flex items-center gap-3 hover:shadow-sm transition cursor-pointer"
+          class="ds-card p-3.5 flex items-center gap-3 hover:transition cursor-pointer"
           @click="useDraft(d)"
         >
           <div class="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
             <FileText class="w-4.5 h-4.5 text-brand-600" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 text-xs text-zinc-400 mb-0.5">
+            <div class="flex items-center gap-2 text-xs ds-sub mb-0.5">
               <span class="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded">{{ d.sectionName || '未选板块' }}</span>
               <span>{{ formatTime(d.createdAt) }}</span>
             </div>
             <p class="text-sm text-zinc-900 font-medium truncate">{{ d.title || '无标题' }}</p>
             <p class="text-xs text-zinc-500 truncate mt-0.5">{{ d.content || '无内容' }}</p>
           </div>
-          <button class="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-full flex-shrink-0" @click.stop="confirmDelete(d)">
+          <button class="p-1.5 ds-sub hover:text-red-500 hover:bg-red-50 rounded-full flex-shrink-0" @click.stop="confirmDelete(d)">
             <Trash2 class="w-4 h-4" />
           </button>
         </div>

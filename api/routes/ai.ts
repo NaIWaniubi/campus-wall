@@ -703,45 +703,68 @@ export function ruleDigest() {
   };
 }
 
-router.get('/digest', async (_req: Request, res: Response) => {
+/**
+ * 简报刷新：先由规则版兜底，AI 只负责把统计写成人话。
+ * 关键设计：AI 永远在后台跑，HTTP 响应不等模型 —— 首屏稳定 <20ms。
+ */
+let digestRefreshing = false;
+
+async function refreshDigest(): Promise<void> {
+  if (digestRefreshing) return;
+  digestRefreshing = true;
   try {
-    if (digestCache.data && Date.now() - digestCache.ts < DIGEST_TTL_MS) {
+    const base = digestCache.data ?? ruleDigest();
+    if (!isAiUsable() || base.stats.posts === 0) {
+      digestCache.data = { ...base, offline: true };
+      digestCache.ts = Date.now();
+      return;
+    }
+    const out = await chatWithAI(
+      [
+        {
+          role: 'system',
+          content:
+            '你是校园墙的每日播报员。根据给定的统计数据，用一句不超过 60 字的简体中文播报今天校园里的情况，语气活泼但不夸张，只输出这一句话，不要引号、不要 emoji。',
+        },
+        {
+          role: 'user',
+          content:
+            base.window + '新动态：' + base.stats.posts + ' 条；评论：' + base.stats.comments + ' 条；活跃板块：' +
+            (base.sections.map((s: { name: string; n: number }) => s.name + '(' + s.n + ')').join('、') || '无') +
+            '；最热帖子：' + (base.hot?.title ?? '无') + '。',
+        },
+      ],
+      512,
+      currentModels(),
+      { budgetMs: 6_000, perModelTimeoutMs: 5_000 } satisfies AiCallOptions
+    );
+    bumpStats();
+    const line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
+    digestCache.data = line.length >= 8 ? { ...base, summary: line, offline: false } : { ...base, offline: true };
+    digestCache.ts = Date.now();
+  } catch (err: any) {
+    logger.warn('AI 简报生成失败，保留统计版', { error: err?.message });
+    if (digestCache.data) digestCache.data = { ...digestCache.data, offline: true };
+    digestCache.ts = Date.now();
+  } finally {
+    digestRefreshing = false;
+  }
+}
+
+router.get('/digest', (_req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    // 命中缓存：直接返回；过期则后台刷新，本次仍返回旧值（stale-while-revalidate）
+    if (digestCache.data) {
+      if (now - digestCache.ts > DIGEST_TTL_MS) void refreshDigest();
       return success(res, digestCache.data);
     }
+    // 冷启首个请求：立刻给规则版（SQL 聚合，毫秒级），AI 版本随后台刷新进缓存
     const base = ruleDigest();
-    let digest: any = base;
-    if (isAiUsable() && base.stats.posts > 0) {
-      try {
-        const out = await chatWithAI(
-          [
-            {
-              role: 'system',
-              content:
-                '你是校园墙的每日播报员。根据给定的统计数据，用一句不超过 60 字的简体中文播报今天校园里的情况，语气活泼但不夸张，只输出这一句话，不要引号、不要 emoji。',
-            },
-            {
-              role: 'user',
-              content:
-                base.window + '新动态：' + base.stats.posts + ' 条；评论：' + base.stats.comments + ' 条；活跃板块：' +
-                (base.sections.map((s) => s.name + '(' + s.n + ')').join('、') || '无') +
-                '；最热帖子：' + (base.hot?.title ?? '无') + '。',
-            },
-          ],
-          512,
-          currentModels(),
-          // 简报是首页首屏内容：拿不到就用统计版，绝不阻塞渲染
-          { budgetMs: 6_000, perModelTimeoutMs: 5_000 } satisfies AiCallOptions
-        );
-        bumpStats();
-        const line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
-        if (line.length >= 8) digest = { ...base, summary: line, offline: false };
-      } catch (err: any) {
-        logger.warn('AI 简报生成失败，退回规则版', { error: err?.message });
-      }
-    }
-    digestCache.ts = Date.now();
-    digestCache.data = digest;
-    return success(res, digest);
+    digestCache.data = base;
+    digestCache.ts = now;
+    void refreshDigest();
+    return success(res, base);
   } catch (err: any) {
     logger.error('今日简报失败', { error: err?.message });
     return success(res, {

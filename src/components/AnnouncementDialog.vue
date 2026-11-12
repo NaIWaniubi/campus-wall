@@ -43,19 +43,20 @@ onMounted(() => {
   <Teleport to="body">
     <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
       <div
-        class="relative bg-white rounded-2xl w-full max-w-sm overflow-hidden animate-scale-in shadow-2xl"
+        class="relative w-full max-w-sm overflow-hidden animate-scale-in"
+        style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard-lg)"
         role="dialog"
         aria-modal="true"
         aria-labelledby="announcement-title"
       >
-        <div class="bg-gradient-to-br from-brand-500 to-brand-600 px-6 pt-6 pb-8 text-center">
+        <div class="px-6 pt-6 pb-8 text-center" style="background: var(--ink)">
           <div class="w-14 h-14 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3">
             <Megaphone class="w-7 h-7 text-white" />
           </div>
           <h3 id="announcement-title" class="text-lg font-bold text-white">官方公告</h3>
         </div>
         <div class="p-6">
-          <h4 class="font-semibold text-zinc-900 mb-2">{{ announcement?.title }}</h4>
+          <h4 class="font-extrabold mb-2" style="color: var(--ink)">{{ announcement?.title }}</h4>
           <p class="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap mb-3">{{ announcement?.content }}</p>
           <p class="text-xs text-zinc-400 mb-4">{{ formatTime(announcement?.createdAt) }}</p>
           <button class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-full font-medium transition-colors" @click="handleAck">

@@ -247,7 +247,7 @@ function goPost(id: number) {
     <!-- 悬浮按钮 -->
     <button
       v-if="!open"
-      class="sa-fab fixed right-4 z-40 flex items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 transition active:scale-95"
+      class="sa-fab fixed right-4 z-40 flex items-center justify-center transition active:scale-95"
       style="height: 52px; width: 52px"
       @click="toggleOpen"
     >
@@ -257,14 +257,15 @@ function goPost(id: number) {
     <!-- 聊天面板 -->
     <div
       v-else
-      class="fixed inset-x-3 bottom-3 z-50 flex max-h-[75vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-200 md:inset-x-auto md:right-4 md:w-96"
+      class="fixed inset-x-3 bottom-3 z-50 flex max-h-[75vh] flex-col overflow-hidden md:inset-x-auto md:right-4 md:w-96"
+      style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard-lg)"
     >
       <!-- 头部 -->
-      <div class="flex items-center justify-between bg-brand-500 px-4 py-3 text-white">
+      <div class="flex items-center justify-between px-4 py-3" style="background: var(--ink); color: var(--paper)">
         <div class="flex items-center gap-2">
           <Bot class="h-5 w-5" />
           <span class="text-sm font-semibold">AI 助手</span>
-          <span class="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">基于官网内容</span>
+          <span class="ds-label" style="color: var(--lime)">官网知识库</span>
         </div>
         <div class="flex items-center gap-1">
           <button
@@ -282,7 +283,7 @@ function goPost(id: number) {
       </div>
 
       <!-- 消息列表 -->
-      <div id="ai-chat-list" class="flex-1 space-y-3 overflow-y-auto bg-zinc-50 px-3 py-3">
+      <div id="ai-chat-list" class="flex-1 space-y-3 overflow-y-auto px-3 py-3" style="background: var(--paper)">
         <div
           v-for="(msg, i) in messages"
           :key="i"
@@ -293,7 +294,8 @@ function goPost(id: number) {
             <!-- 完成后按 Markdown 渲染；流式中按纯文本渲染避免半截标签闪烁 -->
             <div
               v-if="msg.role === 'assistant' && !msg.streaming"
-              class="ai-md rounded-2xl rounded-bl-sm bg-white px-3 py-2 text-sm leading-relaxed text-zinc-800 ring-1 ring-zinc-200"
+              class="ai-md rounded-[14px] px-3 py-2 text-[13.5px] leading-relaxed"
+              style="background: var(--card); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm)"
               @click="onContentClick"
               v-html="renderMarkdown(msg.content)"
             ></div>
@@ -302,8 +304,8 @@ function goPost(id: number) {
               class="whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed"
               :class="
                 msg.role === 'user'
-                  ? 'rounded-br-sm bg-brand-500 text-white'
-                  : 'rounded-bl-sm bg-white text-zinc-800 ring-1 ring-zinc-200'
+                  ? 'rounded-br-sm ds-bubble-user'
+                  : 'rounded-bl-sm ds-bubble-ai'
               "
               >{{ msg.content }}<span v-if="msg.streaming && !msg.content" class="text-zinc-400">…</span></div
             >
@@ -317,7 +319,8 @@ function goPost(id: number) {
               <button
                 v-for="forum in msg.forums"
                 :key="`${forum.id}-${forum.commentId ?? 'p'}`"
-                class="block w-full rounded-xl bg-white p-3 text-left ring-1 ring-zinc-200 transition active:bg-zinc-50"
+                class="block w-full p-3 text-left transition active:translate-x-[1px] active:translate-y-[1px]"
+                style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 12px; box-shadow: 2px 2px 0 var(--ink)"
                 @click="goPost(forum.id)"
               >
                 <div class="flex items-center gap-2">
@@ -349,7 +352,7 @@ function goPost(id: number) {
           <button
             v-for="s in suggestions"
             :key="s"
-            class="rounded-full bg-white px-3 py-1.5 text-xs text-brand-600 ring-1 ring-brand-200 transition active:bg-brand-50"
+            class="ds-chip !text-[11.5px] !py-1.5"
             @click="send(s)"
           >
             {{ s }}
@@ -358,17 +361,18 @@ function goPost(id: number) {
       </div>
 
       <!-- 输入区 -->
-      <div class="flex items-center gap-2 border-t border-zinc-100 bg-white px-3 py-2.5">
+      <div class="flex items-center gap-2 px-3 py-2.5" style="border-top: 1.5px solid var(--ink); background: var(--card)">
         <input
           v-model="input"
-          class="flex-1 rounded-full bg-zinc-100 px-4 py-2 text-sm outline-none placeholder:text-zinc-400"
+          class="ds-input !rounded-full !py-2 !text-[13px]"
           placeholder="输入你的问题…"
           maxlength="500"
           :disabled="loading"
           @keydown.enter="send()"
         />
         <button
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white transition active:scale-95 disabled:opacity-50"
+          class="flex h-9 w-9 shrink-0 items-center justify-center transition active:translate-y-[1px] disabled:opacity-50"
+          style="background: var(--ink); color: var(--lime); border: 1.5px solid var(--ink); border-radius: 12px"
           :disabled="loading || !input.trim()"
           @click="send()"
         >

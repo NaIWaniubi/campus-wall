@@ -199,111 +199,129 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--color-bg)">
-    <!-- 顶部搜索框 -->
-    <header class="hero sticky top-0 z-10">
-      <div class="max-w-[960px] mx-auto flex items-center gap-2 h-14 px-3">
-        <button class="p-1 -ml-1 text-white/90 hover:text-white" @click="goBack">
-          <ArrowLeft class="w-5 h-5" />
-        </button>
-        <div class="flex-1 relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
+  <div class="min-h-screen pb-24">
+    <!-- V4 墨色海报头：返回 + 贴纸 + 大号搜索框（白底墨线胶囊） -->
+    <header class="hero sticky top-0 z-10 rounded-b-[20px]">
+      <div class="max-w-[960px] mx-auto px-4 pt-4 pb-5">
+        <div class="flex items-center gap-2.5">
+          <button class="ds-icon-btn !w-9 !h-9 shrink-0" aria-label="返回" @click="goBack">
+            <ArrowLeft class="w-[18px] h-[18px]" />
+          </button>
+          <span class="ds-sticker ds-sticker--coral">SEARCH</span>
+          <span class="ds-label" style="color: rgb(255 255 255 / 0.45)">帖子 / 话题 / 用户</span>
+        </div>
+        <div class="relative mt-3">
+          <Search class="absolute left-4 top-1/2 -translate-y-1/2 w-[17px] h-[17px]" style="color: var(--ink-mute)" />
           <input
             ref="inputRef"
             v-model="keyword"
             type="text"
             placeholder="搜索帖子"
-            class="w-full h-9 pl-9 pr-9 rounded-full bg-white/20 text-white placeholder-white/60 border border-white/25 focus:bg-white/30 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm transition backdrop-blur"
+            class="ds-input font-semibold !h-12 !rounded-full !py-0 !px-11 !text-[16px]"
             @input="onInput"
             @keyup.enter="doSearch(keyword.trim())"
           />
-          <button v-if="keyword" class="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white" @click="keyword = ''; onInput()">
-            <X class="w-4 h-4" />
+          <button
+            v-if="keyword"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full"
+            style="background: var(--ink); color: var(--paper)"
+            aria-label="清空输入"
+            @click="keyword = ''; onInput()"
+          >
+            <X class="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
     </header>
 
     <main class="max-w-[960px] mx-auto px-4 py-4">
-      <!-- 未搜索：历史 + 热搜 -->
-      <div v-if="!searched" class="space-y-6">
+      <!-- 未搜索：历史 + 热搜（纸卡 + 编号章节头 + 描边胶囊） -->
+      <div v-if="!searched" class="space-y-4">
         <!-- 搜索历史 -->
-        <section v-if="history.length">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
-              <Clock class="w-4 h-4 text-zinc-400" /> 搜索历史
+        <section v-if="history.length" class="ds-card p-4">
+          <div class="ds-section-head mb-3">
+            <span class="ds-section-head__num">01</span>
+            <h3 class="ds-title flex items-center gap-1.5">
+              <Clock class="w-4 h-4" style="color: var(--ink-mute)" /> 搜索历史
             </h3>
-            <button class="text-xs text-zinc-400 hover:text-zinc-600" @click="clearHistory">清空</button>
+            <span class="ds-section-head__line"></span>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button
-              v-for="h in history"
-              :key="h"
-              class="group flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-sm text-zinc-700 transition"
-              @click="searchBy(h)"
-            >
+            <button v-for="h in history" :key="h" class="ds-chip max-w-full break-words !whitespace-normal" @click="searchBy(h)">
               <span>{{ h }}</span>
-              <span class="text-zinc-400 group-hover:text-red-500" @click="removeHistory(h, $event)">
+              <span
+                class="inline-flex items-center opacity-50 transition-opacity hover:opacity-100"
+                style="color: var(--ink-mute)"
+                @click="removeHistory(h, $event)"
+              >
                 <X class="w-3 h-3" />
               </span>
             </button>
+            <button class="ds-chip" style="color: var(--ink-mute)" @click="clearHistory">清空</button>
           </div>
         </section>
 
         <!-- 热门搜索 -->
-        <section v-if="hotWords.length">
-          <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700 mb-3">
-            <Flame class="w-4 h-4 text-orange-500" /> 热门搜索
-          </h3>
+        <section v-if="hotWords.length" class="ds-card p-4">
+          <div class="ds-section-head mb-3">
+            <span class="ds-section-head__num">{{ history.length ? '02' : '01' }}</span>
+            <h3 class="ds-title flex items-center gap-1.5">
+              <Flame class="w-4 h-4" style="color: var(--coral)" /> 热门搜索
+            </h3>
+            <span class="ds-section-head__line"></span>
+          </div>
           <div class="flex flex-wrap gap-2">
-            <button
-              v-for="(w, i) in hotWords"
-              :key="w"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 text-sm text-brand-700 transition"
-              @click="searchBy(w)"
-            >
-              <span class="text-xs font-bold text-brand-500">{{ i + 1 }}</span>
+            <button v-for="(w, i) in hotWords" :key="w" class="ds-chip max-w-full break-words !whitespace-normal" @click="searchBy(w)">
+              <span class="ds-num text-[11px] font-black" style="color: var(--coral)">{{ i + 1 }}</span>
               {{ w }}
             </button>
           </div>
+        </section>
+
+        <!-- 使用提示：把 AI 能力在空搜索页就讲清楚 -->
+        <section class="ds-card ds-card--flat p-4">
+          <p class="ds-label mb-1.5">TIPS</p>
+          <p class="ds-sub">
+            搜「失物」看智能雷达撮合；发帖时用「AI 一键成稿」30 秒成文；帖子详情页点「AI 划重点」先看要点和交易风险。
+          </p>
         </section>
       </div>
 
       <!-- 搜索结果 -->
       <div v-else>
-        <!-- 板块/排序筛选 chip（参考 SectionPage 范式） -->
-        <div class="flex items-center gap-1 mb-2 overflow-x-auto scrollbar-hide">
+        <!-- 板块/排序筛选：V4 描边胶囊（激活 = 墨底荧光字） -->
+        <div class="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide ds-scroll-x pb-1">
           <button
             v-for="sec in [{ id: 0, name: '全部板块' }, ...appStore.sections]"
             :key="sec.id"
-            class="relative px-3 py-1.5 text-xs whitespace-nowrap transition rounded-full"
-            :class="activeSection === sec.id ? 'text-brand-600 font-medium bg-brand-50 border border-brand-200' : 'text-zinc-500 hover:text-zinc-800 bg-white border border-zinc-200'"
+            class="ds-chip shrink-0"
+            :class="{ 'is-active': activeSection === sec.id }"
             @click="selectSection(sec.id)"
           >
             {{ sec.name }}
           </button>
-          <span class="mx-1 w-px h-4 bg-zinc-200" />
+          <span class="mx-1 h-4 w-px shrink-0" style="background: var(--ink); opacity: 0.2" />
           <button
             v-for="opt in sortOptions"
             :key="opt.key"
-            class="px-3 py-1.5 text-xs whitespace-nowrap transition rounded-full"
-            :class="activeSort === opt.key ? 'text-brand-600 font-medium bg-brand-50 border border-brand-200' : 'text-zinc-500 hover:text-zinc-800 bg-white border border-zinc-200'"
+            class="ds-chip shrink-0"
+            :class="{ 'is-active': activeSort === opt.key }"
             @click="selectSort(opt.key)"
           >
             {{ opt.label }}
           </button>
         </div>
 
-        <div class="text-xs text-zinc-400 mb-2">共 {{ total }} 条结果</div>
+        <div class="ds-label mb-2">共 <span class="ds-num">{{ total }}</span> 条结果</div>
 
         <div class="space-y-3">
           <PostSkeleton v-if="loading" :count="3" />
           <template v-else>
             <PostCard v-for="post in results" :key="post.id" :post="post" :keyword="keyword" />
-            <div v-if="loadingMore" class="flex items-center justify-center gap-2 py-3 text-sm text-zinc-400">
+            <div v-if="loadingMore" class="ds-label flex items-center justify-center gap-2 py-3">
               <Loader2 class="w-4 h-4 animate-spin" /> 加载中...
             </div>
-            <p v-else-if="!hasMore && results.length" class="text-center text-xs text-zinc-300 py-3">没有更多了</p>
+            <p v-else-if="!hasMore && results.length" class="ds-label py-3 text-center">没有更多了</p>
             <EmptyState
               v-if="!results.length"
               text="没有找到相关内容"

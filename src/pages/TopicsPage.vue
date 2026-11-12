@@ -8,7 +8,7 @@ import { useRouter } from 'vue-router'
 import { ChevronRight } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { postApi } from '@/utils/api'
-import { sectionColor, sectionGradient, sectionDesc } from '@/utils/sections'
+import { sectionGradient, sectionDesc } from '@/utils/sections'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -41,50 +41,47 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen pb-6" style="background: var(--color-bg)">
-    <!-- 渐变头（对齐小程序 .topic-header） -->
-    <header class="hero pt-6 pb-8 px-5 rounded-b-[20px]">
-      <h1 class="text-[22px] font-bold tracking-wide">校园话题</h1>
-      <p class="mt-1 text-[13px] text-white/80">找到同频的聊天和互助频道</p>
+  <div class="min-h-screen pb-24" style="background: var(--color-bg)">
+    <!-- 墨色海报头：贴纸 + 字距标签 + 大字标题 -->
+    <header class="hero px-5 pt-6 pb-7 rounded-b-[20px]">
+      <div class="flex items-center gap-2">
+        <span class="ds-sticker ds-sticker--coral">TOPICS</span>
+        <span class="ds-label ds-num" style="color: rgb(255 255 255 / 0.45)">{{ appStore.sections.length }} 板块 · 本校</span>
+      </div>
+      <h1 class="ds-display ds-display-lg mt-2 text-white">校园话题</h1>
+      <p class="mt-1 text-[13px] text-white/60">找到同频的聊天和互助频道</p>
     </header>
 
-    <!-- 分类卡片网格 -->
-    <div class="px-3 -mt-5 space-y-2.5 max-w-[1280px] mx-auto">
+    <!-- 分类卡片列表：编号 + 分类色圆点 + 分类名 + 简介 + 动态数 + 箭头 -->
+    <div class="max-w-[960px] mx-auto px-3 mt-3 space-y-3">
       <button
         v-for="(s, idx) in appStore.sections"
         :key="s.id"
-        class="card-premium rise-in relative w-full text-left p-4 flex flex-col gap-2 overflow-hidden"
-        :style="{ animationDelay: `${Math.min(idx, 8) * 45}ms` }"
+        class="ds-card ds-card--hover w-full text-left p-4 flex items-start gap-3"
         @click="router.push(`/section/${s.id}`)"
       >
-        <!-- 分类渐变光晕：左上角一圈彩色氛围 -->
+        <span class="ds-section-head__num shrink-0" style="padding-top: 5px">{{ String(idx + 1).padStart(2, '0') }}</span>
         <span
-          class="pointer-events-none absolute -right-8 -top-10 w-32 h-32 rounded-full opacity-25 blur-2xl"
+          class="ds-tag-dot shrink-0"
+          style="margin-top: 9px"
           :style="{ background: sectionGradient(s.id, s.name) }"
           aria-hidden="true"
         ></span>
-        <span class="absolute left-0 top-0 bottom-0 w-[3px]" :style="{ background: sectionGradient(s.id, s.name) }" aria-hidden="true"></span>
-        <div class="flex items-center gap-2">
-          <span
-            class="w-8 h-8 rounded-xl flex items-center justify-center text-[14px] font-bold text-white"
-            :style="{ background: sectionGradient(s.id, s.name), boxShadow: '0 6px 14px -6px rgba(20,24,40,.45)' }"
-          >
-            {{ s.name.charAt(0) }}
-          </span>
-          <span class="text-[15px] font-semibold text-[#1A1A2E]">{{ s.name }}</span>
-        </div>
-        <p class="text-[12px] text-zinc-500 leading-relaxed">{{ sectionDesc(s.name) }}</p>
-        <div class="flex items-center justify-between pt-0.5">
-          <span class="text-[11px] text-zinc-400">{{ counts[s.id] ?? 0 }} 条动态</span>
-          <span class="text-[12px] font-semibold flex items-center gap-0.5" :style="{ color: sectionColor(s.id, s.name) }">
-            查看 <ChevronRight class="w-3.5 h-3.5" />
-          </span>
+        <div class="flex-1 min-w-0">
+          <h2 class="ds-title truncate">{{ s.name }}</h2>
+          <p class="ds-sub mt-0.5 line-clamp-2">{{ sectionDesc(s.name) }}</p>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <span class="ds-num text-[12px] font-bold" style="color: var(--ink-mute)">{{ counts[s.id] ?? 0 }} 条动态</span>
+            <span class="flex items-center gap-0.5 text-[12px] font-bold shrink-0" style="color: var(--ink)">
+              查看 <ChevronRight class="w-4 h-4" />
+            </span>
+          </div>
         </div>
       </button>
 
       <!-- 板块接口失败时的兜底 -->
-      <div v-if="!appStore.sections.length && !loading" class="card p-6 text-center text-sm text-zinc-500">
-        板块加载失败，请下拉重试
+      <div v-if="!appStore.sections.length && !loading" class="ds-card ds-card--flat p-6 text-center">
+        <p class="ds-sub">板块加载失败，请下拉重试</p>
       </div>
     </div>
   </div>

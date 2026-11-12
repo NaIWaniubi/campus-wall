@@ -432,21 +432,21 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen pb-24" style="background: var(--color-bg)">
-    <!-- 顶部 -->
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
+    <!-- 顶部：墨色海报条 -->
     <header class="hero sticky top-0 z-10">
-      <div class="max-w-[960px] mx-auto flex items-center justify-between h-14 px-3">
-        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
+      <div class="max-w-[960px] mx-auto flex items-center justify-between gap-2 h-14 px-3">
+        <button class="shrink-0 p-2 -ml-2 text-white/90 hover:text-white transition" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="font-semibold text-white">{{ editId ? '编辑帖子' : '发布' }}</span>
-        <div class="flex items-center gap-2">
-          <button v-if="!editId" class="p-2 text-white/80 hover:text-white" title="草稿箱" @click="router.push('/profile/drafts')">
+        <span class="ds-display text-[17px] text-white truncate">{{ editId ? '编辑帖子' : '发布' }}</span>
+        <div class="flex items-center gap-2 shrink-0">
+          <button v-if="!editId" class="p-2 text-white/80 hover:text-white transition" title="草稿箱" @click="router.push('/profile/drafts')">
             <FileText class="w-5 h-5" />
           </button>
           <button
             :disabled="loading"
-            class="px-4 py-1.5 bg-white/95 hover:bg-white disabled:opacity-60 text-brand-500 rounded-full text-sm font-semibold transition shadow-lg shadow-black/10"
+            class="ds-btn ds-btn--accent ds-btn--sm"
             @click="handleSubmit"
           >
             {{ editId ? '保存' : '发布' }}
@@ -457,149 +457,145 @@ async function handleSubmit() {
 
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
       <!-- 信誉分提示 -->
-      <div v-if="!userStore.canPost" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-xs">
+      <div v-if="!userStore.canPost" class="ds-card ds-card--flat flex items-center gap-2 p-3 text-xs" style="border-color: var(--coral); color: var(--coral)">
         <ShieldAlert class="w-4 h-4 flex-shrink-0" /> 需要信誉分 60，当前 {{ creditScore }} 分。通过交易互评可提升信誉
       </div>
 
       <!-- 编辑模式：驳回原因提示（修改重发场景） -->
-      <div v-if="editId && editingPost?.rejectReason" class="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs leading-relaxed">
+      <div v-if="editId && editingPost?.rejectReason" class="ds-card ds-card--flat flex items-start gap-2 p-3 text-xs leading-relaxed" style="border-color: var(--coral); color: var(--coral)">
         <ShieldAlert class="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span>该帖曾被驳回：{{ editingPost.rejectReason }}。请修改内容后保存，将重新提交审核</span>
       </div>
 
-      <!-- AI 一键成稿（V3）：把大模型放进发布主链路，而不是角落聊天框 -->
-      <div class="ai-trail bg-white rounded-xl p-4">
-        <div class="flex items-center gap-2 mb-2">
-          <span class="w-6 h-6 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-            style="background: var(--grad-brand)">
-            <Wand2 class="w-3.5 h-3.5" />
-          </span>
-          <span class="text-sm font-semibold text-zinc-800">AI 一键成稿</span>
-          <span class="dopa-chip ml-auto">30 秒发一条</span>
+      <!-- AI 一键成稿：荧光贴纸卡（lime 头部 + ds-input + ds-btn--primary） -->
+      <section class="ds-card overflow-hidden">
+        <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--lime); border-bottom: 1.5px solid var(--ink)">
+          <Wand2 class="w-4 h-4 shrink-0" style="color: var(--ink)" />
+          <span class="ds-display text-[14px]" style="color: var(--ink)">AI 一键成稿</span>
+          <span class="ds-sticker ds-sticker--coral ml-auto shrink-0">30 秒发一条</span>
         </div>
-        <div class="flex gap-2">
-          <input
-            v-model="aiRaw"
-            type="text"
-            maxlength="120"
-            placeholder="一句话说清要点：出九成新 iPad，1500 元，可小刀"
-            class="flex-1 min-w-0 px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none text-sm"
-            @keyup.enter="aiCompose"
-          />
-          <button
-            type="button"
-            :disabled="aiWriting"
-            class="btn-grad px-4 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 flex items-center gap-1.5 flex-shrink-0"
-            @click="aiCompose"
-          >
-            <Loader2 v-if="aiWriting" class="w-4 h-4 animate-spin" />
-            <Sparkles v-else class="w-4 h-4" />
-            {{ aiWriting ? '生成中' : '生成' }}
-          </button>
+        <div class="p-4">
+          <div class="flex gap-2">
+            <input
+              v-model="aiRaw"
+              type="text"
+              maxlength="120"
+              placeholder="一句话说清要点：出九成新 iPad，1500 元，可小刀"
+              class="ds-input flex-1 min-w-0"
+              @keyup.enter="aiCompose"
+            />
+            <button
+              type="button"
+              :disabled="aiWriting"
+              class="ds-btn ds-btn--primary shrink-0"
+              @click="aiCompose"
+            >
+              <Loader2 v-if="aiWriting" class="w-4 h-4 animate-spin" />
+              <Sparkles v-else class="w-4 h-4" />
+              {{ aiWriting ? '生成中' : '生成' }}
+            </button>
+          </div>
+          <p class="ds-sub mt-2">
+            自动补全标题、正文、板块与价格；生成后请按实际情况修改再发布（未接入大模型时按站内规则生成）
+          </p>
+          <div v-if="aiTags.length" class="mt-2 flex flex-wrap gap-1.5">
+            <span v-for="t in aiTags" :key="t" class="ds-tag">#{{ t }}</span>
+          </div>
         </div>
-        <p class="mt-2 text-[11px] text-zinc-400 leading-relaxed">
-          自动补全标题、正文、板块与价格；生成后请按实际情况修改再发布（未接入大模型时按站内规则生成）
-        </p>
-        <div v-if="aiTags.length" class="mt-2 flex flex-wrap gap-1.5">
-          <span v-for="t in aiTags" :key="t" class="cat-tag"
-            style="background: rgba(109,59,245,.1); color: var(--color-brand-500)">#{{ t }}</span>
-        </div>
-      </div>
+      </section>
 
-      <!-- 板块选择 -->
-      <div ref="sectionPickerRef" class="bg-white rounded-xl p-4">
-        <label class="block text-sm font-medium text-zinc-700 mb-2">选择板块 <span class="text-red-500">*</span></label>
+      <!-- 板块选择：触发框用墨线输入框，选项用 ds-chip -->
+      <section ref="sectionPickerRef" class="ds-card p-4">
+        <label class="ds-label block mb-2">选择板块 <span style="color: var(--coral)">*</span></label>
         <!-- 板块接口失败时给出重试：否则选择器为空、每次提交都被「请选择板块」挡住 -->
-        <div v-if="appStore.sectionsError && !appStore.sections.length" class="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs">
+        <div v-if="appStore.sectionsError && !appStore.sections.length" class="ds-card ds-card--flat mb-2 flex items-center gap-2 p-3 text-xs" style="border-color: var(--coral); border-style: dashed; color: var(--coral)">
           <span class="flex-1">板块加载失败，请重试</span>
-          <button class="px-3 py-1 rounded-full bg-amber-500 text-white" @click="retrySections">重试</button>
+          <button class="ds-btn ds-btn--danger ds-btn--sm" @click="retrySections">重试</button>
         </div>
         <button
-          class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 text-sm"
+          class="ds-input flex items-center justify-between gap-2 text-left"
           @click="showSectionPicker = !showSectionPicker"
         >
-          <span :class="form.sectionId ? 'text-zinc-900' : 'text-zinc-400'">
+          <span class="truncate" :style="form.sectionId ? 'color: var(--ink)' : 'color: var(--ink-mute)'">
             {{ selectedSection?.name || '请选择板块' }}
           </span>
-          <ChevronDown class="w-4 h-4 text-zinc-400 transition-transform" :class="showSectionPicker ? 'rotate-180' : ''" />
+          <ChevronDown class="w-4 h-4 shrink-0 transition-transform" style="color: var(--ink-mute)" :class="showSectionPicker ? 'rotate-180' : ''" />
         </button>
-        <div v-if="showSectionPicker" class="mt-2 grid grid-cols-3 gap-2">
+        <div v-if="showSectionPicker" class="mt-3 flex flex-wrap gap-2">
           <button
             v-for="s in appStore.sections"
             :key="s.id"
-            class="px-2 py-2 rounded-lg text-sm border transition"
-            :class="form.sectionId === s.id ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-zinc-200 text-zinc-600 hover:border-brand-300'"
+            class="ds-chip"
+            :class="{ 'is-active': form.sectionId === s.id }"
             @click="pickSection(s.id)"
           >
             {{ s.name }}
           </button>
         </div>
         <!-- 强匿名板块说明：不再自动开启匿名开关，改为明示规则 -->
-        <p v-if="selectedSection?.forceAnonymous" class="mt-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-600 text-xs leading-relaxed">
+        <p v-if="selectedSection?.forceAnonymous" class="ds-card ds-card--flat mt-2 p-3 text-xs leading-relaxed" style="border-style: dashed; border-color: var(--ink-mute); color: var(--ink-mute)">
           「{{ selectedSection.name }}」为强匿名板块：需开启下方「匿名发布」后才能发布<template v-if="!userStore.canAnonymous">；开启匿名需要信誉分 ≥90，当前 {{ creditScore }} 分，暂不能在该板块发布</template>。
         </p>
-      </div>
+      </section>
 
       <!-- 标题 -->
-      <div class="bg-white rounded-xl p-4">
+      <section class="ds-card p-4">
         <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-zinc-700">标题 <span class="text-red-500">*</span></label>
-          <span class="text-xs" :class="form.title.length > 50 ? 'text-red-500' : 'text-zinc-400'">{{ form.title.length }}/50</span>
+          <label class="ds-label">标题 <span style="color: var(--coral)">*</span></label>
+          <span class="ds-num text-xs" :style="form.title.length > 50 ? 'color: var(--coral)' : 'color: var(--ink-mute)'">{{ form.title.length }}/50</span>
         </div>
-        <input v-model="form.title" type="text" maxlength="50" placeholder="一句话概括"
-          class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
-      </div>
+        <input v-model="form.title" type="text" maxlength="50" placeholder="一句话概括" class="ds-input" />
+      </section>
 
       <!-- 正文 -->
-      <div class="bg-white rounded-xl p-4">
+      <section class="ds-card p-4">
         <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-zinc-700">正文 <span class="text-red-500">*</span></label>
-          <span class="text-xs" :class="form.content.length > 500 ? 'text-red-500' : 'text-zinc-400'">{{ form.content.length }}/500</span>
+          <label class="ds-label">正文 <span style="color: var(--coral)">*</span></label>
+          <span class="ds-num text-xs" :style="form.content.length > 500 ? 'color: var(--coral)' : 'color: var(--ink-mute)'">{{ form.content.length }}/500</span>
         </div>
-        <textarea v-model="form.content" maxlength="500" rows="6" placeholder="说点什么，至少10个字"
-          class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition resize-none post-content"></textarea>
+        <textarea v-model="form.content" maxlength="500" rows="6" placeholder="说点什么，至少10个字" class="ds-input resize-none post-content"></textarea>
         <!-- 敏感词提示：review 拦截、warn 仅提示 -->
-        <div v-if="sensitive.level === 'review'" class="mt-2 flex items-start gap-1.5 text-xs text-red-500">
+        <div v-if="sensitive.level === 'review'" class="mt-2 flex items-start gap-1.5 text-xs" style="color: var(--coral)">
           <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           <span>内容包含违规敏感词：{{ sensitive.hits.join('、') }}，请修改后再发布</span>
         </div>
-        <div v-else-if="sensitive.level === 'warn'" class="mt-2 flex items-start gap-1.5 text-xs text-amber-500">
+        <div v-else-if="sensitive.level === 'warn'" class="mt-2 flex items-start gap-1.5 text-xs" style="color: var(--ink-mute)">
           <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           <span>检测到敏感表述：{{ sensitive.hits.join('、') }}，建议斟酌用词（不影响发布）</span>
         </div>
-      </div>
+      </section>
 
-      <!-- 图片上传 -->
-      <div class="bg-white rounded-xl p-4">
-        <label class="block text-sm font-medium text-zinc-700 mb-2">图片（最多9张）</label>
+      <!-- 图片上传：墨线虚线框 -->
+      <section class="ds-card p-4">
+        <label class="ds-label block mb-2">图片（最多9张）</label>
         <div class="grid grid-cols-3 gap-2">
-          <div v-for="(img, i) in form.images" :key="i" class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
+          <div v-for="(img, i) in form.images" :key="i" class="relative aspect-square rounded-xl overflow-hidden" style="border: 1.5px solid var(--ink)">
             <img :src="img" class="w-full h-full object-cover" alt="" />
-            <button class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center" @click="removeImage(i)">
+            <button class="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center" style="background: var(--coral); color: var(--paper)" @click="removeImage(i)">
               <X class="w-3 h-3" />
             </button>
           </div>
-          <label v-if="form.images.length < 9" class="aspect-square rounded-xl border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-zinc-400 hover:border-brand-400 hover:text-brand-500 hover:bg-brand-50/50 cursor-pointer transition" :class="uploading ? 'pointer-events-none opacity-60' : ''">
-            <ImagePlus v-if="!uploading" class="w-7 h-7 mb-1" />
+          <label v-if="form.images.length < 9" class="pub-upload ds-card ds-card--hover aspect-square flex flex-col items-center justify-center gap-1 cursor-pointer" :class="uploading ? 'pointer-events-none opacity-60' : ''">
+            <ImagePlus v-if="!uploading" class="w-7 h-7" />
             <Loader2 v-else class="w-7 h-7 animate-spin" />
-            <span v-if="!uploading" class="text-xs">上传图片</span>
-            <span v-else class="text-xs">上传中</span>
+            <span v-if="!uploading" class="ds-label">上传图片</span>
+            <span v-else class="ds-label">上传中</span>
             <input type="file" accept="image/jpeg,image/png,image/heic" multiple class="hidden" :disabled="uploading" @change="onUpload" />
           </label>
         </div>
-      </div>
+      </section>
 
       <!-- 板块差异化字段 -->
-      <div v-if="sectionKind === 'trade'" class="bg-white rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-medium text-zinc-700">交易信息</h4>
+      <section v-if="sectionKind === 'trade'" class="ds-card p-4 space-y-3">
+        <h4 class="ds-label">交易信息</h4>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">价格</span>
+          <span class="ds-label w-16 shrink-0">价格</span>
           <input v-model="form.extraFields.price" type="text" placeholder="¥ 金额" @input="setExtra('price', form.extraFields.price)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">新旧</span>
-          <select v-model="form.extraFields.condition" class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm">
+          <span class="ds-label w-16 shrink-0">新旧</span>
+          <select v-model="form.extraFields.condition" class="ds-input flex-1 min-w-0">
             <option value="">请选择</option>
             <option value="全新">全新</option>
             <option value="九成新">九成新</option>
@@ -608,147 +604,146 @@ async function handleSubmit() {
           </select>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">联系方式</span>
+          <span class="ds-label w-16 shrink-0">联系方式</span>
           <input v-model="form.extraFields.contact" type="text" placeholder="微信/QQ" @input="setExtra('contact', form.extraFields.contact)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
-      </div>
+      </section>
 
-      <div v-else-if="sectionKind === 'lost'" class="bg-white rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-medium text-zinc-700">失物信息</h4>
+      <section v-else-if="sectionKind === 'lost'" class="ds-card p-4 space-y-3">
+        <h4 class="ds-label">失物信息</h4>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">类型</span>
-          <div class="flex-1 flex gap-2">
+          <span class="ds-label w-16 shrink-0">类型</span>
+          <div class="flex-1 min-w-0 flex gap-2">
             <button v-for="d in [{ v: 'lost', t: '我丢失了' }, { v: 'found', t: '我捡到了' }]" :key="d.v"
-              type="button" :class="[
-                'flex-1 py-2 rounded-lg text-sm border transition',
-                form.extraFields.direction === d.v
-                  ? 'bg-brand-500 text-white border-brand-500'
-                  : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-brand-300'
-              ]" @click="setExtra('direction', d.v)">
+              type="button" class="ds-chip flex-1 justify-center"
+              :class="{ 'is-active': form.extraFields.direction === d.v }"
+              @click="setExtra('direction', d.v)">
               {{ d.t }}
             </button>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">地点</span>
+          <span class="ds-label w-16 shrink-0">地点</span>
           <input v-model="form.extraFields.location" type="text" placeholder="丢失/拾到地点" @input="setExtra('location', form.extraFields.location)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">时间</span>
+          <span class="ds-label w-16 shrink-0">时间</span>
           <input v-model="form.extraFields.time" type="text" placeholder="如：今天上午" @input="setExtra('time', form.extraFields.time)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">物品类型</span>
+          <span class="ds-label w-16 shrink-0">物品类型</span>
           <input v-model="form.extraFields.itemType" type="text" placeholder="如：校园卡/钥匙" @input="setExtra('itemType', form.extraFields.itemType)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
-      </div>
+      </section>
 
-      <div v-else-if="sectionKind === 'activity'" class="bg-white rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-medium text-zinc-700">活动信息</h4>
+      <section v-else-if="sectionKind === 'activity'" class="ds-card p-4 space-y-3">
+        <h4 class="ds-label">活动信息</h4>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">时间</span>
+          <span class="ds-label w-16 shrink-0">时间</span>
           <input v-model="form.extraFields.time" type="text" placeholder="活动时间" @input="setExtra('time', form.extraFields.time)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">地点</span>
+          <span class="ds-label w-16 shrink-0">地点</span>
           <input v-model="form.extraFields.location" type="text" placeholder="活动地点" @input="setExtra('location', form.extraFields.location)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">主办方</span>
+          <span class="ds-label w-16 shrink-0">主办方</span>
           <input v-model="form.extraFields.organizer" type="text" placeholder="主办方/社团" @input="setExtra('organizer', form.extraFields.organizer)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
-      </div>
+      </section>
 
-      <div v-else-if="sectionKind === 'carpool'" class="bg-white rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-medium text-zinc-700">拼车信息</h4>
+      <section v-else-if="sectionKind === 'carpool'" class="ds-card p-4 space-y-3">
+        <h4 class="ds-label">拼车信息</h4>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">出发时间</span>
+          <span class="ds-label w-16 shrink-0">出发时间</span>
           <input v-model="form.extraFields.time" type="text" placeholder="如：周五 18:00" @input="setExtra('time', form.extraFields.time)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">集合点</span>
+          <span class="ds-label w-16 shrink-0">集合点</span>
           <input v-model="form.extraFields.location" type="text" placeholder="如：东门/校车站" @input="setExtra('location', form.extraFields.location)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">分摊费用</span>
+          <span class="ds-label w-16 shrink-0">分摊费用</span>
           <input v-model="form.extraFields.price" type="text" placeholder="如：人均 ¥30" @input="setExtra('price', form.extraFields.price)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">联系方式</span>
+          <span class="ds-label w-16 shrink-0">联系方式</span>
           <input v-model="form.extraFields.contact" type="text" placeholder="微信/QQ" @input="setExtra('contact', form.extraFields.contact)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
-      </div>
+      </section>
 
-      <div v-else-if="sectionKind === 'teamup'" class="bg-white rounded-xl p-4 space-y-3">
-        <h4 class="text-sm font-medium text-zinc-700">组队信息</h4>
+      <section v-else-if="sectionKind === 'teamup'" class="ds-card p-4 space-y-3">
+        <h4 class="ds-label">组队信息</h4>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">活动时间</span>
+          <span class="ds-label w-16 shrink-0">活动时间</span>
           <input v-model="form.extraFields.time" type="text" placeholder="如：周六全天" @input="setExtra('time', form.extraFields.time)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">集合地点</span>
+          <span class="ds-label w-16 shrink-0">集合地点</span>
           <input v-model="form.extraFields.location" type="text" placeholder="集合地点" @input="setExtra('location', form.extraFields.location)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">主办方</span>
+          <span class="ds-label w-16 shrink-0">主办方</span>
           <input v-model="form.extraFields.organizer" type="text" placeholder="主办方/社团" @input="setExtra('organizer', form.extraFields.organizer)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500 w-16">联系方式</span>
+          <span class="ds-label w-16 shrink-0">联系方式</span>
           <input v-model="form.extraFields.contact" type="text" placeholder="微信/QQ" @input="setExtra('contact', form.extraFields.contact)"
-            class="flex-1 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" />
+            class="ds-input flex-1 min-w-0" />
         </div>
-      </div>
+      </section>
 
       <!-- 匿名开关 -->
-      <div class="bg-white rounded-xl p-4 flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium text-zinc-700">匿名发布</p>
-          <p class="text-xs text-zinc-400 mt-0.5">匿名发布后台可溯源，请文明发言</p>
-          <p v-if="!userStore.canAnonymous" class="text-xs text-red-400 mt-0.5">信誉分 ≥90 可匿名，当前 {{ creditScore }} 分</p>
-          <p v-if="selectedSection?.forceAnonymous" class="text-xs text-blue-500 mt-0.5">当前板块要求匿名发布</p>
+      <section class="ds-card p-4 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="ds-label">匿名发布</p>
+          <p class="ds-sub mt-0.5">匿名发布后台可溯源，请文明发言</p>
+          <p v-if="!userStore.canAnonymous" class="ds-sub mt-0.5" style="color: var(--coral)">信誉分 ≥90 可匿名，当前 {{ creditScore }} 分</p>
+          <p v-if="selectedSection?.forceAnonymous" class="ds-sub mt-0.5" style="color: var(--violet)">当前板块要求匿名发布</p>
         </div>
         <button
-          class="relative w-11 h-6 rounded-full transition"
-          :class="[form.isAnonymous ? 'bg-brand-500' : 'bg-zinc-200', !userStore.canAnonymous ? 'opacity-50 cursor-not-allowed' : '']"
+          class="relative w-12 h-7 rounded-full shrink-0 transition"
+          :style="{ background: form.isAnonymous ? 'var(--ink)' : 'rgb(20 17 15 / 0.14)' }"
+          :class="!userStore.canAnonymous ? 'opacity-50 cursor-not-allowed' : ''"
           :disabled="!userStore.canAnonymous"
           @click="onAnonymousChange(!form.isAnonymous)"
         >
-          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform" :class="form.isAnonymous ? 'translate-x-5' : ''"></span>
+          <span class="absolute top-1 left-1 w-5 h-5 rounded-full transition-transform" style="background: var(--card); border: 1.5px solid var(--ink); box-sizing: border-box" :class="form.isAnonymous ? 'translate-x-5' : ''"></span>
         </button>
-      </div>
+      </section>
 
-      <div class="flex gap-3">
+      <!-- 底部提交条：墨底 + 荧光大按钮（唯一视觉重心） -->
+      <section class="ds-card flex items-center gap-3 p-3" style="background: var(--ink)">
         <button
           v-if="!editId"
-          class="px-6 py-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-full font-medium transition"
+          class="pub-draft ds-btn shrink-0"
           @click="saveDraft"
         >
           存草稿
         </button>
         <button
           :disabled="loading"
-          class="flex-1 py-3 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
+          class="pub-submit ds-btn ds-btn--accent flex-1"
           @click="handleSubmit"
         >
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
           {{ loading ? (editId ? '保存中...' : '发布中...') : (editId ? '保存修改' : '发布') }}
         </button>
-      </div>
+      </section>
     </main>
 
     <!-- 切换板块确认：避免静默清空已填的差异化字段 -->
@@ -762,4 +757,17 @@ async function handleSubmit() {
     />
   </div>
 </template>
+
+<style scoped>
+.pub-upload { border-style: dashed; border-color: var(--ink); color: var(--ink-mute); }
+.pub-upload:hover { color: var(--ink); }
+.pub-draft {
+  padding: 12px 18px;
+  background: transparent;
+  color: var(--paper);
+  border-color: rgb(255 255 255 / 0.42);
+  box-shadow: none;
+}
+.pub-submit { padding: 13px 20px; font-size: 15px; }
+</style>
 

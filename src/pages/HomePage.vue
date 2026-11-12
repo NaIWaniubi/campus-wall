@@ -9,7 +9,7 @@ import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid, 
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, subscriptionApi, announcementApi, sectionApi, aiApi } from '@/utils/api'
-import { sectionGradient, sectionColor, sectionTint } from '@/utils/sections'
+import { sectionGradient, sectionColor } from '@/utils/sections'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
@@ -261,66 +261,105 @@ watch(list, () => nextTick(updateScrollMargin))
 
 <template>
   <div class="min-h-screen pb-24" style="background: var(--color-bg)">
-    <!-- 顶部渐变头（复刻原生小程序 pages/index/index.wxss 的 .header） -->
+    <!-- V4 海报头：墨色画布 + 字标 + 荧光走马条（高度压到 ~210px，首屏能露两张卡） -->
     <header class="hero sticky top-0 z-20">
-      <div class="max-w-[1280px] mx-auto px-3 pt-3">
-        <div class="flex items-center gap-2.5 mb-3">
-          <!-- 校区选择（原界面就叫「📍 本校」，桌面端顺带承担品牌位） -->
-          <button class="inline-flex hero-pill font-semibold shrink-0" aria-label="切换校区">
-            <span>📍</span><span>本校</span>
-          </button>
-          <button class="inline-flex hero-pill flex-1 min-w-0 justify-start text-white/70" @click="router.push('/search')">
+      <div class="max-w-[1280px] mx-auto px-4 pt-3">
+        <!-- 品牌行 -->
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="ds-sticker ds-sticker--coral shrink-0">CAMPUS</span>
+            <h1 class="ds-display text-[26px] md:text-[34px] leading-none text-white whitespace-nowrap">
+              校园<span style="color: var(--lime)">墙</span>
+            </h1>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              class="hidden md:inline-flex ds-icon-btn"
+              style="width:34px;height:34px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.32);color:#fff;box-shadow:none"
+              title="刷新" :disabled="refreshing" @click="manualRefresh"
+            >
+              <RefreshCw class="w-4 h-4" :class="refreshing ? 'animate-spin' : ''" />
+            </button>
+            <button
+              class="hidden md:inline-flex ds-icon-btn relative"
+              style="width:34px;height:34px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.32);color:#fff;box-shadow:none"
+              aria-label="消息中心" @click="goMessage"
+            >
+              <Bell class="w-[17px] h-[17px]" />
+              <span v-if="appStore.unreadCount > 0" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style="background: var(--coral); box-shadow: 0 0 0 1.5px var(--ink)"></span>
+            </button>
+            <button
+              class="ds-icon-btn overflow-hidden"
+              style="width:34px;height:34px;background: var(--lime); border-color: var(--lime); color: var(--ink); box-shadow: none"
+              aria-label="个人中心" @click="goProfile"
+            >
+              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="w-full h-full object-cover" alt="" />
+              <span v-else class="text-[12px] font-black">{{ userStore.user?.nickname?.charAt(0) || '我' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 搜索行 -->
+        <div class="mt-2.5 flex items-center gap-2">
+          <button
+            class="flex-1 min-w-0 flex items-center gap-2 rounded-full px-4 py-2 text-[13px] text-white/60"
+            style="background: rgba(255,255,255,.07); border: 1.2px solid rgba(255,255,255,.26)"
+            @click="router.push('/search')"
+          >
             <Search class="w-4 h-4 opacity-70 shrink-0" />
             <span class="truncate">搜索内容、话题、用户</span>
           </button>
-          <button class="hidden md:inline-flex hero-pill !px-2.5" title="刷新" :disabled="refreshing" @click="manualRefresh">
-            <RefreshCw class="w-4 h-4" :class="refreshing ? 'animate-spin' : ''" />
-          </button>
-          <button class="hidden md:inline-flex hero-pill !px-2.5 relative" aria-label="消息中心" @click="goMessage">
-            <Bell class="w-[18px] h-[18px]" />
-            <span v-if="appStore.unreadCount > 0" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-          <button class="hidden md:inline-flex hero-pill !px-1.5 !py-1.5" aria-label="个人中心" @click="goProfile">
-            <span class="w-6 h-6 rounded-full overflow-hidden bg-white/85 flex items-center justify-center">
-              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="w-full h-full object-cover" alt="" />
-              <span v-else class="text-[11px] font-bold text-brand-500">{{ userStore.user?.nickname?.charAt(0) || '我' }}</span>
-            </span>
+          <button class="hero-pill shrink-0 font-bold !text-[12px]" aria-label="切换校区">
+            <span>📍</span><span>本校</span>
           </button>
         </div>
 
-        <!-- 分类 chips -->
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3">
+        <!-- 分类 chips：纸底描边 + 分类色圆点（颜色留给点，不铺满整颗 chip） -->
+        <div class="mt-2.5 flex items-center gap-2 overflow-x-auto scrollbar-hide pb-2.5 ds-scroll-x">
           <button
             v-for="sec in [{ id: 0, name: '全部' }, ...appStore.sections]"
             :key="sec.id"
             class="hero-chip"
             :class="{ 'is-active': activeSection === sec.id }"
-            :style="activeSection === sec.id
-              ? (sec.id === 0
-                ? { background: 'rgba(255,255,255,0.95)', color: 'var(--color-brand-500)', borderColor: 'transparent', boxShadow: '0 6px 16px -6px rgba(15,20,40,.45)' }
-                : { background: sectionGradient(sec.id, sec.name), color: '#fff', borderColor: 'transparent', boxShadow: '0 6px 16px -6px rgba(15,20,40,.45)' })
-              : undefined"
             @click="selectSection(sec.id)"
           >
+            <span
+              class="w-[7px] h-[7px] rounded-full shrink-0"
+              :style="{
+                background: sec.id ? sectionGradient(sec.id, sec.name) : 'currentColor',
+                boxShadow: 'inset 0 0 0 1px rgba(20,17,15,.45)',
+              }"
+            ></span>
             {{ sec.name }}
-            <BellRing v-if="sec.id > 0 && subscribedSectionIds.has(sec.id)" class="w-3 h-3 ml-0.5" />
+            <BellRing v-if="sec.id > 0 && subscribedSectionIds.has(sec.id)" class="w-3 h-3 opacity-70" />
           </button>
         </div>
       </div>
 
-      <!-- 白色排序条：顶部圆角贴在渐变头下沿（对齐小程序 .sort-tabs） -->
-      <div class="max-w-[1280px] mx-auto px-3">
-        <div class="sort-strip flex items-center gap-12 px-4 pt-3">
-          <button
-            v-for="opt in sortOptions"
-            :key="opt.key"
-            class="sort-strip-item"
-            :class="{ 'is-active': activeSort === opt.key }"
-            @click="selectSort(opt.key)"
-          >
-            {{ opt.label }}
-          </button>
+      <!-- 荧光走马条：把「今天有什么」压成一行 -->
+      <div class="ds-marquee">
+        <div class="ds-marquee__track" aria-hidden="true">
+          <template v-for="n in 2" :key="n">
+            <span>★ 今日校园 · {{ digest ? `${digest.stats.posts} 条新动态 / ${digest.stats.comments} 条评论` : '真实同学，真实生活' }}</span>
+            <span>★ 失物雷达自动撮合</span>
+            <span>★ AI 一键成稿 · 30 秒发一条</span>
+            <span>★ 信誉分 92 才敢匿名</span>
+            <span>★ 交易先验货，押金都是坑</span>
+          </template>
         </div>
+      </div>
+
+      <!-- 排序条：纸色 + 墨色下划线 -->
+      <div class="sort-strip max-w-[1280px] mx-auto flex items-center gap-10 px-4 pt-2.5 pb-2">
+        <button
+          v-for="opt in sortOptions"
+          :key="opt.key"
+          class="sort-strip-item"
+          :class="{ 'is-active': activeSort === opt.key }"
+          @click="selectSort(opt.key)"
+        >
+          {{ opt.label }}
+        </button>
       </div>
     </header>
 
@@ -354,27 +393,34 @@ watch(list, () => nextTick(updateScrollMargin))
         <p class="mt-2.5 text-[13px] text-zinc-700 leading-relaxed">{{ digest.summary }}</p>
 
         <div class="mt-2.5 flex flex-wrap gap-1.5">
-          <span
-            v-for="sec in digest.sections"
-            :key="sec.name"
-            class="cat-tag"
-            :style="{ background: sectionTint(sectionColor(null, sec.name), 0.12), color: sectionColor(null, sec.name) }"
-          >{{ sec.name }} {{ sec.n }}</span>
-          <span class="cat-tag" style="background: rgba(109,59,245,.1); color: var(--color-brand-500)">新动态 {{ digest.stats.posts }}</span>
-          <span class="cat-tag" style="background: rgba(6,182,212,.14); color: #0E7490">评论 {{ digest.stats.comments }}</span>
+          <span v-for="sec in digest.sections" :key="sec.name" class="ds-tag">
+            <span class="ds-tag-dot" :style="{ background: sectionColor(null, sec.name) }"></span>
+            {{ sec.name }} {{ sec.n }}
+          </span>
+          <span class="ds-tag">
+            <span class="ds-tag-dot" style="background: var(--lime)"></span>
+            新动态 {{ digest.stats.posts }}
+          </span>
+          <span class="ds-tag">
+            <span class="ds-tag-dot" style="background: var(--sky)"></span>
+            评论 {{ digest.stats.comments }}
+          </span>
         </div>
 
         <button
           v-if="digest.hot"
-          class="mt-3 w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg bg-zinc-50 hover:bg-zinc-100 transition active:scale-[.99]"
+          class="mt-3 w-full flex items-center gap-2 text-left px-3 py-2.5 transition active:translate-x-[1px] active:translate-y-[1px]"
+          style="border: 1.5px solid var(--ink); border-radius: 12px; background: var(--paper); box-shadow: 2px 2px 0 var(--ink)"
           @click="router.push(`/post/${digest.hot.id}`)"
         >
-          <Flame class="w-4 h-4 text-orange-500 flex-shrink-0" />
-          <span class="text-[12px] text-zinc-700 truncate flex-1">今日最热：{{ digest.hot.title }}</span>
-          <ChevronRight class="w-4 h-4 text-zinc-400 flex-shrink-0" />
+          <span class="w-6 h-6 rounded-[7px] flex items-center justify-center shrink-0" style="background: var(--coral)">
+            <Flame class="w-3.5 h-3.5 text-white" />
+          </span>
+          <span class="text-[12.5px] font-semibold truncate flex-1" style="color: var(--ink)">今日最热：{{ digest.hot.title }}</span>
+          <ChevronRight class="w-4 h-4 shrink-0" style="color: var(--ink-mute)" />
         </button>
 
-        <p v-if="digest.tip" class="mt-2 text-[11px] text-zinc-400 leading-relaxed">{{ digest.tip }}</p>
+        <p v-if="digest.tip" class="mt-2.5 text-[11px] leading-relaxed" style="color: var(--ink-mute)">{{ digest.tip }}</p>
       </section>
 
       <PostSkeleton v-if="loading" :count="4" />
@@ -414,27 +460,38 @@ watch(list, () => nextTick(updateScrollMargin))
       </template>
       </div>
 
-      <!-- 右栏：官方公告 / 热门搜索 / 板块直达（仅桌面端） -->
-      <aside class="hidden xl:block w-[300px] shrink-0 sticky top-[132px] space-y-3">
-        <section v-if="announcements.length" class="card-premium p-4">
-          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
-            <Megaphone class="w-4 h-4 text-brand-500" /> 官方公告
-          </h2>
-          <div v-for="a in announcements" :key="a.id" class="pb-3 mb-3 border-b border-zinc-50 last:pb-0 last:mb-0 last:border-0">
-            <p class="text-sm text-zinc-800 font-medium leading-snug">{{ a.title }}</p>
-            <p class="mt-1 text-xs text-zinc-500 leading-relaxed line-clamp-3">{{ a.content }}</p>
+      <!-- 右栏：官方公告 / 热门搜索 / 板块直达（V4 海报卡） -->
+      <aside class="hidden xl:block w-[300px] shrink-0 sticky top-[196px] space-y-3">
+        <section v-if="announcements.length" class="ds-card p-4">
+          <div class="ds-section-head mb-3">
+            <span class="ds-section-head__num">01</span>
+            <h2 class="ds-title !text-[16px]">官方公告</h2>
+            <span class="ds-section-head__line"></span>
+            <Megaphone class="w-4 h-4" style="color: var(--coral)" />
+          </div>
+          <div
+            v-for="a in announcements"
+            :key="a.id"
+            class="pb-3 mb-3 last:pb-0 last:mb-0"
+            style="border-bottom: 1px solid var(--hairline)"
+          >
+            <p class="text-[13.5px] font-bold leading-snug" style="color: var(--ink)">{{ a.title }}</p>
+            <p class="mt-1 text-[12px] leading-relaxed line-clamp-3" style="color: var(--ink-mute)">{{ a.content }}</p>
           </div>
         </section>
 
-        <section class="card-premium p-4">
-          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
-            <Flame class="w-4 h-4 text-orange-500" /> 热门搜索
-          </h2>
-          <div class="flex flex-wrap gap-2">
+        <section class="ds-card p-4">
+          <div class="ds-section-head mb-3">
+            <span class="ds-section-head__num">{{ announcements.length ? '02' : '01' }}</span>
+            <h2 class="ds-title !text-[16px]">热门搜索</h2>
+            <span class="ds-section-head__line"></span>
+            <Flame class="w-4 h-4" style="color: var(--coral)" />
+          </div>
+          <div class="flex flex-wrap gap-1.5">
             <button
               v-for="w in hotWords"
               :key="w"
-              class="px-2.5 py-1 rounded-full bg-zinc-50 hover:bg-brand-50 hover:text-brand-600 text-xs text-zinc-600 transition"
+              class="ds-chip !text-[11.5px] !py-1 !px-2.5"
               @click="router.push({ path: '/search', query: { keyword: w } })"
             >
               {{ w }}
@@ -442,37 +499,48 @@ watch(list, () => nextTick(updateScrollMargin))
           </div>
         </section>
 
-        <section class="card-premium p-4">
-          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 mb-3">
-            <LayoutGrid class="w-4 h-4 text-brand-500" /> 板块直达
-          </h2>
-          <div class="grid grid-cols-2 gap-2">
+        <section class="ds-card p-4">
+          <div class="ds-section-head mb-3">
+            <span class="ds-section-head__num">{{ announcements.length ? '03' : '02' }}</span>
+            <h2 class="ds-title !text-[16px]">板块直达</h2>
+            <span class="ds-section-head__line"></span>
+            <LayoutGrid class="w-4 h-4" style="color: var(--violet)" />
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
             <button
               v-for="sec in appStore.sections"
               :key="sec.id"
-              class="px-3 py-2 rounded-xl bg-zinc-50 hover:bg-brand-50 hover:text-brand-600 text-xs text-zinc-600 text-left transition truncate"
+              class="ds-chip !justify-start !text-[11.5px] !py-1.5 !px-2.5 truncate"
               @click="router.push(`/section/${sec.id}`)"
             >
-              {{ sec.name }}
+              <span
+                class="w-[6px] h-[6px] rounded-full shrink-0"
+                :style="{ background: sectionGradient(sec.id, sec.name) }"
+              ></span>
+              <span class="truncate">{{ sec.name }}</span>
             </button>
           </div>
         </section>
 
-        <section class="rounded-[16px] p-4 text-white relative overflow-hidden" style="background: var(--grad-aurora)">
-          <span class="pointer-events-none absolute -right-6 -top-8 w-28 h-28 rounded-full bg-white/25 blur-2xl" aria-hidden="true"></span>
-          <p class="text-sm font-semibold">校园墙 · 八板块社区</p>
-          <p class="mt-1 text-xs/relaxed text-white/85">
-            二手交易 · 失物招领 · 表白墙 · 吐槽树洞 · 互助问答 · 校园活动 · 拼车 · 组队
-          </p>
-          <p class="mt-2 text-xs text-white/70">失物雷达 / 信誉分 / 匿名治理 / 实时私信</p>
+        <!-- 品牌卡：墨色海报 + 荧光字 -->
+        <section class="relative overflow-hidden p-4" style="background: var(--ink); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard)">
+          <span class="pointer-events-none absolute -right-8 -top-10 w-28 h-28 rounded-full blur-2xl" style="background: rgb(200 240 74 / 0.35)" aria-hidden="true"></span>
+          <div class="relative">
+            <span class="ds-sticker ds-sticker--coral">SINCE 2026</span>
+            <p class="ds-display text-[22px] mt-2" style="color: var(--paper)">校园墙</p>
+            <p class="mt-1.5 text-[11.5px] leading-relaxed" style="color: rgb(247 242 232 / 0.72)">
+              二手 · 失物 · 表白 · 树洞 · 互助 · 活动 · 拼车 · 组队
+            </p>
+            <p class="mt-2 text-[11px] font-bold" style="color: var(--lime)">失物雷达 / 信誉分 / 匿名治理 / 实时私信</p>
+          </div>
         </section>
       </aside>
     </main>
 
     <!-- 悬浮发布按钮 -->
     <button
-      class="hidden md:flex fixed right-4 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 active:scale-90 shadow-lg shadow-brand-500/40 items-center justify-center text-white transition-all duration-200 z-20"
-      style="bottom: calc(1.5rem + env(safe-area-inset-bottom));"
+      class="hidden md:flex fixed right-5 w-14 h-14 rounded-[16px] items-center justify-center transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] z-20"
+      style="background: var(--ink); color: var(--lime); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard); bottom: calc(1.5rem + env(safe-area-inset-bottom))"
       aria-label="发布新内容"
       @click="goPublish"
     >

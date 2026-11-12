@@ -12,7 +12,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { uploadApi, tradeApi, followApi } from '@/utils/api'
-import { creditColor, formatTime } from '@/utils/helpers'
+import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import CreditBadge from '@/components/CreditBadge.vue'
@@ -174,155 +174,183 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-6">
-    <!-- 顶部用户信息卡片 -->
-    <header class="hero text-white px-4 pt-8 pb-12">
+  <div class="min-h-screen pb-24">
+    <!-- 墨色海报头：方形贴纸头像 + 昵称 .ds-display + 信誉分大数字 -->
+    <header class="hero px-4 pt-7 pb-8 rounded-b-[20px]">
       <div class="max-w-[960px] mx-auto">
-        <div class="flex items-center gap-4">
-          <!-- 头像 -->
-          <div class="relative">
-            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-white/30 to-white/10 backdrop-blur overflow-hidden border-2 border-white/50 flex items-center justify-center shadow-lg">
+        <div class="flex items-center gap-2">
+          <span class="ds-sticker ds-sticker--coral">PROFILE</span>
+          <span class="ds-label" style="color: rgb(255 255 255 / 0.45)">校园墙 · 个人中心</span>
+        </div>
+
+        <div class="mt-3 flex items-start gap-3.5">
+          <!-- 方形贴纸头像 -->
+          <div class="relative shrink-0">
+            <div class="w-[76px] h-[76px] rounded-[16px] overflow-hidden flex items-center justify-center"
+              style="background: var(--lime); border: 1.5px solid var(--paper); box-shadow: var(--shadow-hard-sm)">
               <img v-if="user?.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="头像" />
-              <span v-else class="text-2xl font-bold text-white drop-shadow">{{ user?.nickname?.charAt(0) || '我' }}</span>
+              <span v-else class="ds-display text-[30px]" style="color: var(--ink)">{{ user?.nickname?.charAt(0) || '我' }}</span>
             </div>
-            <label class="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white text-brand-600 flex items-center justify-center shadow cursor-pointer">
+            <label class="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-[9px] flex items-center justify-center cursor-pointer"
+              style="background: var(--paper); border: 1.5px solid var(--ink); color: var(--ink)">
               <Loader2 v-if="uploading" class="w-3.5 h-3.5 animate-spin" />
               <Camera v-else class="w-3.5 h-3.5" />
               <input type="file" accept="image/jpeg,image/png" class="hidden" @change="onAvatarChange" />
             </label>
           </div>
+
           <!-- 昵称 + 学号 -->
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-lg font-bold truncate">{{ user?.nickname || '未设置' }}</span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h1 class="ds-display text-[23px] text-white max-w-full truncate">{{ user?.nickname || '未设置' }}</h1>
               <CreditBadge :score="credit" size="sm" />
-              <span v-if="userStore.isAdmin" class="px-1.5 py-0.5 rounded bg-white/20 text-xs flex items-center gap-0.5">
+              <span v-if="userStore.isAdmin" class="ds-sticker ds-sticker--sky shrink-0">
                 <Shield class="w-3 h-3" /> 管理员
               </span>
             </div>
-            <div class="text-xs text-white/80 space-y-0.5">
-              <p>学号：{{ user?.studentId || '-' }}</p>
-              <p>{{ user?.college || '未设置学院' }} · {{ user?.grade || '未设置年级' }}</p>
+            <div class="mt-1.5 space-y-0.5 text-[12px]" style="color: rgb(255 255 255 / 0.72)">
+              <p class="truncate">学号：{{ user?.studentId || '-' }}</p>
+              <p class="truncate">{{ user?.college || '未设置学院' }} · {{ user?.grade || '未设置年级' }}</p>
             </div>
           </div>
+
+          <!-- 信誉分大数字 -->
+          <div class="shrink-0 text-right pl-1">
+            <div class="ds-display ds-num text-[32px] leading-none" style="color: var(--lime)">{{ credit }}</div>
+            <div class="ds-label mt-1" style="color: rgb(255 255 255 / 0.45)">信誉分</div>
+          </div>
         </div>
+
         <!-- 个性签名 -->
-        <p v-if="user?.signature" class="mt-4 text-sm text-white/90 italic line-clamp-1">
+        <p v-if="user?.signature" class="mt-3.5 text-[13px] italic line-clamp-1" style="color: rgb(255 255 255 / 0.85)">
           "{{ user.signature }}"
         </p>
-        <!-- 关注 / 粉丝 -->
-        <div class="mt-3 flex items-center gap-6 text-sm">
-          <button class="flex items-baseline gap-1.5 hover:opacity-80 transition" @click="gotoFollow('following')">
-            <span class="text-lg font-bold">{{ followingTotal }}</span>
-            <span class="text-white/80">关注</span>
-          </button>
-          <button class="flex items-baseline gap-1.5 hover:opacity-80 transition" @click="gotoFollow('followers')">
-            <span class="text-lg font-bold">{{ followersTotal }}</span>
-            <span class="text-white/80">粉丝</span>
-          </button>
-        </div>
       </div>
     </header>
 
-    <main class="max-w-[960px] mx-auto px-4 -mt-6 space-y-4">
-      <!-- 信誉分卡片 -->
-      <div class="bg-white rounded-xl shadow-sm p-4">
-        <div class="flex items-center justify-between mb-2">
+    <main class="max-w-[960px] mx-auto px-3 pt-3 space-y-3">
+      <!-- 数据三宫格：关注 / 粉丝 / 交易评价 -->
+      <section class="ds-card ds-card--flat grid grid-cols-3 overflow-hidden">
+        <button class="flex flex-col items-center gap-1 py-3.5 transition active:translate-y-[1px]" @click="gotoFollow('following')">
+          <span class="ds-display ds-num text-[22px] leading-none" style="color: var(--ink)">{{ followingTotal }}</span>
+          <span class="ds-label">关注</span>
+        </button>
+        <button class="flex flex-col items-center gap-1 py-3.5 transition active:translate-y-[1px]"
+          style="border-left: 1px solid var(--hairline)" @click="gotoFollow('followers')">
+          <span class="ds-display ds-num text-[22px] leading-none" style="color: var(--ink)">{{ followersTotal }}</span>
+          <span class="ds-label">粉丝</span>
+        </button>
+        <div class="flex flex-col items-center gap-1 py-3.5" style="border-left: 1px solid var(--hairline)">
+          <span class="ds-display ds-num text-[22px] leading-none" style="color: var(--coral)">{{ ratingTotal }}</span>
+          <span class="ds-label">评价</span>
+        </div>
+      </section>
+
+      <!-- 信誉分 -->
+      <section class="ds-card p-4">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-zinc-700">信誉分</span>
+            <span class="ds-label">信誉分</span>
             <CreditBadge :score="credit" size="md" />
           </div>
-          <span class="text-xl font-bold" :style="{ color: creditColor(credit) }">{{ credit }}</span>
+          <span class="ds-display ds-num text-[20px] leading-none" style="color: var(--ink)">{{ credit }}</span>
         </div>
-        <div class="h-2.5 rounded-full bg-zinc-100 overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-current to-white/30" :style="{ width: Math.min(credit, 100) + '%', color: creditColor(credit), backgroundColor: creditColor(credit) }"></div>
+        <div class="mt-3 h-2.5" style="background: var(--paper); border: 1px solid var(--ink)">
+          <div class="h-full transition-all duration-500"
+            :style="{ width: Math.min(credit, 100) + '%', background: 'var(--lime)' }"></div>
         </div>
-        <p class="text-xs text-zinc-400 mt-2">{{ permissionText }}</p>
-      </div>
+        <p class="mt-2 text-[12px]" style="color: var(--ink-mute)">{{ permissionText }}</p>
+      </section>
 
       <!-- 交易评价 -->
-      <div class="bg-white rounded-xl shadow-sm p-4">
-        <div class="flex items-center justify-between mb-1">
+      <section class="ds-card p-4">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-zinc-700">交易评价</span>
-            <span v-if="ratingAvg !== null" class="text-xs font-medium text-amber-500">{{ ratingAvg }} 分</span>
+            <span class="ds-label">交易评价</span>
+            <span v-if="ratingAvg !== null" class="text-[12px] font-bold" style="color: var(--coral)">{{ ratingAvg }} 分</span>
           </div>
-          <span v-if="ratingTotal > 0" class="text-xs text-zinc-400">共 {{ ratingTotal }} 条</span>
+          <span v-if="ratingTotal > 0" class="ds-label">共 {{ ratingTotal }} 条</span>
         </div>
-        <p v-if="!ratings.length" class="text-xs text-zinc-400 py-2">暂无交易评价，完成二手交易后可获得互评</p>
-        <div v-else class="divide-y divide-zinc-50">
-          <div v-for="r in ratings.slice(0, 3)" :key="r.id" class="flex items-start gap-2.5 py-2.5">
-            <div class="w-7 h-7 rounded-full bg-zinc-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+        <p v-if="!ratings.length" class="mt-2 text-[12px] leading-relaxed" style="color: var(--ink-mute)">暂无交易评价，完成二手交易后可获得互评</p>
+        <div v-else class="mt-1">
+          <div v-for="r in ratings.slice(0, 3)" :key="r.id" class="flex items-start gap-2.5 py-2.5"
+            style="border-top: 1px solid var(--hairline)">
+            <div class="w-7 h-7 rounded-[8px] flex-shrink-0 overflow-hidden flex items-center justify-center"
+              style="background: var(--paper); border: 1px solid var(--hairline); color: var(--ink-mute)">
               <img v-if="r.rater?.avatar" :src="r.rater.avatar" class="w-full h-full object-cover" alt="" />
-              <span v-else class="text-xs text-zinc-400">{{ r.rater?.nickname?.charAt(0) || '匿' }}</span>
+              <span v-else class="text-[12px] font-bold">{{ r.rater?.nickname?.charAt(0) || '匿' }}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-zinc-600 truncate">{{ r.rater?.nickname || '匿名用户' }}</span>
+                <span class="text-[12.5px] font-semibold truncate" style="color: var(--ink)">{{ r.rater?.nickname || '匿名用户' }}</span>
                 <div class="flex gap-px">
                   <Star v-for="i in 5" :key="i" class="w-3 h-3"
-                    :class="i <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-zinc-200'" />
+                    :style="{ color: i <= r.rating ? 'var(--coral)' : 'var(--hairline)', fill: i <= r.rating ? 'var(--coral)' : 'none' }" />
                 </div>
-                <span class="ml-auto text-[11px] text-zinc-300 flex-shrink-0">{{ formatTime(r.createdAt) }}</span>
+                <span class="ml-auto ds-num text-[11px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(r.createdAt) }}</span>
               </div>
-              <p v-if="r.comment" class="text-xs text-zinc-500 mt-0.5 line-clamp-2">{{ r.comment }}</p>
-              <p class="text-[11px] text-zinc-300 mt-0.5 truncate">来自「{{ r.postTitle }}」</p>
+              <p v-if="r.comment" class="mt-0.5 text-[12px] leading-relaxed line-clamp-2" style="color: var(--ink-soft)">{{ r.comment }}</p>
+              <p class="mt-0.5 text-[11px] truncate" style="color: var(--ink-mute)">来自「{{ r.postTitle }}」</p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 关注 / 粉丝 -->
-      <div ref="followSectionRef" class="bg-white rounded-xl shadow-sm p-4 scroll-mt-16">
+      <!-- 关注与粉丝 -->
+      <section ref="followSectionRef" class="ds-card p-4 scroll-mt-20">
         <div class="flex items-center gap-2 mb-3">
-          <Users class="w-4 h-4 text-brand-500" />
-          <span class="text-sm font-medium text-zinc-700">关注与粉丝</span>
-          <div class="ml-auto flex items-center bg-zinc-100 rounded-full p-0.5 text-xs">
-            <button class="px-3 py-1 rounded-full transition"
-              :class="followTab === 'following' ? 'bg-white text-brand-600 font-medium shadow-sm' : 'text-zinc-500'"
+          <Users class="w-4 h-4" style="color: var(--violet)" />
+          <span class="text-[15px] font-extrabold" style="color: var(--ink)">关注与粉丝</span>
+          <div class="ml-auto flex items-center gap-1.5">
+            <button class="ds-chip !py-1 !px-3 !text-[12px]"
+              :class="{ 'is-active': followTab === 'following' }"
               @click="switchFollowTab('following')">关注 {{ followingTotal }}</button>
-            <button class="px-3 py-1 rounded-full transition"
-              :class="followTab === 'followers' ? 'bg-white text-brand-600 font-medium shadow-sm' : 'text-zinc-500'"
+            <button class="ds-chip !py-1 !px-3 !text-[12px]"
+              :class="{ 'is-active': followTab === 'followers' }"
               @click="switchFollowTab('followers')">粉丝 {{ followersTotal }}</button>
           </div>
         </div>
-        <p v-if="!followLoading && !followUsers.length" class="text-xs text-zinc-400 py-2">
+        <p v-if="!followLoading && !followUsers.length" class="py-2 text-[12px] leading-relaxed" style="color: var(--ink-mute)">
           {{ followTab === 'following' ? '还没有关注的人，去帖子详情关注感兴趣的作者吧' : '还没有粉丝，多发帖互动会被更多人关注' }}
         </p>
-        <div v-else class="divide-y divide-zinc-50">
-          <div v-for="u in followUsers" :key="u.id" class="flex items-center gap-2.5 py-2.5">
-            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div v-else>
+          <div v-for="u in followUsers" :key="u.id" class="flex items-center gap-2.5 py-2.5"
+            style="border-top: 1px solid var(--hairline)">
+            <div class="w-9 h-9 rounded-[10px] flex items-center justify-center overflow-hidden flex-shrink-0"
+              style="background: var(--sky); color: var(--ink)">
               <img v-if="u.avatar" :src="u.avatar" class="w-full h-full object-cover" alt="" />
-              <span v-else class="text-sm font-bold text-brand-700">{{ u.nickname?.charAt(0) || '友' }}</span>
+              <span v-else class="text-[14px] font-bold">{{ u.nickname?.charAt(0) || '友' }}</span>
             </div>
-            <span class="flex-1 min-w-0 truncate text-sm text-zinc-700">{{ u.nickname || '用户' }}</span>
+            <span class="flex-1 min-w-0 truncate text-[13px] font-semibold" style="color: var(--ink)">{{ u.nickname || '用户' }}</span>
             <CreditBadge :score="u.creditScore || 0" size="sm" />
           </div>
         </div>
-        <button v-if="followHasMore"
-          class="w-full mt-2 py-2 text-xs text-brand-600 hover:bg-brand-50 rounded-lg transition"
-          :disabled="followLoading"
+        <button v-if="followHasMore" class="ds-btn ds-btn--sm w-full mt-3" :disabled="followLoading"
           @click="loadFollowList()">
           {{ followLoading ? '加载中...' : '加载更多' }}
         </button>
-      </div>
+      </section>
 
-      <!-- 功能入口列表 -->
-      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <!-- 功能入口：墨线行 + 右侧箭头 -->
+      <section class="ds-card overflow-hidden">
         <button v-for="item in menuItems" :key="item.path || item.label"
-          class="w-full flex items-center gap-3 px-4 py-3.5 border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition active:bg-zinc-100"
+          class="w-full flex items-center gap-3 px-4 py-3.5 border-b last:border-0 transition active:translate-y-[1px]"
+          style="border-color: var(--hairline)"
           @click="onMenuClick(item)">
-          <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-            <component :is="item.icon" class="w-4 h-4 text-brand-500" />
+          <div class="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
+            style="background: var(--paper); border: 1px solid var(--hairline); color: var(--ink)">
+            <component :is="item.icon" class="w-4 h-4" />
           </div>
-          <span class="flex-1 text-left text-sm text-zinc-700">{{ item.label }}</span>
-          <span v-if="item.badge > 0" class="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs min-w-[20px] text-center">{{ item.badge }}</span>
-          <ChevronRight class="w-4 h-4 text-zinc-300" />
+          <span class="flex-1 text-left text-[13.5px] font-semibold" style="color: var(--ink-soft)">{{ item.label }}</span>
+          <span v-if="item.badge > 0" class="ds-num px-1.5 py-0.5 text-[11px] font-bold min-w-[20px] text-center"
+            style="background: var(--coral); color: var(--card); border-radius: 999px">{{ item.badge }}</span>
+          <ChevronRight class="w-4 h-4 shrink-0" style="color: var(--ink-mute)" />
         </button>
-      </div>
+      </section>
 
-      <!-- 退出登录 -->
-      <button class="w-full py-3 bg-white rounded-xl shadow-sm text-red-500 font-medium hover:bg-red-50 transition flex items-center justify-center gap-2"
+      <!-- 退出登录：描边危险色 -->
+      <button class="ds-btn w-full"
+        style="color: var(--coral); border-color: var(--coral); background: var(--card); box-shadow: none; border-radius: 14px"
         @click="showLogout = true">
         <LogOut class="w-4 h-4" /> 退出登录
       </button>

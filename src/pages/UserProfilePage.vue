@@ -84,20 +84,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-10">
+  <div class="min-h-screen bg-transparent pb-10">
     <!-- 顶部导航 -->
     <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-100">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
         <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900">个人主页</span>
+        <span class="ml-1 font-extrabold" style="color: var(--ink)">个人主页</span>
       </div>
     </header>
 
     <!-- 加载骨架 -->
     <main v-if="loading" class="max-w-[960px] mx-auto px-4 py-6 space-y-4">
-      <div class="bg-white rounded-xl p-5 shadow-sm">
+      <div class="ds-card p-5">
         <div class="flex items-center gap-4">
           <div class="w-16 h-16 rounded-full skeleton flex-shrink-0"></div>
           <div class="flex-1">
@@ -106,11 +106,11 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      <div class="h-24 bg-white rounded-xl skeleton"></div>
+      <div class="h-24 ds-card skeleton"></div>
     </main>
 
     <!-- 用户不存在 -->
-    <main v-else-if="notFound" class="max-w-[960px] mx-auto px-4 py-16 text-center text-sm text-zinc-400">
+    <main v-else-if="notFound" class="max-w-[960px] mx-auto px-4 py-16 text-center text-sm ds-sub">
       用户不存在或已被封禁
     </main>
 
@@ -122,7 +122,7 @@ onMounted(() => {
 
     <main v-else-if="user" class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
       <!-- 公开资料卡 -->
-      <div class="bg-gradient-to-b from-brand-500 to-brand-600 rounded-2xl text-white p-5 shadow-sm">
+      <div class="bg-gradient-to-b from-brand-500 to-brand-600 rounded-2xl text-white p-5">
         <div class="flex items-center gap-4">
           <div class="w-16 h-16 rounded-full bg-gradient-to-br from-white/30 to-white/10 overflow-hidden border-2 border-white/50 flex items-center justify-center flex-shrink-0 shadow">
             <img v-if="user.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="头像" />
@@ -141,7 +141,7 @@ onMounted(() => {
       </div>
 
       <!-- 信誉分 -->
-      <div class="bg-white rounded-xl shadow-sm p-4">
+      <div class="ds-card p-4">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-zinc-700">信誉分</span>
@@ -155,20 +155,20 @@ onMounted(() => {
       </div>
 
       <!-- 交易评价 -->
-      <div class="bg-white rounded-xl shadow-sm p-4">
+      <div class="ds-card p-4">
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-zinc-700">交易评价</span>
             <span v-if="ratingAvg !== null" class="text-xs font-medium text-amber-500">{{ ratingAvg }} 分</span>
           </div>
-          <span v-if="ratingTotal > 0" class="text-xs text-zinc-400">共 {{ ratingTotal }} 条</span>
+          <span v-if="ratingTotal > 0" class="text-xs ds-sub">共 {{ ratingTotal }} 条</span>
         </div>
-        <p v-if="!ratings.length" class="text-xs text-zinc-400 py-2">暂无交易评价</p>
+        <p v-if="!ratings.length" class="text-xs ds-sub py-2">暂无交易评价</p>
         <div v-else class="divide-y divide-zinc-50">
           <div v-for="r in ratings" :key="r.id" class="flex items-start gap-2.5 py-2.5">
             <div class="w-7 h-7 rounded-full bg-zinc-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
               <img v-if="r.rater?.avatar" :src="r.rater.avatar" class="w-full h-full object-cover" alt="" />
-              <span v-else class="text-xs text-zinc-400">{{ r.rater?.nickname?.charAt(0) || '匿' }}</span>
+              <span v-else class="text-xs ds-sub">{{ r.rater?.nickname?.charAt(0) || '匿' }}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
@@ -189,13 +189,13 @@ onMounted(() => {
       </div>
 
       <!-- 公开帖子列表（GET /posts?authorId=） -->
-      <div class="bg-white rounded-xl shadow-sm p-4">
+      <div class="ds-card p-4">
         <div class="flex items-center gap-2">
           <FileText class="w-4 h-4 text-brand-500" />
           <span class="text-sm font-medium text-zinc-700">TA 的帖子</span>
-          <span v-if="postsTotal > 0" class="text-xs text-zinc-400">共 {{ postsTotal }} 条</span>
+          <span v-if="postsTotal > 0" class="text-xs ds-sub">共 {{ postsTotal }} 条</span>
         </div>
-        <p v-if="!posts.length" class="text-xs text-zinc-400 py-3 text-center">暂无公开帖子</p>
+        <p v-if="!posts.length" class="text-xs ds-sub py-3 text-center">暂无公开帖子</p>
         <div v-else class="divide-y divide-zinc-50">
           <button
             v-for="p in posts"
@@ -208,7 +208,7 @@ onMounted(() => {
                 <span class="text-sm text-zinc-800 font-medium truncate">{{ p.title }}</span>
                 <span v-if="p.isTop" class="px-1 py-0.5 rounded text-[10px] bg-brand-100 text-brand-600 flex-shrink-0">置顶</span>
               </div>
-              <div class="flex items-center gap-3 mt-1 text-[11px] text-zinc-400">
+              <div class="flex items-center gap-3 mt-1 text-[11px] ds-sub">
                 <span>{{ formatTime(p.createdAt) }}</span>
                 <span>👍 {{ p.likeCount }}</span>
                 <span>💬 {{ p.commentCount }}</span>

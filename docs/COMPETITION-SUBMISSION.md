@@ -77,9 +77,23 @@ V3 起它不再是「又一个绿白校园墙」：视觉换成**紫→品红→
 - **AI 助手三级容错**：修掉三个连锁 bug——① key/URL 绑死导致「自定义网关 key 失效」时连 OpenRouter 免费档也拿错 key（现按模型路由：`:free` 后缀走官方 OpenRouter + OPENROUTER_API_KEY，其余走自定义网关）；② nemotron 等 reasoning 模型 1024 token 只够 thinking，content 恒空（现 max_tokens ≥2048）；③ 旧模型链全部下架（实测 404），换成 2026-11-12 实测可用的免费档。另加**站内检索兜底**：在线模型全挂/未配置时用知识库+论坛检索作答，不编造、不失联。实测「怎么找回密码」返回真 AI 回复 + 1 条相关论坛推荐
 - 上传文件 Content-Type 修正（demo jpg 曾被误标 `image/jpg`→现按扩展名精确映射 png/jpeg/webp）
 
+### V4（本轮）：纸感海报体系 + 全站逐页重做
+
+V3 的「渐变 + 玻璃」在多轮打磨后仍显廉价，V4 直接换设计语言：**纸底（#F7F2E8）+ 1.5px 墨线 + 3px 硬投影 + 900 字重标题 + 荧光块（青柠/珊瑚/天蓝/紫）**。全站用一个文件承载：`src/styles/v4.css`（令牌 + 组件类 + 旧类名重定义），未改造的页面也会立即统一。
+
+| 层 | 内容 |
+|---|---|
+| 令牌 | `--paper/--card/--ink/--ink-soft/--ink-mute/--hairline/--lime/--coral/--sky/--violet`，硬投影三档；暗色主题全套映射（纸→深墨、墨线→纸色） |
+| 组件 | `ds-card`（描边+硬投影，hover 上浮/active 下沉）、`ds-btn`（primary 墨底荧光/ accent 荧光底墨字）、`ds-chip`（激活=墨底荧光）、`ds-input`（focus 变硬投影）、`ds-tag`、`ds-sticker`（微旋转贴纸）、`ds-marquee`（荧光走马条）、`ds-section-head`（01—— 编号章节头）、`ds-marker`（荧光笔）、`ds-fab` |
+| 海报头 | 首页：CAMPUS 贴纸 + 26/34px 字标 + 荧光走马条（真实统计）；板块/话题/搜索/消息/发布/详情：贴纸 + `ds-display` 大字 + 一句说明 |
+| 逐页重做 | 首页（今日校园卡 + 右栏 01/02/03 编号卡）、板块页（筛选岛 chips）、详情页（正文 1.85 行高 + 四颗等宽互动 chip + AI 划重点虚线切卡）、发布页（lime AI 成稿卡 + 全量表单 + 墨线图片框）、话题页（01–08 编号列表）、消息页（墨条 + 分段列表 + V4 空态）、个人页（方形贴纸头像 + 荧光信誉分 + 硬投影三宫格）、登录/注册（海报头 + 白卡表单 + 墨底荧光按钮）、搜索页（大搜索框 + 编号章节 + TIPS） |
+| 集群施工 | 8 页由 8 个并行 worker（zcode-fleet swarm）按同一份 `docs/DESIGN-V4.md` 契约改造，0 失败；共享组件（PostCard/BottomNav/骨架/空态/AI 助手/弹窗）由主线统一改，避免风格分叉 |
+| 顺带修的性能坑 | `/api/ai/digest` 原来最多阻塞 6s（等模型），改成 **stale-while-revalidate**：规则版立刻返回（实测 40ms），AI 版本后台刷新进缓存 |
+
 ## 8. 截图与录屏素材
 
-- **V3 视觉验收**：`captures/v3/`（手机 8 张：首页/简报卡/话题/板块/详情/详情-AI 划重点/发布/发布-AI 成稿；桌面 3 张：首页/话题/详情）——由 `node scripts/capture-v3.mjs` 一键复现，脚本自带 console/pageerror 断言
+- **V4 视觉验收**：`captures/v4/`（手机 10 张：登录/首页/话题/板块/详情/详情-AI 划重点/发布/消息/个人/搜索/注册；桌面 4 张：首页/话题/详情/发布）——`node scripts/capture-v4.mjs` 一键复现，0 console 报错
+- **V3 视觉验收**：`captures/v3/`（手机 8 张 + 桌面 3 张，历史版本留档）
 - 桌面 + 移动端实拍图：`captures/deploy/`（首页桌面/移动、登录、板块页、帖子详情、我的、消息、后台总览共 8 张）
 - 原始采集图：`captures/`（8 张 Web 窄屏）
 - 建议补录：90 秒真机小程序视频（28 页里挑首页/详情/发布/消息/我的/雷达 6 页）

@@ -20,7 +20,7 @@ withDefaults(defineProps<{
     <div
       v-for="i in count"
       :key="i"
-      class="rounded-xl p-4"
+      class="ds-card p-4"
       style="background-color: var(--color-surface); box-shadow: var(--shadow-sm); border: 1px solid var(--color-border);"
     >
       <!-- 头部：头像 + 名字 + 时间 -->

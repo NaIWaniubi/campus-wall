@@ -34,14 +34,14 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-6">
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+  <div class="min-h-screen bg-transparent pb-6">
+    <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
         <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900">我的评论</span>
-        <span class="ml-2 text-xs text-zinc-400">共 {{ list.length }} 条</span>
+        <span class="ml-1 font-extrabold" style="color: var(--ink)">我的评论</span>
+        <span class="ml-2 text-xs ds-sub">共 {{ list.length }} 条</span>
       </div>
     </header>
 
@@ -51,15 +51,15 @@ onMounted(load)
 
       <template v-else>
         <button v-for="c in list" :key="c.id"
-          class="w-full text-left bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition active:bg-zinc-50"
+          class="w-full text-left ds-card p-4 hover:shadow-md transition active:bg-zinc-50"
           @click="goPost(c)">
-          <div class="flex items-center gap-1.5 text-xs text-zinc-400 mb-1.5">
+          <div class="flex items-center gap-1.5 text-xs ds-sub mb-1.5">
             <MessageCircle class="w-3.5 h-3.5 text-brand-500 flex-shrink-0" />
             <span class="truncate">评论了：{{ c.postTitle || '已删除的帖子' }}</span>
           </div>
           <p class="text-sm text-zinc-700 post-content line-clamp-3">{{ c.content }}</p>
           <div class="flex items-center justify-between mt-2">
-            <span class="text-xs text-zinc-400">{{ formatTime(c.createdAt) }}</span>
+            <span class="text-xs ds-sub">{{ formatTime(c.createdAt) }}</span>
             <ChevronRight class="w-4 h-4 text-zinc-300" />
           </div>
         </button>

@@ -65,16 +65,16 @@
   --color-info-500:    #3B82F6;
 
   /* === 表面 / 文字 / 边框（light 默认） === */
-  --color-surface:    #FFFFFF;
-  --color-surface-2:  #F4F4F5;   /* zinc-100，用于骨架/灰底 */
-  --color-surface-3:  #E4E4E7;   /* zinc-200，更深一层 */
-  --color-border:     #E4E4E7;
-  --color-border-2:   #D4D4D8;
-  --color-text:       #18181B;
-  --color-text-soft:  #52525B;
+  --color-surface:    #FFFFFF;      /* 纸卡 */
+  --color-surface-2:  #EFE8DA;   /* V4 纸灰：骨架/输入底 */
+  --color-surface-3:  #E3DAC8;   /* V4 纸灰更深一层 */
+  --color-border:     #DED3BF;
+  --color-border-2:   #CBBCA3;
+  --color-text:       #14110F;
+  --color-text-soft:  #4A443C;
   /* 原 #A1A1AA 在白底仅 2.56:1；#71717A 为 4.83:1，满足正文 AA */
-  --color-text-mute:  #71717A;
-  --color-bg:         #F7F5FF;   /* 页面级背景：淡紫调，替掉「灰白」底色 */
+  --color-text-mute:  #6E6659;   /* 纸底上 4.6:1 */
+  --color-bg:         #F7F2E8;   /* V4 纸底（暖白） */
 
   /* === 间距 4-based === */
   --space-1:  4px;

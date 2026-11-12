@@ -4,7 +4,7 @@
  */
 import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ArrowLeft, Eye, EyeOff, Loader2, GraduationCap } from '@lucide/vue'
+import { ArrowLeft, Eye, EyeOff, Loader2 } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { toast, safeRedirect } from '@/utils/request'
 
@@ -77,92 +77,113 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-brand-50 to-white">
-    <!-- 顶部返回栏 -->
-    <div class="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-zinc-100">
-      <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
-          <ArrowLeft class="w-5 h-5" />
+  <div class="min-h-screen pb-24">
+    <!-- V4 海报头：墨色画布 + 贴纸 + 大字标题（与登录页同一套 hero） -->
+    <header class="hero px-5 pt-6 pb-7 rounded-b-[20px]">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="ds-sticker ds-sticker--coral shrink-0">JOIN</span>
+          <span class="ds-label text-white/45 truncate">本校 · 学号注册</span>
+        </div>
+        <button
+          class="ds-icon-btn shrink-0"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:rgb(255 255 255);box-shadow:none"
+          aria-label="返回" @click="router.back()"
+        >
+          <ArrowLeft class="w-4 h-4" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900">注册账号</span>
       </div>
-    </div>
+      <h1 class="ds-display ds-display-lg mt-2 text-white">加入校园墙</h1>
+      <p class="mt-1 text-[13px] text-white/60">注册成功自动登录，昵称可随时修改</p>
+    </header>
 
-    <div class="max-w-[960px] mx-auto px-4 py-6">
-      <div class="text-center mb-6">
-        <div class="w-16 h-16 mx-auto rounded-2xl bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30 mb-3">
-          <GraduationCap class="w-9 h-9 text-white" />
-        </div>
-        <h1 class="text-xl font-bold text-zinc-900">加入校园墙</h1>
-      </div>
-
-      <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+    <main class="max-w-[520px] mx-auto px-3 mt-3 space-y-3">
+      <!-- 白卡表单 -->
+      <section class="ds-card p-4 sm:p-5 space-y-4">
         <div>
-          <label for="reg-student-id" class="block text-sm font-medium text-zinc-700 mb-1.5">学号 <span class="text-red-500">*</span></label>
+          <label for="reg-student-id" class="ds-label block mb-1.5">学号 <span style="color: var(--coral)">*</span></label>
           <input id="reg-student-id" aria-required="true" v-model="form.studentId" autocomplete="username" type="text" inputmode="numeric" maxlength="12" placeholder="6-12位数字"
-            class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
-          <p v-if="errors.studentId" class="text-xs text-red-500 mt-1">{{ errors.studentId }}</p>
+            class="ds-input" />
+          <p v-if="errors.studentId" class="mt-1.5 text-[12px] font-bold" style="color: var(--coral)">{{ errors.studentId }}</p>
         </div>
 
         <div>
-          <label for="reg-password" class="block text-sm font-medium text-zinc-700 mb-1.5">密码 <span class="text-red-500">*</span></label>
+          <label for="reg-password" class="ds-label block mb-1.5">密码 <span style="color: var(--coral)">*</span></label>
           <div class="relative">
             <input id="reg-password" aria-required="true" v-model="form.password" autocomplete="new-password" :type="showPassword ? 'text' : 'password'" placeholder="至少6位"
-              class="w-full px-4 py-2.5 pr-11 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition"
+              class="ds-input !pr-11"
               @keyup.enter="handleSubmit" />
-            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600" @click="showPassword = !showPassword">
+            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
+              style="color: var(--ink-mute)"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword"
+              @click="showPassword = !showPassword">
               <Eye v-if="showPassword" class="w-5 h-5" />
               <EyeOff v-else class="w-5 h-5" />
             </button>
           </div>
-          <p v-if="errors.password" class="text-xs text-red-500 mt-1">{{ errors.password }}</p>
+          <!-- 密码强度提示：纯展示，判定阈值与脚本 canSubmit 一致（6 位） -->
+          <div class="mt-1.5 flex flex-wrap items-center gap-2">
+            <span class="ds-tag">
+              <span
+                class="ds-tag-dot"
+                :style="{ background: form.password.length >= 10 ? 'var(--lime)' : (form.password.length >= 6 ? 'var(--sky)' : 'var(--coral)') }"
+              ></span>
+              {{ form.password.length === 0 ? '密码强度 待输入' : (form.password.length >= 10 ? '密码强度 强' : (form.password.length >= 6 ? '密码强度 中' : '密码强度 弱')) }}
+            </span>
+          </div>
+          <p v-if="errors.password" class="mt-1.5 text-[12px] font-bold" style="color: var(--coral)">{{ errors.password }}</p>
         </div>
 
         <div>
-          <label for="reg-confirm" class="block text-sm font-medium text-zinc-700 mb-1.5">确认密码 <span class="text-red-500">*</span></label>
+          <label for="reg-confirm" class="ds-label block mb-1.5">确认密码 <span style="color: var(--coral)">*</span></label>
           <input id="reg-confirm" aria-required="true" v-model="form.confirmPassword" autocomplete="new-password" type="password" placeholder="再次输入密码"
-            class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition"
+            class="ds-input"
             @keyup.enter="handleSubmit" />
-          <p v-if="errors.confirmPassword" class="text-xs text-red-500 mt-1">{{ errors.confirmPassword }}</p>
+          <p v-if="errors.confirmPassword" class="mt-1.5 text-[12px] font-bold" style="color: var(--coral)">{{ errors.confirmPassword }}</p>
         </div>
 
         <div>
-          <label for="reg-nickname" class="block text-sm font-medium text-zinc-700 mb-1.5">昵称 <span class="text-red-500">*</span></label>
+          <label for="reg-nickname" class="ds-label block mb-1.5">昵称 <span style="color: var(--coral)">*</span></label>
           <input id="reg-nickname" aria-required="true" v-model="form.nickname" autocomplete="nickname" type="text" maxlength="20" placeholder="给自己起个名字"
-            class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
-          <p v-if="errors.nickname" class="text-xs text-red-500 mt-1">{{ errors.nickname }}</p>
+            class="ds-input" />
+          <p v-if="errors.nickname" class="mt-1.5 text-[12px] font-bold" style="color: var(--coral)">{{ errors.nickname }}</p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">学院</label>
+          <label for="reg-college" class="ds-label block mb-1.5">学院</label>
           <input id="reg-college" v-model="form.college" autocomplete="organization" type="text" maxlength="50" placeholder="如：计算机学院"
-            class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
+            class="ds-input" />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">年级</label>
+          <label for="reg-grade" class="ds-label block mb-1.5">年级</label>
           <input id="reg-grade" v-model="form.grade" autocomplete="off" type="text" maxlength="20" placeholder="如：2023级"
-            class="w-full px-4 py-2.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition" />
+            class="ds-input" />
         </div>
 
-        <label class="flex items-start gap-2 text-sm text-zinc-600 cursor-pointer">
-          <input v-model="form.agreement" type="checkbox" class="mt-0.5 w-4 h-4 rounded accent-brand-500" />
-          <span>我已阅读并同意 <a class="text-brand-600 cursor-pointer hover:underline" @click.prevent="showAgreement">《用户协议》</a> 和 <a class="text-brand-600 cursor-pointer hover:underline" @click.prevent="showAgreement">《隐私政策》</a></span>
+        <div class="ds-hairline"></div>
+
+        <label class="flex items-start gap-2 cursor-pointer" style="color: var(--ink-soft)">
+          <input v-model="form.agreement" type="checkbox" class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--coral)" />
+          <span class="text-[12.5px] leading-relaxed">我已阅读并同意 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement">《用户协议》</a> 和 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement">《隐私政策》</a></span>
         </label>
 
-        <button type="button" :disabled="loading"
-          class="w-full py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
-          @click="handleSubmit">
+        <button
+          type="button"
+          class="ds-btn ds-btn--primary w-full !py-3"
+          :disabled="loading"
+          @click="handleSubmit"
+        >
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
           {{ loading ? '注册中...' : '注册' }}
         </button>
-      </div>
+      </section>
 
-      <p class="text-center text-sm text-zinc-500 mt-6">
+      <p class="text-center text-[13px] pt-1" style="color: var(--ink-mute)">
         已有账号？
-        <router-link to="/login" class="text-brand-600 font-medium hover:text-brand-700">去登录</router-link>
+        <router-link to="/login" class="font-bold underline underline-offset-2" style="color: var(--violet)">去登录</router-link>
       </p>
-    </div>
+    </main>
   </div>
 </template>
 

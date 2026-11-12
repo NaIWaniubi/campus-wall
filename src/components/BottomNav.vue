@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 移动端底部 TabBar：首页 / 话题 / 发布 / 消息 / 我的
- * V3：激活项用品牌紫渐变文字 + 紫色投影（原生小程序 tabBar 的青绿已弃用）。
+ * V4：激活项 = 墨色胶囊 + 荧光字（纸感海报体系），未激活为纸色底灰字。
  * 仅在 < 640px 显示，且只在主 Tab 页面出现（详情页/登录页/后台自带底部操作条，不显示）。
  */
 import { computed } from 'vue'
@@ -60,29 +60,23 @@ function go(to: string, key: string) {
         <button
           v-for="t in tabs"
           :key="t.key"
-          class="flex-1 flex flex-col items-center justify-center gap-0.5 transition active:scale-95"
+          class="ds-tab flex-1 flex items-center justify-center transition active:scale-95"
+          :class="{ 'is-active': isActive(t.key) }"
           :aria-current="isActive(t.key) ? 'page' : undefined"
           :aria-label="t.label"
           @click="go(t.to, t.key)"
         >
-          <span class="relative">
-            <component
-              :is="t.icon"
-              class="w-[22px] h-[22px] transition-transform"
-              :style="isActive(t.key)
-                ? { color: 'var(--color-brand-400)', filter: 'drop-shadow(0 4px 10px rgba(109,59,245,.45))', transform: 'translateY(-1px)' }
-                : { color: '#A4B0BE' }"
-            />
-            <span
-              v-if="t.key === 'message' && appStore.unreadCount > 0"
-              class="absolute -top-1 -right-1.5 w-2 h-2 bg-red-500 rounded-full"
-            ></span>
+          <span class="ds-tab__pill">
+            <span class="relative">
+              <component :is="t.icon" class="w-[20px] h-[20px]" />
+              <span
+                v-if="t.key === 'message' && appStore.unreadCount > 0"
+                class="absolute -top-1 -right-1.5 w-2 h-2 rounded-full"
+                style="background: var(--coral); box-shadow: 0 0 0 1.5px var(--paper)"
+              ></span>
+            </span>
+            <span class="text-[10.5px] font-bold leading-none whitespace-nowrap">{{ t.label }}</span>
           </span>
-          <span class="text-[10px] leading-none transition-colors"
-            :style="isActive(t.key)
-              ? { background: 'var(--grad-aurora-soft)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', fontWeight: 700 }
-              : { color: '#A4B0BE', fontWeight: 400 }"
-          >{{ t.label }}</span>
         </button>
       </div>
     </nav>

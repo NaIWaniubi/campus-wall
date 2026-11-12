@@ -11,7 +11,6 @@ import { postApi, subscriptionApi } from '@/utils/api'
 import { toast } from '@/utils/request'
 import PostCard from '@/components/PostCard.vue'
 import PostSkeleton from '@/components/PostSkeleton.vue'
-import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -193,19 +192,23 @@ watch(sectionId, () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-24">
-    <!-- 顶部导航 -->
-    <header class="hero sticky top-0 z-20">
-      <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
+  <div class="min-h-screen pb-24">
+    <!-- 墨色海报头：贴纸 + 大字标题 + 一句说明 -->
+    <header class="hero rounded-b-[20px]">
+      <!-- 导航行 -->
+      <div class="max-w-[960px] mx-auto flex items-center gap-2 h-12 px-3 pt-2">
+        <button
+          class="ds-icon-btn shrink-0"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:rgb(255 255 255);box-shadow:none"
+          aria-label="返回"
+          @click="router.back()"
+        >
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-2 font-semibold text-white flex-1">{{ section?.name || '板块详情' }}</span>
+        <span class="ds-label flex-1 truncate" style="color:rgb(255 255 255 / 0.45)">SECTION / 板块</span>
         <button
-          class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm transition disabled:opacity-60"
-          :class="subscribed
-            ? 'border-transparent bg-white/95 text-brand-500 font-medium'
-            : 'border-white/30 text-white/90 hover:bg-white/15'"
+          class="hero-chip shrink-0 px-3 py-1.5 text-[13px] font-bold transition disabled:opacity-60"
+          :class="{ 'is-active': subscribed }"
           :disabled="subLoading"
           @click="toggleSubscribe"
         >
@@ -215,42 +218,22 @@ watch(sectionId, () => {
         </button>
       </div>
 
-      <!-- 排序 Tab：白底条，顶部圆角贴住渐变头 -->
-      <div class="sort-strip max-w-[960px] mx-auto px-3 flex items-center gap-6 h-11">
-        <button
-          v-for="opt in sortOptions"
-          :key="opt.key"
-          class="relative px-3 py-2 text-sm whitespace-nowrap transition"
-          :class="activeSort === opt.key ? 'text-brand-600 font-medium' : 'text-zinc-500 hover:text-zinc-800'"
-          @click="switchSort(opt.key)"
-        >
-          {{ opt.label }}
-          <span v-if="activeSort === opt.key" class="absolute left-1/2 -translate-x-1/2 bottom-0 w-6 h-0.5 bg-brand-500 rounded-full"></span>
-        </button>
-      </div>
-
-      <!-- 交易/失物筛选（上抛后端全局执行）：浅底浮岛，避免压在渐变上不好读 -->
-      <div class="max-w-[960px] mx-auto px-3 pb-3">
-        <div class="flex flex-wrap items-center gap-2 text-xs rounded-xl px-3 py-2.5" style="background: var(--color-bg)">
-          <span class="text-zinc-500">价格</span>
-          <button
-            v-for="p in [['', '不限'], ['0-100', '0-100'], ['100-500', '100-500'], ['500-', '500+']]"
-            :key="p[0]"
-            class="px-2 py-1 rounded-full border transition"
-            :class="activePriceRange === p[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
-            :style="activePriceRange === p[0] ? { background: 'var(--grad-brand)' } : undefined"
-            @click="setFilter(p[0], activeTimeRange, activeSubType)"
-          >{{ p[1] }}</button>
-          <span class="text-zinc-500 ml-1">时间</span>
-          <button
-            v-for="t in [['', '不限'], ['1', '一天内'], ['7', '一周内'], ['30', '一月内']]"
-            :key="t[0]"
-            class="px-2 py-1 rounded-full border transition"
-            :class="activeTimeRange === t[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
-            :style="activeTimeRange === t[0] ? { background: 'var(--grad-brand)' } : undefined"
-            @click="setFilter(activePriceRange, t[0], activeSubType)"
-          >{{ t[1] }}</button>
+      <!-- 海报块 -->
+      <div class="max-w-[960px] mx-auto px-4 pt-1 pb-8">
+        <div class="flex items-center gap-2">
+          <span class="ds-sticker ds-sticker--coral">CAMPUS</span>
+          <span class="ds-label" style="color:rgb(255 255 255 / 0.45)">校园墙 · 板块</span>
         </div>
+        <div class="mt-2.5 flex items-end justify-between gap-3">
+          <h1 class="ds-display ds-display-lg text-white min-w-0 truncate">{{ section?.name || '板块详情' }}</h1>
+          <div class="shrink-0 text-right pb-0.5">
+            <div class="ds-num ds-display text-[30px] leading-none" style="color: var(--lime)">
+              {{ list.length }}<span v-if="hasMore" class="align-top text-[15px]">+</span>
+            </div>
+            <div class="ds-label mt-1" style="color:rgb(255 255 255 / 0.45)">篇帖子</div>
+          </div>
+        </div>
+        <p class="mt-1.5 text-[13px]" style="color:rgb(255 255 255 / 0.6)">本校同学的真实动态 · 支持价格与时间筛选</p>
       </div>
     </header>
 
@@ -262,31 +245,84 @@ watch(sectionId, () => {
       @touchend="onTouchEnd"
     >
       <!-- 下拉刷新指示器 -->
-      <div class="flex items-center justify-center text-xs text-zinc-400 transition-all overflow-hidden" :style="{ height: pullDistance + 'px' }">
+      <div class="flex items-center justify-center ds-label transition-all overflow-hidden" :style="{ height: pullDistance + 'px' }">
         <RefreshCw v-if="refreshing" class="w-4 h-4 animate-spin mr-1" />
-        {{ refreshing ? '刷新中...' : pullDistance >= pullThreshold ? '松开刷新' : '下拉刷新' }}
+        {{ refreshing ? '刷新中…' : pullDistance >= pullThreshold ? '松开刷新' : '下拉刷新' }}
+      </div>
+
+      <!-- 筛选岛：排序 / 价格 / 时间，统一描边胶囊 -->
+      <section class="ds-card p-3.5 space-y-2.5" aria-label="排序与筛选">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="ds-label shrink-0 mr-1">排序</span>
+          <button
+            v-for="opt in sortOptions"
+            :key="opt.key"
+            class="ds-chip"
+            :class="{ 'is-active': activeSort === opt.key }"
+            @click="switchSort(opt.key)"
+          >{{ opt.label }}</button>
+        </div>
+
+        <div class="ds-hairline"></div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="ds-label shrink-0 mr-1">价格</span>
+          <button
+            v-for="p in [['', '不限'], ['0-100', '0-100'], ['100-500', '100-500'], ['500-', '500+']]"
+            :key="p[0]"
+            class="ds-chip"
+            :class="{ 'is-active': activePriceRange === p[0] }"
+            @click="setFilter(p[0], activeTimeRange, activeSubType)"
+          >{{ p[1] }}</button>
+        </div>
+
+        <div class="ds-hairline"></div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="ds-label shrink-0 mr-1">时间</span>
+          <button
+            v-for="t in [['', '不限'], ['1', '一天内'], ['7', '一周内'], ['30', '一月内']]"
+            :key="t[0]"
+            class="ds-chip"
+            :class="{ 'is-active': activeTimeRange === t[0] }"
+            @click="setFilter(activePriceRange, t[0], activeSubType)"
+          >{{ t[1] }}</button>
+        </div>
+      </section>
+
+      <!-- 列表头：编号 + 标题 + 墨线 -->
+      <div class="ds-section-head">
+        <span class="ds-section-head__num">01</span>
+        <h2 class="ds-title">板块帖子</h2>
+        <span class="ds-section-head__line"></span>
       </div>
 
       <PostSkeleton v-if="loading" :count="4" />
 
       <template v-else>
         <PostCard v-for="post in list" :key="post.id" :post="post" />
-        <div v-if="loadingMore" class="py-4 text-center text-sm text-zinc-400 flex items-center justify-center gap-2">
-          <RefreshCw class="w-4 h-4 animate-spin" /> 加载中...
+        <div v-if="loadingMore" class="py-4 flex items-center justify-center gap-2 ds-label">
+          <RefreshCw class="w-4 h-4 animate-spin" /> 加载中…
         </div>
-        <div v-else-if="!hasMore && list.length" class="py-4 text-center text-xs text-zinc-400">— 已经到底了 —</div>
-        <EmptyState
-          v-if="!loading && !list.length"
-          text="该板块暂无帖子，快来发布第一条吧"
-          action-text="去发布"
-          @action="goPublish"
-        />
+        <div v-else-if="!hasMore && list.length" class="py-4 text-center ds-label">— 已经到底了 —</div>
+        <div v-if="!loading && !list.length" class="ds-card ds-card--flat px-6 py-12 text-center">
+          <div
+            class="mx-auto w-14 h-14 flex items-center justify-center mb-4"
+            style="background: var(--lime); border: 1.5px solid var(--ink); border-radius: 14px; box-shadow: var(--shadow-hard-sm); transform: rotate(-3deg)"
+          >
+            <Plus class="w-7 h-7" style="color: var(--ink)" />
+          </div>
+          <p class="ds-label">NO POSTS YET</p>
+          <p class="mt-2 text-[13px] leading-relaxed" style="color: var(--ink-soft)">该板块暂无帖子，快来发布第一条吧</p>
+          <button class="ds-btn ds-btn--primary ds-btn--sm mt-4" @click="goPublish">去发布</button>
+        </div>
       </template>
     </main>
 
     <!-- 悬浮发布按钮 -->
     <button
-      class="hidden md:flex fixed right-4 bottom-6 w-14 h-14 rounded-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 shadow-lg shadow-brand-500/40 items-center justify-center text-white transition z-20"
+      class="hidden md:flex fixed right-4 bottom-6 w-14 h-14 rounded-full sa-fab items-center justify-center transition active:scale-95 z-20"
+      aria-label="发布新内容"
       @click="goPublish"
     >
       <Plus class="w-7 h-7" />

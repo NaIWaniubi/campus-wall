@@ -230,19 +230,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-6">
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+  <div class="min-h-screen bg-transparent pb-6">
+    <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
         <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900">设置</span>
+        <span class="ml-1 font-extrabold" style="color: var(--ink)">设置</span>
       </div>
     </header>
 
     <main class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
       <!-- 编辑资料 -->
-      <section class="bg-white rounded-xl p-4 space-y-4">
+      <section class="ds-card p-4 space-y-4">
         <h3 class="text-sm font-medium text-zinc-700">编辑资料</h3>
         <!-- 头像 -->
         <div class="flex items-center gap-3">
@@ -257,22 +257,22 @@ onMounted(() => {
               <input type="file" accept="image/jpeg,image/png" class="hidden" @change="onAvatarChange" />
             </label>
           </div>
-          <span class="text-xs text-zinc-400">点击图标更换头像</span>
+          <span class="text-xs ds-sub">点击图标更换头像</span>
         </div>
         <!-- 昵称 -->
         <div>
           <label class="block text-sm text-zinc-700 mb-1.5">昵称</label>
           <input v-model="profileForm.nickname" type="text" maxlength="20" placeholder="请输入昵称"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
+            class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
         </div>
         <!-- 签名 -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
             <label class="text-sm text-zinc-700">个性签名</label>
-            <span class="text-xs" :class="profileForm.signature.length > 100 ? 'text-red-500' : 'text-zinc-400'">{{ profileForm.signature.length }}/100</span>
+            <span class="text-xs" :class="profileForm.signature.length > 100 ? 'text-red-500' : 'ds-sub'">{{ profileForm.signature.length }}/100</span>
           </div>
           <textarea v-model="profileForm.signature" maxlength="100" rows="2" placeholder="一句话介绍自己"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm resize-none"></textarea>
+            class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm resize-none"></textarea>
         </div>
         <button :disabled="!profileDirty || savingProfile"
           class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition flex items-center justify-center gap-2"
@@ -283,16 +283,16 @@ onMounted(() => {
       </section>
 
       <!-- 修改密码 -->
-      <section class="bg-white rounded-xl p-4 space-y-3">
+      <section class="ds-card p-4 space-y-3">
         <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
           <Lock class="w-4 h-4" /> 修改密码
         </h3>
         <input v-model="pwdForm.oldPassword" type="password" placeholder="原密码"
-          class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
+          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
         <input v-model="pwdForm.newPassword" type="password" placeholder="新密码（至少6位）"
-          class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
+          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
         <input v-model="pwdForm.confirmPassword" type="password" placeholder="确认新密码"
-          class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
+          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
         <button :disabled="savingPassword"
           class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition flex items-center justify-center gap-2"
           @click="savePassword">
@@ -302,7 +302,7 @@ onMounted(() => {
       </section>
 
       <!-- 外观设置 -->
-      <section class="bg-white rounded-xl p-4 space-y-3">
+      <section class="ds-card p-4 space-y-3">
         <h3 class="text-sm font-medium text-zinc-700">外观</h3>
         <div class="grid grid-cols-3 gap-2">
           <button v-for="opt in themeOptions" :key="opt.mode"
@@ -318,12 +318,12 @@ onMounted(() => {
       </section>
 
       <!-- 消息推送（服务端 VAPID 未配置时整块隐藏） -->
-      <section v-if="pushAvailable" class="bg-white rounded-xl p-4 space-y-3">
+      <section v-if="pushAvailable" class="ds-card p-4 space-y-3">
         <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
           <Bell class="w-4 h-4" /> 消息推送
         </h3>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-zinc-400">离线时通过浏览器通知提醒新消息</span>
+          <span class="text-xs ds-sub">离线时通过浏览器通知提醒新消息</span>
           <div class="flex items-center gap-2">
             <button :disabled="pushBusy || pushEnabled"
               class="px-4 py-1.5 rounded-full text-xs font-medium transition"
@@ -341,16 +341,16 @@ onMounted(() => {
       </section>
 
       <!-- 危险操作 -->
-      <section class="bg-white rounded-xl p-4 space-y-1">
+      <section class="ds-card p-4 space-y-1">
         <h3 class="text-sm font-medium text-zinc-700 mb-2">危险操作</h3>
-        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-zinc-50 transition"
+        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-transparent transition"
           @click="showDelete = true">
           <span class="flex items-center gap-2 text-sm text-red-500">
             <UserX class="w-4 h-4" /> 账号注销
           </span>
-          <span class="text-xs text-zinc-400">7天冷静期</span>
+          <span class="text-xs ds-sub">7天冷静期</span>
         </button>
-        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-zinc-50 transition"
+        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-transparent transition"
           @click="showLogout = true">
           <span class="flex items-center gap-2 text-sm text-zinc-700">
             <LogOut class="w-4 h-4" /> 退出登录

@@ -60,21 +60,22 @@ watch(
     >
       <div class="absolute inset-0 bg-black/40"></div>
       <div
-        class="relative bg-white rounded-2xl w-full max-w-sm p-6 animate-scale-in"
+        class="relative w-full max-w-sm p-6 animate-scale-in"
+        style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard-lg)"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-desc"
       >
         <button
-          class="absolute top-3 right-3 text-zinc-400 hover:text-zinc-600"
+          class="absolute top-3 right-3" style="color: var(--ink-mute)"
           aria-label="关闭"
           @click="emit('cancel')"
         >
           <X class="w-5 h-5" />
         </button>
-        <h3 id="confirm-dialog-title" class="text-lg font-semibold text-zinc-900 mb-2">{{ title || '提示' }}</h3>
-        <p id="confirm-dialog-desc" class="text-sm text-zinc-600 mb-6">{{ content }}</p>
+        <h3 id="confirm-dialog-title" class="text-[17px] font-extrabold mb-2" style="color: var(--ink)">{{ title || '提示' }}</h3>
+        <p id="confirm-dialog-desc" class="text-[13.5px] leading-relaxed mb-6" style="color: var(--ink-soft)">{{ content }}</p>
         <div class="flex gap-3">
           <button
             class="flex-1 py-2.5 rounded-full text-sm font-medium border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors"

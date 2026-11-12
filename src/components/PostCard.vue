@@ -73,9 +73,9 @@ function highlight(text: string): string {
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-1.5">
-            <span class="text-sm font-semibold text-[#1A1A2E] truncate">{{ author.nickname || '匿名用户' }}</span>
+            <span class="text-[13.5px] font-bold truncate" style="color: var(--ink)">{{ author.nickname || '匿名用户' }}</span>
             <CreditBadge v-if="!post.isAnonymous && author.creditScore != null" :score="author.creditScore" size="sm" />
-            <span v-if="post.isTop" class="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full font-medium">置顶</span>
+            <span v-if="post.isTop" class="ds-tag !py-0 !px-1.5 !text-[10px]" style="background: var(--coral); color: #fff; border-color: var(--ink)">置顶</span>
           </div>
           <div class="text-[11px] text-zinc-400 mt-0.5">{{ formatTime(post.createdAt) }}</div>
         </div>
@@ -84,18 +84,18 @@ function highlight(text: string): string {
     </div>
 
     <!-- 标题 -->
-    <h3 v-if="post.title" class="font-bold text-[16px] leading-[1.5] text-[#1A1A2E] mb-1.5 line-clamp-1" v-html="highlight(post.title)"></h3>
+    <h3 v-if="post.title" class="font-extrabold text-[16.5px] leading-[1.45] mb-1.5 line-clamp-1" style="color: var(--ink)" v-html="highlight(post.title)"></h3>
 
     <!-- 正文 -->
-    <p class="text-[14px] text-[#2D3436] leading-[1.7] mb-2.5 post-content" :class="post.title ? 'line-clamp-2' : 'line-clamp-3'" v-html="highlight(post.content)"></p>
+    <p class="text-[14px] leading-[1.7] mb-2.5 post-content" style="color: var(--ink-soft)" :class="post.title ? 'line-clamp-2' : 'line-clamp-3'" v-html="highlight(post.content)"></p>
 
     <!-- 图片 -->
     <div v-if="images.length > 0" class="mb-2.5">
-      <div v-if="images.length === 1" class="rounded-lg overflow-hidden bg-zinc-100 max-h-[200px]">
+      <div v-if="images.length === 1" class="overflow-hidden max-h-[220px]" style="border: 1.5px solid var(--ink); border-radius: 12px">
         <img :src="thumbs[0] || images[0]" class="w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, images[0])" />
       </div>
       <div v-else class="grid grid-cols-3 gap-1">
-        <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="h-[100px] rounded-xl overflow-hidden bg-zinc-100 relative group">
+        <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="h-[100px] overflow-hidden relative group" style="border: 1.5px solid var(--ink); border-radius: 10px">
           <img :src="thumbs[i] || img" class="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500" loading="lazy" alt="" @error="onThumbError($event, img)" />
           <!-- 第三张上叠加 +N 提示还有更多图片 -->
           <div v-if="i === 2 && images.length > 3" class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-medium text-lg">
@@ -106,12 +106,17 @@ function highlight(text: string): string {
     </div>
 
     <!-- 扩展字段（价格等） -->
-    <div v-if="post.extraFields?.price" class="grad-text font-extrabold text-[19px] mb-2.5 tracking-tight">
-      ¥{{ post.extraFields.price }}
+    <div v-if="post.extraFields?.price" class="mb-2.5">
+      <span
+        class="inline-flex items-baseline gap-1 px-2.5 py-1 text-[17px] font-black ds-num"
+        style="background: var(--lime); color: #14110F; border: 1.5px solid var(--ink); border-radius: 8px; box-shadow: 2px 2px 0 var(--ink)"
+      >
+        <span class="text-[12px] font-extrabold">¥</span>{{ post.extraFields.price }}
+      </span>
     </div>
 
     <!-- 互动数据 -->
-    <div class="flex items-center gap-5 text-[12px] text-[#7B8794] pt-2.5 border-t border-zinc-100">
+    <div class="flex items-center gap-5 text-[12px] pt-2.5" style="border-top: 1px solid var(--hairline); color: var(--ink-mute)">
       <span class="flex items-center gap-1">
         <Eye class="w-3.5 h-3.5" />
         {{ post.viewCount }}

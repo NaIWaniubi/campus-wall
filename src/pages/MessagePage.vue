@@ -197,53 +197,58 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-6">
+  <div class="min-h-screen pb-24">
+    <!-- 顶栏：简洁墨色条（返回 + 标题） -->
     <header class="hero sticky top-0 z-10">
-      <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-white/90 hover:text-white" @click="router.back()">
+      <div class="max-w-[960px] mx-auto flex items-center gap-2.5 h-14 px-3">
+        <button
+          class="shrink-0 w-9 h-9 rounded-[12px] flex items-center justify-center"
+          style="border: 1.5px solid rgb(255 255 255 / 0.34); color: var(--paper)"
+          aria-label="返回"
+          @click="router.back()"
+        >
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-semibold text-white flex-1">消息</span>
-        <button v-if="view === 'notice'"
-          class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs hover:bg-white/30 transition"
-          @click="readAll">
-          <CheckCheck class="w-3.5 h-3.5" /> 全部已读
-        </button>
+        <h1 class="ds-display text-[22px]" style="color: var(--paper)">消息</h1>
       </div>
-      <!-- 顶层 Tab：通知 / 私信 -->
-      <div class="max-w-[960px] mx-auto px-3 flex items-center gap-1 h-11">
+    </header>
+
+    <!-- Tab：顶层 通知 / 私信（.ds-chip） -->
+    <div class="max-w-[960px] mx-auto px-4 pt-3 space-y-2">
+      <div class="flex items-center gap-2">
         <button v-for="t in [
             { key: 'notice', label: '通知' },
             { key: 'chat', label: '私信' },
           ]" :key="t.key"
-          class="relative px-3 py-2 text-sm whitespace-nowrap transition"
-          :class="view === t.key ? 'text-brand-600 font-medium' : 'text-zinc-500 hover:text-zinc-800'"
+          class="ds-chip"
+          :class="{ 'is-active': view === t.key }"
           @click="switchView(t.key as any)">
           {{ t.label }}
           <span v-if="t.key === 'chat' && chatUnread > 0"
-            class="absolute -top-0.5 right-0 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 text-center">{{ chatUnread > 99 ? '99+' : chatUnread }}</span>
-          <span v-if="view === t.key" class="absolute left-1/2 -translate-x-1/2 bottom-0 w-6 h-0.5 bg-brand-500 rounded-full"></span>
+            class="min-w-[16px] h-4 px-1 rounded-full text-[10px] leading-4 text-center font-bold text-white"
+            style="background: var(--coral)">{{ chatUnread > 99 ? '99+' : chatUnread }}</span>
         </button>
-        <!-- 通知子 Tab -->
-        <template v-if="view === 'notice'">
-          <div class="ml-auto flex items-center gap-1 overflow-x-auto">
-            <button v-for="t in tabs" :key="t.key"
-              class="relative px-2.5 py-1.5 text-xs whitespace-nowrap rounded-full transition"
-              :class="activeTab === t.key ? 'text-brand-600 font-medium bg-brand-50' : 'text-zinc-500 hover:text-zinc-800'"
-              @click="switchTab(t.key)">
-              {{ t.label }}
-            </button>
-          </div>
-        </template>
+        <button v-if="view === 'notice'" class="ds-btn ds-btn--sm ml-auto shrink-0" @click="readAll">
+          <CheckCheck class="w-3.5 h-3.5" /> 全部已读
+        </button>
       </div>
-    </header>
+      <!-- 通知子 Tab（.ds-chip） -->
+      <div v-if="view === 'notice'" class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide ds-scroll-x pb-0.5">
+        <button v-for="t in tabs" :key="t.key"
+          class="ds-chip !py-1 !px-2.5 !text-[11.5px]"
+          :class="{ 'is-active': activeTab === t.key }"
+          @click="switchTab(t.key)">
+          {{ t.label }}
+        </button>
+      </div>
+    </div>
 
-    <!-- 通知列表 -->
-    <main v-if="view === 'notice'" class="max-w-[960px] mx-auto px-4 py-3 space-y-2">
+    <!-- 通知列表：墨线卡 + .ds-hairline 分隔 -->
+    <main v-if="view === 'notice'" class="max-w-[960px] mx-auto px-4 py-3">
       <!-- 加载骨架 -->
       <div v-if="loading" class="space-y-2">
-        <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-3 flex items-center gap-3">
-          <div class="w-9 h-9 rounded-full skeleton"></div>
+        <div v-for="i in 4" :key="i" class="ds-card ds-card--flat p-3 flex items-center gap-3">
+          <div class="w-9 h-9 rounded-[10px] skeleton"></div>
           <div class="flex-1">
             <div class="h-3 w-3/4 skeleton rounded mb-2"></div>
             <div class="h-2 w-1/3 skeleton rounded"></div>
@@ -252,20 +257,29 @@ onUnmounted(() => {
       </div>
 
       <template v-else>
-        <button v-for="msg in list" :key="msg.id"
-          class="w-full text-left bg-white rounded-xl p-3 flex items-start gap-3 shadow-sm hover:shadow-md transition active:bg-zinc-50"
-          @click="onItemClick(msg)">
-          <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" :class="typeMeta(msg.type).bg">
-            <component :is="typeMeta(msg.type).icon" class="w-5 h-5" :class="typeMeta(msg.type).color" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-zinc-800 post-content"
-              :class="[!msg.isRead ? 'font-medium' : '', msg.type === 'digest' && !expandedDigest.has(msg.id) ? 'line-clamp-2' : '']">{{ msg.content }}</p>
-            <span class="text-xs text-zinc-400">{{ formatTime(msg.createdAt) }}</span>
-            <span v-if="msg.type === 'digest'" class="text-xs text-brand-600 ml-2">{{ expandedDigest.has(msg.id) ? '收起' : '展开全文' }}</span>
-          </div>
-          <span v-if="!msg.isRead" class="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
-        </button>
+        <div v-if="list.length" class="ds-card overflow-hidden">
+          <template v-for="(msg, i) in list" :key="msg.id">
+            <div v-if="i" class="ds-hairline"></div>
+            <button
+              class="w-full text-left p-3 flex items-start gap-3 transition active:opacity-70"
+              @click="onItemClick(msg)">
+              <div class="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0"
+                style="background: var(--paper); border: 1.5px solid var(--ink)">
+                <component :is="typeMeta(msg.type).icon" class="w-[18px] h-[18px]" style="color: var(--ink)" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13.5px] leading-relaxed post-content"
+                  :class="[!msg.isRead ? 'font-bold' : '', msg.type === 'digest' && !expandedDigest.has(msg.id) ? 'line-clamp-2' : '']"
+                  style="color: var(--ink)">{{ msg.content }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="ds-num text-[11px]" style="color: var(--ink-mute)">{{ formatTime(msg.createdAt) }}</span>
+                  <span v-if="msg.type === 'digest'" class="ds-label" style="color: var(--violet)">{{ expandedDigest.has(msg.id) ? '收起' : '展开全文' }}</span>
+                </div>
+              </div>
+              <span v-if="!msg.isRead" class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style="background: var(--coral)"></span>
+            </button>
+          </template>
+        </div>
 
         <EmptyState v-if="!list.length" text="暂无消息" action-text="去逛逛" @action="router.push('/')" />
       </template>
@@ -274,11 +288,11 @@ onUnmounted(() => {
     <!-- 私信：会话列表 + 分栏聊天 -->
     <main v-else class="max-w-[960px] mx-auto px-4 py-3">
       <div class="flex gap-3 items-stretch">
-        <!-- 会话列表 -->
-        <aside class="w-full md:w-[280px] flex-shrink-0 space-y-2" :class="activeConvId ? 'hidden md:block' : ''">
+        <!-- 会话列表：墨线卡 + .ds-hairline 分隔 -->
+        <aside class="w-full md:w-[280px] flex-shrink-0" :class="activeConvId ? 'hidden md:block' : ''">
           <div v-if="convsLoading" class="space-y-2">
-            <div v-for="i in 4" :key="i" class="bg-white rounded-xl p-3 flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full skeleton"></div>
+            <div v-for="i in 4" :key="i" class="ds-card ds-card--flat p-3 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-[12px] skeleton"></div>
               <div class="flex-1">
                 <div class="h-3 w-20 skeleton rounded mb-2"></div>
                 <div class="h-2 w-2/3 skeleton rounded"></div>
@@ -286,25 +300,33 @@ onUnmounted(() => {
             </div>
           </div>
           <template v-else>
-            <button v-for="c in convs" :key="c.id"
-              class="w-full text-left bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm transition hover:shadow-md"
-              :class="activeConvId === c.id ? 'ring-2 ring-brand-200' : ''"
-              @click="openConv(c)">
-              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                <img v-if="c.peer.avatar" :src="c.peer.avatar" class="w-full h-full object-cover" alt="" />
-                <span v-else class="text-base font-bold text-brand-700">{{ c.peer.nickname?.charAt(0) || '友' }}</span>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-zinc-900 truncate">{{ c.peer.nickname || '用户' }}</span>
-                  <span class="ml-auto text-[11px] text-zinc-400 flex-shrink-0">{{ formatTime(c.lastAt) }}</span>
-                </div>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <p class="text-xs text-zinc-500 truncate flex-1">{{ c.lastMessage || '暂无消息' }}</p>
-                  <span v-if="c.unread > 0" class="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-[18px] text-center flex-shrink-0">{{ c.unread > 99 ? '99+' : c.unread }}</span>
-                </div>
-              </div>
-            </button>
+            <div v-if="convs.length" class="ds-card overflow-hidden">
+              <template v-for="(c, i) in convs" :key="c.id">
+                <div v-if="i" class="ds-hairline"></div>
+                <button
+                  class="w-full text-left p-3 flex items-center gap-3 transition active:opacity-70"
+                  :style="activeConvId === c.id ? { background: 'var(--paper)', boxShadow: 'inset 3px 0 0 var(--ink)' } : {}"
+                  @click="openConv(c)">
+                  <div class="w-10 h-10 rounded-[12px] flex items-center justify-center overflow-hidden flex-shrink-0"
+                    style="background: var(--lime); border: 1.5px solid var(--ink)">
+                    <img v-if="c.peer.avatar" :src="c.peer.avatar" class="w-full h-full object-cover" alt="" />
+                    <span v-else class="text-base font-bold" style="color: var(--ink)">{{ c.peer.nickname?.charAt(0) || '友' }}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-[13.5px] font-bold truncate" style="color: var(--ink)">{{ c.peer.nickname || '用户' }}</span>
+                      <span class="ml-auto ds-num text-[11px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(c.lastAt) }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <p class="text-xs truncate flex-1" style="color: var(--ink-mute)">{{ c.lastMessage || '暂无消息' }}</p>
+                      <span v-if="c.unread > 0"
+                        class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] leading-[18px] text-center font-bold text-white flex-shrink-0"
+                        style="background: var(--coral)">{{ c.unread > 99 ? '99+' : c.unread }}</span>
+                    </div>
+                  </div>
+                </button>
+              </template>
+            </div>
             <EmptyState v-if="!convs.length" text="暂无会话，去帖子详情找作者聊聊吧" action-text="去逛逛" @action="router.push('/')" />
           </template>
         </aside>
@@ -313,7 +335,7 @@ onUnmounted(() => {
         <section class="flex-1 min-w-0" :class="activeConvId ? '' : 'hidden md:block'">
           <div class="md:h-[calc(100vh-11rem)] md:min-h-[420px]">
             <ChatPanel v-if="activeConv" :key="activeConv.id" :conv="activeConv" @back="activeConvId = null" @read="onConvRead" @activity="onConvActivity" />
-            <div v-else class="hidden md:flex h-full min-h-[420px] items-center justify-center bg-white rounded-xl shadow-sm">
+            <div v-else class="hidden md:flex h-full min-h-[420px] items-center justify-center">
               <EmptyState text="选择一个会话开始聊天" />
             </div>
           </div>

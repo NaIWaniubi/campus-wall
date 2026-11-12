@@ -59,14 +59,14 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 pb-6">
-    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100">
+  <div class="min-h-screen bg-transparent pb-6">
+    <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
         <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <span class="ml-1 font-medium text-zinc-900">我的订阅</span>
-        <span class="ml-2 text-xs text-zinc-400">共 {{ list.length }} 个</span>
+        <span class="ml-1 font-extrabold" style="color: var(--ink)">我的订阅</span>
+        <span class="ml-2 text-xs ds-sub">共 {{ list.length }} 个</span>
       </div>
     </header>
 
@@ -74,7 +74,7 @@ onMounted(load)
       <SkeletonList v-if="loading" :count="3" :show-media="false" />
 
       <template v-else>
-        <div v-if="list.length" class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div v-if="list.length" class="ds-card overflow-hidden">
           <div
             v-for="s in list"
             :key="s.id"
@@ -86,7 +86,7 @@ onMounted(load)
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium text-zinc-800 truncate">{{ s.name }}</div>
-                <div class="text-xs text-zinc-400 mt-0.5">每日摘要将推送该板块新帖</div>
+                <div class="text-xs ds-sub mt-0.5">每日摘要将推送该板块新帖</div>
               </div>
               <ChevronRight class="w-4 h-4 text-zinc-300 flex-shrink-0" />
             </button>

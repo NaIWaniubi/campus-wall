@@ -1,0 +1,46 @@
+# 校园墙 · Render 一键部署蓝图（从源码仓库直接构建）
+#
+# 用法：Render 控制台 → New → Blueprint → 选本仓库（NaIWaniubi/campus-wall）→ Apply。
+# 说明：
+#   - 免费档 = 0.5 vCPU / 512MB / 15 分钟无流量休眠 / 无持久盘。
+#     磁盘是临时的，但本项目 `start.sh` 在空库时自动灌演示数据，休眠重启后站点照常可用。
+#   - 构建过程在 Render 的构建机上跑：装依赖 → 打前端 → esbuild 打后端单文件 →
+#     在 stage 里按 linux x64 交叉安装 sharp（含预编译二进制，不在服务器上编译）。
+#   - 想让它不休眠：750 实例小时/月 ≈ 可支撑 24×7（720h），用任意定时器每 10 分钟
+#     请求一次 https://<你的服务>.onrender.com/api/health 即可保持常亮。
+services:
+  - type: web
+    name: campus-wall
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: >-
+      npm install --no-audit --no-fund &&
+      npx vite build &&
+      node scripts/build-site-bundle.mjs &&
+      cd .zcode-site/stage && npm install --omit=dev --no-audit --no-fund --os=linux --cpu=x64 --libc=glibc
+    startCommand: cd .zcode-site/stage && bash start.sh
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /opt/render/project/src/.zcode-site/stage/data
+      - key: LOG_TO_FILE
+        value: "0"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: WS_ENABLED
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_INITIAL_PASSWORD
+        value: CampusWall@2026
+      # 可选：接上大模型网关（不配则三个 AI 入口走站内规则版，功能照常）
+      # - key: AI_BASE_URL
+      #   sync: false
+      # - key: AI_API_KEY
+      #   sync: false
+      # - key: OPENROUTER_API_KEY
+      #   sync: false

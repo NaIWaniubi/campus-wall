@@ -84,6 +84,12 @@ coverage/
 
 # ZCode Sites 部署工作区（含 node_modules，不入库）
 .zcode-site/
+# 例外：部署打包要用到 node:sqlite 兼容层（Render/ZCode Sites 构建时读取）
+!.zcode-site/
+.zcode-site/*
+!.zcode-site/build/
+.zcode-site/build/*
+!.zcode-site/build/sqlite-compat.ts
 
 # 部署打包产物（由 scripts/build-site-bundle.mjs 生成，不入库）
 api/server.bundle.mjs

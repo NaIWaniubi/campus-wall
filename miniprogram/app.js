@@ -10,7 +10,7 @@ App({
 
   /**
    * 微信静默登录链：wx.login 取 code -> POST /auth/wx-login -> 存 token 走已登录态。
-   * 返回 code 501（后端未配置微信登录）或任何失败：静默落入学号密码表单登录，
+   * 返回 code 501（后端未配置微信登录）或任何失败：静默落入账号密码表单登录，
    * 不弹窗不打扰用户；已有 token（含学号密码会话）时跳过，避免覆盖登出状态。
    */
   async silentWxLogin() {
@@ -21,7 +21,7 @@ App({
       })
       await api.wxLogin(code)
     } catch (e) {
-      console.warn('[auth] 微信静默登录未生效，回退学号密码登录:', (e && (e.code || e.message)) || e)
+      console.warn('[auth] 微信静默登录未生效，回退账号密码登录:', (e && (e.code || e.message)) || e)
     }
   },
 

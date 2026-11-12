@@ -135,7 +135,7 @@
       <input
         class="search-input"
         value="{{userKeyword}}"
-        placeholder="搜索学号 / 昵称"
+        placeholder="搜索账号 / 昵称"
         confirm-type="search"
         bindinput="onUserKeywordInput"
         bindconfirm="onUserSearch"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 登录页：学号 + 密码登录
+ * 登录页：账号 + 密码登录（账号可为手机号 / 拼音 / 邮箱前缀 / 原学号）
  */
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -22,7 +22,7 @@ const showForgot = ref(false)
 
 async function handleSubmit() {
   if (!form.studentId.trim()) {
-    toast.error('请输入学号')
+    toast.error('请输入账号')
     return
   }
   if (!form.password) {
@@ -50,7 +50,7 @@ async function handleSubmit() {
     <header class="hero px-5 pt-9 pb-12 rounded-b-[24px] text-center">
       <div class="flex items-center justify-center gap-2">
         <span class="ds-sticker ds-sticker--coral">CAMPUS</span>
-        <span class="ds-label" style="color: rgb(247 242 232 / 0.5)">本校 · 学号登录</span>
+        <span class="ds-label" style="color: rgb(247 242 232 / 0.5)">本校 · 账号登录</span>
       </div>
       <h1 class="ds-display ds-display-xl mt-3 text-white">
         校园<span style="color: var(--lime)">墙</span>
@@ -64,15 +64,14 @@ async function handleSubmit() {
       <!-- 表单卡：白纸 + 1.5px 墨线 + 硬投影 -->
       <section class="ds-card p-5 space-y-4">
         <div>
-          <label for="login-student-id" class="ds-label block mb-1.5">学号</label>
+          <label for="login-student-id" class="ds-label block mb-1.5">账号</label>
           <input
             id="login-student-id"
             v-model="form.studentId"
             type="text"
-            inputmode="numeric"
             autocomplete="username"
             aria-required="true"
-            placeholder="请输入学号"
+            placeholder="手机号 / 拼音 / 账号"
             class="ds-input"
             @keyup.enter="handleSubmit"
           />
@@ -134,7 +133,7 @@ async function handleSubmit() {
           <span class="ds-label">演示账号 DEMO</span>
         </div>
         <p class="mt-1.5 text-[12.5px] ds-num leading-relaxed" style="color: var(--ink-soft)">
-          学号 23770001 · 密码 demo1234
+          账号 23770001 · 密码 demo1234
         </p>
       </section>
 

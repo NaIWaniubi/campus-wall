@@ -24,12 +24,14 @@ const SAFE_USER_COLS = `id, student_id, nickname, avatar, college, grade, signat
 
 // 注册
 router.post('/register', authRateLimit, validate({ body: userSchemas.register }), (req, res) => {
-  const { studentId, password, nickname, college, grade } = req.body;
+  // 账号统一落到 student_id 列（历史列名，语义已是「登录账号」）
+  const { password, nickname, college, grade } = req.body;
+  const studentId = String(req.body.account ?? req.body.studentId ?? '').trim();
 
   const exist = db.prepare('SELECT id FROM users WHERE student_id = ?').get(studentId);
   if (exist) {
     recordAuthFailure(req);
-    return fail(res, '该学号已注册');
+    return fail(res, '该账号已被注册，换一个或直接登录');
   }
 
   const hashedPassword = bcrypt.hashSync(password, 10);
@@ -51,13 +53,14 @@ router.post('/register', authRateLimit, validate({ body: userSchemas.register })
 
 // 登录
 router.post('/login', authRateLimit, validate({ body: userSchemas.login }), (req, res) => {
-  const { studentId, password } = req.body;
+  const { password } = req.body;
+  const studentId = String(req.body.account ?? req.body.studentId ?? '').trim();
 
   const user = db.prepare(`SELECT password, ${SAFE_USER_COLS} FROM users WHERE student_id = ?`).get(studentId) as any;
   // 不区分「账号不存在」与「密码错误」，防账号枚举（审计 P0-3）
   if (!user) {
     recordAuthFailure(req);
-    return fail(res, '学号或密码错误', 1002);
+    return fail(res, '账号或密码错误', 1002);
   }
 
   if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
@@ -70,7 +73,7 @@ router.post('/login', authRateLimit, validate({ body: userSchemas.login }), (req
   const isMatch = bcrypt.compareSync(password, user.password);
   if (!isMatch) {
     recordAuthFailure(req);
-    return fail(res, '学号或密码错误', 1002);
+    return fail(res, '账号或密码错误', 1002);
   }
   clearAuthFailures(req);
 

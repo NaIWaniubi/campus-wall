@@ -12,9 +12,19 @@ describe('Validation Schemas & Middleware', () => {
       expect(commonSchemas.studentId.parse('admin')).toBe('admin');
     });
 
-    it('rejects invalid student ID format', () => {
-      expect(() => commonSchemas.studentId.parse('1234')).toThrow();
-      expect(() => commonSchemas.studentId.parse('abcdefgh')).toThrow();
+    it('accepts non-numeric accounts (no longer forced to be a student ID)', () => {
+      expect(commonSchemas.studentId.parse('1234')).toBe('1234');
+      expect(commonSchemas.studentId.parse('abcdefgh')).toBe('abcdefgh');
+    });
+
+    it('enforces the generic account rule: 3-32 chars, ASCII, no spaces', () => {
+      expect(commonSchemas.account.parse('chenxiaobei')).toBe('chenxiaobei');
+      expect(commonSchemas.account.parse('13800138000')).toBe('13800138000');
+      expect(commonSchemas.account.parse('chen.xb@campus')).toBe('chen.xb@campus');
+      expect(() => commonSchemas.account.parse('ab')).toThrow();          // 太短
+      expect(() => commonSchemas.account.parse('a'.repeat(33))).toThrow(); // 太长
+      expect(() => commonSchemas.account.parse('张三')).toThrow();        // 非 ASCII
+      expect(() => commonSchemas.account.parse('a b')).toThrow();         // 含空格
     });
   });
 
@@ -49,6 +59,32 @@ describe('Validation Schemas & Middleware', () => {
       expect(res.studentId).toBe('20240001');
       expect(res.nickname).toBe('测试小明');
       expect(res.college).toBe('计算机学院');
+    });
+
+    it('registers with a plain account and no college (学号不再必填)', () => {
+      const res = userSchemas.register.parse({
+        account: 'chenxiaobei',
+        password: 'abc123',
+        nickname: '小北',
+      });
+      expect(res.account).toBe('chenxiaobei');
+      expect(res.studentId).toBe('chenxiaobei'); // 兼容字段同步
+      expect(res.college).toBeUndefined();
+    });
+
+    it('accepts phone number as account, rejects short password', () => {
+      expect(userSchemas.register.parse({
+        account: '13800138000', password: 'abc123', nickname: '手机用户',
+      }).account).toBe('13800138000');
+      expect(() => userSchemas.register.parse({
+        account: 'chenxiaobei', password: 'abc', nickname: '小北',
+      })).toThrow();
+    });
+
+    it('login accepts account without studentId', () => {
+      const res = userSchemas.login.parse({ account: 'chen.xb', password: 'whatever' });
+      expect(res.account).toBe('chen.xb');
+      expect(res.studentId).toBe('chen.xb');
     });
 
     it('validates user login payload', () => {

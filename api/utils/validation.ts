@@ -60,10 +60,17 @@ export const commonSchemas = {
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
   }),
   
-  // 学号
-  studentId: z.string()
-    .regex(/^[0-9]{8}$/, '学号必须是 8 位数字')
-    .or(z.literal('admin')),
+  /**
+   * 登录账号（字段名沿用 studentId，避免破坏 JWT / 数据库 / 小程序契约）。
+   * 不再强制学号：3–32 位，允许字母、数字、下划线、点、中划线、@，
+   * 覆盖手机号（13800138000）、拼音（chenxiaobei）、邮箱前缀（chen.xb）、
+   * 老学号（23770001）与超管 admin。中文请用昵称字段，账号保持 ASCII 便于输入。
+   */
+  account: z.string()
+    .trim()
+    .min(3, '账号至少 3 位')
+    .max(32, '账号最多 32 位')
+    .regex(/^[A-Za-z0-9_.@-]+$/, '账号只能包含字母、数字、下划线、点、中划线或 @'),
   
   // 密码（基础版本，后面会增强）
   password: z.string()
@@ -73,6 +80,20 @@ export const commonSchemas = {
     .regex(/[a-z]/, '密码必须包含小写字母')
     .regex(/[0-9]/, '密码必须包含数字'),
   
+  /** 旧字段名别名（历史代码/小程序仍传 studentId） */
+  studentId: z.string().trim().min(1).max(32),
+
+  /**
+   * 注册密码：6–32 位，只需包含字母与数字。
+   * 原 commonSchemas.password（8 位 + 大小写 + 数字）保留给「修改密码」，
+   * 注册侧放宽，避免前端提示「至少 6 位」但后端拒收的错位。
+   */
+  registerPassword: z.string()
+    .min(6, '密码至少 6 位')
+    .max(32, '密码最多 32 位')
+    .regex(/[A-Za-z]/, '密码需包含字母')
+    .regex(/[0-9]/, '密码需包含数字'),
+
   // 手机号
   phone: z.string().regex(/^1[3-9]\d{9}$/, '手机号格式不正确'),
   
@@ -176,29 +197,41 @@ export const commentSchemas = {
  */
 export const userSchemas = {
   // 注册
-  register: z.object({
-    studentId: commonSchemas.studentId,
-    password: commonSchemas.password,
-    nickname: z.string()
-      .min(1, '昵称不能为空')
-      .max(20, '昵称最多 20 字')
-      .transform((s) => s.trim()),
-    college: z.string()
-      .min(1, '学院不能为空')
-      .max(50, '学院最多 50 字'),
-    classInfo: z.string()
-      .max(50, '班级信息最多 50 字')
-      .optional(),
-    phone: commonSchemas.phone.optional(),
-    email: commonSchemas.email.optional(),
-  }),
-  
+  register: z
+    .object({
+      /** 新调用方用 account；老调用方仍可传 studentId */
+      account: z.string().trim().min(1).max(32).optional(),
+      studentId: z.string().trim().min(1).max(32).optional(),
+      password: commonSchemas.registerPassword,
+      nickname: z.string()
+        .min(1, '昵称不能为空')
+        .max(20, '昵称最多 20 字')
+        .transform((s) => s.trim()),
+      // 学院选填：账号注册即可，不强制补齐院系
+      college: z.string().max(50, '学院最多 50 字').optional(),
+      classInfo: z.string().max(50, '班级信息最多 50 字').optional(),
+      phone: commonSchemas.phone.optional(),
+      email: commonSchemas.email.optional(),
+    })
+    .refine((v) => !!(v.account || v.studentId), { message: '请输入账号', path: ['account'] })
+    .transform((v) => {
+      const account = commonSchemas.account.parse((v.account ?? v.studentId)!.trim())
+      return { ...v, account, studentId: account }
+    }),
+
   // 登录
-  login: z.object({
-    studentId: commonSchemas.studentId,
-    password: z.string().min(1, '密码不能为空'),
-  }),
-  
+  login: z
+    .object({
+      account: z.string().trim().min(1).max(32).optional(),
+      studentId: z.string().trim().min(1).max(32).optional(),
+      password: z.string().min(1, '密码不能为空'),
+    })
+    .refine((v) => !!(v.account || v.studentId), { message: '请输入账号', path: ['account'] })
+    .transform((v) => {
+      const account = commonSchemas.account.parse((v.account ?? v.studentId)!.trim())
+      return { ...v, account, studentId: account }
+    }),
+
   // 修改密码
   changePassword: z.object({
     oldPassword: z.string().min(1, '旧密码不能为空'),

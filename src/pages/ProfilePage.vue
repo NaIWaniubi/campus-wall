@@ -199,7 +199,7 @@ onMounted(() => {
             </label>
           </div>
 
-          <!-- 昵称 + 学号 -->
+          <!-- 昵称 + 账号 -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h1 class="ds-display text-[23px] text-white max-w-full truncate">{{ user?.nickname || '未设置' }}</h1>
@@ -209,7 +209,7 @@ onMounted(() => {
               </span>
             </div>
             <div class="mt-1.5 space-y-0.5 text-[12px]" style="color: rgb(255 255 255 / 0.72)">
-              <p class="truncate">学号：{{ user?.studentId || '-' }}</p>
+              <p class="truncate">账号：{{ user?.studentId || '-' }}</p>
               <p class="truncate">{{ user?.college || '未设置学院' }} · {{ user?.grade || '未设置年级' }}</p>
             </div>
           </div>

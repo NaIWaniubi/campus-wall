@@ -42,13 +42,14 @@ export const useUserStore = defineStore('user', {
     setToken(token: string) {
       this.token = token
     },
-    async login(studentId: string, password: string) {
-      const res: any = await request.post('/auth/login', { studentId, password })
+    /** 登录：账号可为手机号 / 拼音 / 邮箱前缀 / 原学号 */
+    async login(account: string, password: string) {
+      const res: any = await request.post('/auth/login', { account, password })
       this.token = res.data.token
       this.user = res.data.user
       return res
     },
-    async register(data: { studentId: string; password: string; nickname: string; college?: string; grade?: string }) {
+    async register(data: { account: string; password: string; nickname: string; college?: string; grade?: string }) {
       const res: any = await request.post('/auth/register', data)
       this.token = res.data.token
       this.user = res.data.user

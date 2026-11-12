@@ -57,9 +57,9 @@ onMounted(() => {
         </div>
         <div class="p-6">
           <h4 class="font-extrabold mb-2" style="color: var(--ink)">{{ announcement?.title }}</h4>
-          <p class="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap mb-3">{{ announcement?.content }}</p>
-          <p class="text-xs text-zinc-400 mb-4">{{ formatTime(announcement?.createdAt) }}</p>
-          <button class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-full font-medium transition-colors" @click="handleAck">
+          <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap mb-3" style="color: var(--ink-soft)">{{ announcement?.content }}</p>
+          <p class="ds-label mb-4">{{ formatTime(announcement?.createdAt) }}</p>
+          <button class="ds-btn ds-btn--primary w-full !py-3" @click="handleAck">
             我已知晓
           </button>
         </div>

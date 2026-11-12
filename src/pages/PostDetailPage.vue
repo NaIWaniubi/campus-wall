@@ -820,7 +820,7 @@ function closeMoreMenu(e: MouseEvent) {
       <section v-if="canMarkSold" class="ds-card p-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
           <p class="text-[13px] font-bold" style="color: var(--ink)">物品已卖出去了？</p>
-          <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--ink-mute)">标记已售后，双方可互相评价；可登记买家学号便于定向评价</p>
+          <p class="text-[12px] mt-0.5 leading-relaxed" style="color: var(--ink-mute)">标记已售后，双方可互相评价；可登记买家账号便于定向评价</p>
         </div>
         <button
           class="ds-btn ds-btn--primary ds-btn--sm shrink-0"
@@ -1181,21 +1181,21 @@ function closeMoreMenu(e: MouseEvent) {
     <ConfirmDialog :visible="deleteCommentDialog.visible" content="确定删除该评论吗？删除后不可恢复" title="删除评论" confirm-text="删除" danger
       @confirm="confirmDeleteComment" @cancel="deleteCommentDialog.visible = false; deleteCommentDialog.comment = null" />
 
-    <!-- 标记已售弹窗（可选登记买家学号） -->
+    <!-- 标记已售弹窗（可选登记买家账号） -->
     <Teleport to="body">
       <div v-if="showMarkSold" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showMarkSold = false">
         <div class="absolute inset-0 bg-black/40"></div>
         <div class="ds-card relative w-full max-w-sm p-5">
           <h4 class="ds-title text-center">标记交易完成</h4>
-          <p class="ds-sub text-center mt-1">可选登记买家学号，便于你之后定向评价对方</p>
+          <p class="ds-sub text-center mt-1">可选登记买家账号，便于你之后定向评价对方</p>
           <input
             v-model="buyerStudentId"
-            placeholder="买家学号（选填）"
+            placeholder="买家账号（选填）"
             class="ds-input mt-4"
             @input="resolveBuyer"
           />
           <p v-if="buyerPreview" class="text-[12px] mt-1.5" style="color: var(--violet)">✓ 找到买家：{{ buyerPreview.nickname }}</p>
-          <p v-else-if="buyerStudentId.trim() && !resolvingBuyer" class="text-[12px] mt-1.5" style="color: var(--ink-mute)">未找到该学号，可留空直接标记</p>
+          <p v-else-if="buyerStudentId.trim() && !resolvingBuyer" class="text-[12px] mt-1.5" style="color: var(--ink-mute)">未找到该账号，可留空直接标记</p>
           <div class="flex gap-2 mt-4">
             <button class="ds-btn flex-1" @click="showMarkSold = false">取消</button>
             <button

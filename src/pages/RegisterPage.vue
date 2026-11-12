@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 注册页：学号、密码、昵称、学院、年级
+ * 注册页：账号（手机号/拼音/邮箱前缀均可）、密码、昵称、学院（选填）、年级（选填）
  */
 import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -24,16 +24,22 @@ const form = reactive({
 const showPassword = ref(false)
 const loading = ref(false)
 
+const ACCOUNT_RE = /^[A-Za-z0-9_.@-]{3,32}$/
+const PASSWORD_OK = (v: string) => v.length >= 6 && /[A-Za-z]/.test(v) && /[0-9]/.test(v)
+
 const errors = computed(() => ({
-  studentId: form.studentId && !/^\d{6,12}$/.test(form.studentId) ? '学号为6-12位数字' : '',
-  password: form.password && form.password.length < 6 ? '密码至少6位' : '',
+  studentId:
+    form.studentId && !ACCOUNT_RE.test(form.studentId)
+      ? '账号 3-32 位，可用字母、数字、下划线、点、中划线或 @'
+      : '',
+  password: form.password && !PASSWORD_OK(form.password) ? '密码至少 6 位，且包含字母和数字' : '',
   confirmPassword: form.confirmPassword && form.confirmPassword !== form.password ? '两次密码不一致' : '',
   nickname: form.nickname && form.nickname.trim().length < 1 ? '请输入昵称' : '',
 }))
 
 const canSubmit = computed(() =>
-  /^\d{6,12}$/.test(form.studentId) &&
-  form.password.length >= 6 &&
+  ACCOUNT_RE.test(form.studentId) &&
+  PASSWORD_OK(form.password) &&
   form.confirmPassword === form.password &&
   form.nickname.trim().length >= 1 &&
   form.agreement
@@ -47,8 +53,8 @@ async function handleSubmit() {
   if (!canSubmit.value) {
     // 逐项指出不满足的字段（先必填校验，再选填 + 协议）
     const missing: string[] = []
-    if (!/^\d{6,12}$/.test(form.studentId)) missing.push('学号格式（6-12位数字）')
-    if (form.password.length < 6) missing.push('密码（至少6位）')
+    if (!ACCOUNT_RE.test(form.studentId)) missing.push('账号（3-32 位字母/数字/下划线）')
+    if (!PASSWORD_OK(form.password)) missing.push('密码（至少 6 位且含字母和数字）')
     if (form.confirmPassword !== form.password) missing.push('两次密码不一致')
     if (form.nickname.trim().length < 1) missing.push('昵称')
     if (!form.agreement) missing.push('同意用户协议')
@@ -59,7 +65,7 @@ async function handleSubmit() {
   loading.value = true
   try {
     await userStore.register({
-      studentId: form.studentId,
+      account: form.studentId.trim(),
       password: form.password,
       nickname: form.nickname.trim(),
       college: form.college.trim() || undefined,
@@ -83,7 +89,7 @@ async function handleSubmit() {
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-2 min-w-0">
           <span class="ds-sticker ds-sticker--coral shrink-0">JOIN</span>
-          <span class="ds-label text-white/45 truncate">本校 · 学号注册</span>
+          <span class="ds-label text-white/45 truncate">本校 · 账号注册</span>
         </div>
         <button
           class="ds-icon-btn shrink-0"
@@ -94,23 +100,26 @@ async function handleSubmit() {
         </button>
       </div>
       <h1 class="ds-display ds-display-lg mt-2 text-white">加入校园墙</h1>
-      <p class="mt-1 text-[13px] text-white/60">注册成功自动登录，昵称可随时修改</p>
+      <p class="mt-1 text-[13px] text-white/60">不用学号也能注册，手机号 / 拼音 / 邮箱前缀都行</p>
     </header>
 
     <main class="max-w-[520px] mx-auto px-3 mt-3 space-y-3">
       <!-- 白卡表单 -->
       <section class="ds-card p-4 sm:p-5 space-y-4">
         <div>
-          <label for="reg-student-id" class="ds-label block mb-1.5">学号 <span style="color: var(--coral)">*</span></label>
-          <input id="reg-student-id" aria-required="true" v-model="form.studentId" autocomplete="username" type="text" inputmode="numeric" maxlength="12" placeholder="6-12位数字"
+          <label for="reg-student-id" class="ds-label block mb-1.5">账号 <span style="color: var(--coral)">*</span></label>
+          <input id="reg-student-id" aria-required="true" v-model="form.studentId" autocomplete="username" type="text" maxlength="32" placeholder="手机号 / 拼音 / 邮箱前缀"
             class="ds-input" />
+          <p class="mt-1.5 text-[11.5px] leading-relaxed" style="color: var(--ink-mute)">
+            3-32 位，可用字母、数字、下划线、点、中划线或 @；注册后不可修改，请记牢
+          </p>
           <p v-if="errors.studentId" class="mt-1.5 text-[12px] font-bold" style="color: var(--coral)">{{ errors.studentId }}</p>
         </div>
 
         <div>
           <label for="reg-password" class="ds-label block mb-1.5">密码 <span style="color: var(--coral)">*</span></label>
           <div class="relative">
-            <input id="reg-password" aria-required="true" v-model="form.password" autocomplete="new-password" :type="showPassword ? 'text' : 'password'" placeholder="至少6位"
+            <input id="reg-password" aria-required="true" v-model="form.password" autocomplete="new-password" :type="showPassword ? 'text' : 'password'" placeholder="至少 6 位，含字母和数字"
               class="ds-input !pr-11"
               @keyup.enter="handleSubmit" />
             <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
@@ -150,13 +159,13 @@ async function handleSubmit() {
         </div>
 
         <div>
-          <label for="reg-college" class="ds-label block mb-1.5">学院</label>
+          <label for="reg-college" class="ds-label block mb-1.5">学院 <span class="font-normal" style="color: var(--ink-mute)">（选填）</span></label>
           <input id="reg-college" v-model="form.college" autocomplete="organization" type="text" maxlength="50" placeholder="如：计算机学院"
             class="ds-input" />
         </div>
 
         <div>
-          <label for="reg-grade" class="ds-label block mb-1.5">年级</label>
+          <label for="reg-grade" class="ds-label block mb-1.5">年级 <span class="font-normal" style="color: var(--ink-mute)">（选填）</span></label>
           <input id="reg-grade" v-model="form.grade" autocomplete="off" type="text" maxlength="20" placeholder="如：2023级"
             class="ds-input" />
         </div>

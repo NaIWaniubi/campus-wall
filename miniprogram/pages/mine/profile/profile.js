@@ -56,7 +56,7 @@ Page({
     if (app.checkLogin()) return true
     wx.showModal({
       title: '需要登录',
-      content: action ? `${action}需要先使用学号登录` : '请先使用学号登录',
+      content: action ? `${action}需要先登录` : '请先登录',
       confirmText: '去登录',
       success: res => {
         if (res.confirm) this.setData({ authMode: 'login' })
@@ -154,11 +154,11 @@ Page({
     this.setData({ [field]: e.detail.value })
   },
 
-  /** 学号 + 密码 JWT 登录 / 注册（POST /auth/login | /auth/register） */
+  /** 账号 + 密码 JWT 登录 / 注册（POST /auth/login | /auth/register） */
   async onAuthSubmit() {
     if (this.data.authLoading) return
     const { authMode, studentId, password, nickname, college } = this.data
-    if (!studentId.trim()) { showToast('请输入学号'); return }
+    if (!studentId.trim()) { showToast('请输入账号'); return }
     if (!password) { showToast('请输入密码'); return }
     if (authMode === 'register' && !nickname.trim()) { showToast('请输入昵称'); return }
 

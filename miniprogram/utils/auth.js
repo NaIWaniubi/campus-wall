@@ -10,7 +10,10 @@ const { rawRequest, getAppSafe } = require('./request')
 const { normalizeUser } = require('./legacy-adapter')
 const { showToast } = require('./util')
 
-const STUDENT_ID_RE = /^\d{6,12}$/
+// 账号规则（与服务端 commonSchemas.account 一致）：3-32 位，字母/数字/下划线/点/中划线/@
+const ACCOUNT_RE = /^[A-Za-z0-9_.@-]{3,32}$/
+// 兼容旧命名：历史代码 import 了 STUDENT_ID_RE
+const STUDENT_ID_RE = ACCOUNT_RE
 
 function saveSession(result) {
   const app = getAppSafe()
@@ -36,10 +39,10 @@ function clearSession() {
   } catch (e) { /* 忽略 */ }
 }
 
-/** 学号密码登录：POST /auth/login -> {token, user} */
+/** 账号密码登录：POST /auth/login -> {token, user}（账号可为手机号/拼音/邮箱前缀/原学号） */
 async function login(studentId, password) {
-  if (!STUDENT_ID_RE.test(String(studentId))) {
-    const err = { message: '学号应为6-12位数字' }
+  if (!ACCOUNT_RE.test(String(studentId))) {
+    const err = { message: '账号 3-32 位，可用字母、数字、下划线、点、中划线或 @' }
     showToast(err.message)
     throw err
   }
@@ -48,18 +51,18 @@ async function login(studentId, password) {
     showToast(err.message)
     throw err
   }
-  const result = await rawRequest({ url: '/auth/login', method: 'POST', data: { studentId, password }, loading: false })
+  const result = await rawRequest({ url: '/auth/login', method: 'POST', data: { account: studentId, password }, loading: false })
   return saveSession(result)
 }
 
-/** 注册：studentId 6-12 位数字；password ≥6 位；nickname 必填 */
+/** 注册：账号 3-32 位 ASCII；密码 ≥6 位且含字母+数字；昵称必填；学院选填 */
 async function register(payload) {
   const { studentId, password, nickname, college, grade } = payload || {}
   let invalid = null
-  if (!STUDENT_ID_RE.test(String(studentId))) {
-    invalid = '学号应为6-12位数字'
-  } else if (!password || password.length < 6) {
-    invalid = '密码长度至少6位'
+  if (!ACCOUNT_RE.test(String(studentId))) {
+    invalid = '账号 3-32 位，可用字母、数字、下划线、点、中划线或 @'
+  } else if (!password || password.length < 6 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    invalid = '密码至少 6 位，且包含字母和数字'
   } else if (!nickname || !nickname.trim()) {
     invalid = '昵称不能为空'
   }
@@ -70,7 +73,7 @@ async function register(payload) {
   const result = await rawRequest({
     url: '/auth/register',
     method: 'POST',
-    data: { studentId, password, nickname: nickname.trim(), college: college || '', grade: grade || '' },
+    data: { account: studentId, password, nickname: nickname.trim(), college: college || '', grade: grade || '' },
     loading: false
   })
   return saveSession(result)
@@ -117,6 +120,7 @@ function requireLogin(action) {
 }
 
 module.exports = {
+  ACCOUNT_RE,
   STUDENT_ID_RE,
   saveSession,
   clearSession,

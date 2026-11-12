@@ -55,7 +55,8 @@
 ## 3. B 新后端契约（docs/ARCHITECTURE.md + api/routes/*.ts，挂载见 app.ts）
 
 - **响应包**：`{code, message, data}`；成功 `code===200`；失败多为 HTTP200 + body `code`(400/401/403/404/1001 账号不存在/1002 密码错误/1003 封禁)；`data` 失败为 null。⚠️ 与 A 的 `code===0`+`msg` 不同
-- **认证**：header `Authorization: Bearer <token>`；JWT 7d payload `{id, studentId, role}`；学号密码 bcrypt；中间件 authRequired/authOptional/adminRequired/superAdminRequired
+- **认证**：header `Authorization: Bearer <token>`；JWT 7d payload `{id, studentId, role}`；账号密码 bcrypt；中间件 authRequired/authOptional/adminRequired/superAdminRequired
+  - **V5 变更**：登录名不再强制 8 位学号。`POST /auth/register|login` 接受 `account`（3–32 位，`[A-Za-z0-9_.@-]`），同时兼容旧字段 `studentId`；学院改为选填；注册密码 6 位起且含字母+数字（`commonSchemas.registerPassword`），`password`（8 位+大小写+数字）仅用于改密。数据库列名仍是 `student_id`（语义=登录账号）。
 - **分页形状**：`{list, total, page, pageSize, hasMore}`
 - **帖子对象 formatPost（全 camelCase）**：`id`(number), `title`, `content`, `images[]`, `thumbImages[]`(原图+.thumb.webp), `isAnonymous`, `status`('published'|'pending'|'pending_review'|'deleted'), `isTop`, `topType`, `rejectReason`, `viewCount`, `likeCount`, `commentCount`, `favoriteCount`, `extraFields{}`, `section{id,name,icon}`, `author{id,nickname,avatar,college,creditScore}`(匿名时 id:0/creditScore:null), `isMine`, `liked`, `favorited`, `createdAt/updatedAt`(ISO)
 - **发帖**：POST `/api/posts` `{sectionId, title(≤50), content(10~500字), images(≤9), isAnonymous, extraFields{price,contact,location,tradeType,condition,time,itemType,organizer 白名单}}` → `{id, status, matchedCount}`（失物匹配命中数）

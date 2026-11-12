@@ -32,14 +32,31 @@ if (isProduction) {
 
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-export function generateToken(payload: { id: number; studentId: string; role: string }): string {
+/**
+ * 生成 token。ver 为账号当前的 token_version：
+ * 改密/封禁会 +1，使所有旧 token 立即失效（token 吊销能力）。
+ */
+export function generateToken(payload: { id: number; studentId: string; role: string; ver?: number }): string {
   const options: SignOptions = { expiresIn: EXPIRES_IN as any };
-  return jwt.sign(payload, SECRET, options);
+  return jwt.sign(
+    { id: payload.id, studentId: payload.studentId, role: payload.role, ver: payload.ver ?? 0 },
+    SECRET,
+    options
+  );
 }
 
-export function verifyToken(token: string): { id: number; studentId: string; role: string } | null {
+export function verifyToken(
+  token: string
+): { id: number; studentId: string; role: string; ver: number } | null {
   try {
-    return jwt.verify(token, SECRET) as { id: number; studentId: string; role: string };
+    const raw = jwt.verify(token, SECRET) as any;
+    return {
+      id: raw.id,
+      studentId: raw.studentId,
+      role: raw.role,
+      // 兼容升级前签发的旧 token（无 ver 字段）：视为 0
+      ver: Number(raw.ver ?? 0),
+    };
   } catch {
     return null;
   }

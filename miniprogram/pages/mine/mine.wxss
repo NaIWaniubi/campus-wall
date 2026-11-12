@@ -1,7 +1,8 @@
 .page-mine {
   background: #F5F6F8;
   min-height: 100vh;
-  padding-bottom: 40rpx;
+  /* 40rpx 不足以避开 104rpx 的自定义 tabBar，「意见反馈」会被压住 */
+  padding-bottom: calc(176rpx + env(safe-area-inset-bottom));
 }
 
 .profile-header {
@@ -252,9 +253,19 @@
   align-items: center;
 }
 
+/* 图标底座：统一 56rpx 圆角方块 + 品牌浅底，emoji 只作为字形来源，
+   不同机型渲染差异被底座与尺寸约束吸收 */
 .menu-icon {
-  font-size: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
   margin-right: 20rpx;
+  border-radius: 14rpx;
+  background: rgba(22, 160, 133, 0.08);
+  font-size: 30rpx;
+  line-height: 1;
 }
 
 .menu-text {
@@ -264,9 +275,15 @@
   font-weight: 700;
 }
 
+/* 箭头：用 CSS 绘制 chevron（零图片资源，全机型像素一致）。
+   原先用文本 ">" 在不同字体下粗细/位置都不稳定。 */
 .menu-arrow {
-  font-size: 28rpx;
-  color: #DFE6E9;
+  width: 16rpx;
+  height: 16rpx;
+  border-top: 3rpx solid #C7CFD6;
+  border-right: 3rpx solid #C7CFD6;
+  transform: rotate(45deg);
+  margin-left: 8rpx;
 }
 
 .unread-badge {

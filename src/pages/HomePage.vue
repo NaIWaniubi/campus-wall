@@ -5,11 +5,11 @@
  */
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid } from '@lucide/vue'
+import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid, Sparkles, ChevronRight } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { postApi, subscriptionApi, announcementApi, sectionApi } from '@/utils/api'
-import { sectionGradient } from '@/utils/sections'
+import { postApi, subscriptionApi, announcementApi, sectionApi, aiApi } from '@/utils/api'
+import { sectionGradient, sectionColor, sectionTint } from '@/utils/sections'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
@@ -230,7 +230,19 @@ async function loadRailData() {
   }
 }
 
+// ── 今日校园 · AI 简报（V3）：服务端 60s 缓存，未接入大模型时走站内统计，永不空窗 ──
+const digest = ref<any>(null)
+async function loadDigest() {
+  try {
+    const res: any = await aiApi.digest()
+    digest.value = res?.data ?? null
+  } catch {
+    digest.value = null // 简报失败不影响信息流
+  }
+}
+
 onMounted(() => {
+  loadDigest()
   if (!useVirtual.value) window.addEventListener('scroll', onScroll)
   if (!appStore.sections.length) appStore.fetchSections()
   loadList(true)
@@ -324,6 +336,46 @@ watch(list, () => nextTick(updateScrollMargin))
         <RefreshCw v-if="refreshing" class="w-4 h-4 animate-spin mr-1" />
         {{ refreshing ? '刷新中...' : pullDistance >= pullThreshold ? '松开刷新' : '下拉刷新' }}
       </div>
+
+      <!-- 今日校园 · AI 简报：AI 进首页主链路，一眼看完今天 -->
+      <section v-if="digest" class="card-premium ai-trail rounded-[16px] p-4">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+            style="background: var(--grad-brand)">
+            <Sparkles class="w-4 h-4" />
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-zinc-900 leading-tight">今日校园</h2>
+            <p class="text-[11px] text-zinc-400">{{ digest.date }}<template v-if="digest.window"> · {{ digest.window }}</template></p>
+          </div>
+          <span class="ml-auto dopa-chip flex-shrink-0">{{ digest.offline ? '站内统计' : 'AI 生成' }}</span>
+        </div>
+
+        <p class="mt-2.5 text-[13px] text-zinc-700 leading-relaxed">{{ digest.summary }}</p>
+
+        <div class="mt-2.5 flex flex-wrap gap-1.5">
+          <span
+            v-for="sec in digest.sections"
+            :key="sec.name"
+            class="cat-tag"
+            :style="{ background: sectionTint(sectionColor(null, sec.name), 0.12), color: sectionColor(null, sec.name) }"
+          >{{ sec.name }} {{ sec.n }}</span>
+          <span class="cat-tag" style="background: rgba(109,59,245,.1); color: var(--color-brand-500)">新动态 {{ digest.stats.posts }}</span>
+          <span class="cat-tag" style="background: rgba(6,182,212,.14); color: #0E7490">评论 {{ digest.stats.comments }}</span>
+        </div>
+
+        <button
+          v-if="digest.hot"
+          class="mt-3 w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg bg-zinc-50 hover:bg-zinc-100 transition active:scale-[.99]"
+          @click="router.push(`/post/${digest.hot.id}`)"
+        >
+          <Flame class="w-4 h-4 text-orange-500 flex-shrink-0" />
+          <span class="text-[12px] text-zinc-700 truncate flex-1">今日最热：{{ digest.hot.title }}</span>
+          <ChevronRight class="w-4 h-4 text-zinc-400 flex-shrink-0" />
+        </button>
+
+        <p v-if="digest.tip" class="mt-2 text-[11px] text-zinc-400 leading-relaxed">{{ digest.tip }}</p>
+      </section>
 
       <PostSkeleton v-if="loading" :count="4" />
 

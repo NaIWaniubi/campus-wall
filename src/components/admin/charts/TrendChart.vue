@@ -37,7 +37,7 @@ const option = computed(() => ({
   series: [
     { name: '用户', type: 'line', smooth: true, symbolSize: 4, data: props.trend.map((d) => d.users), itemStyle: { color: '#38bdf8' }, lineStyle: { width: 2 } },
     { name: '帖子', type: 'line', smooth: true, symbolSize: 4, data: props.trend.map((d) => d.posts), itemStyle: { color: '#a78bfa' }, lineStyle: { width: 2 } },
-    { name: '评论', type: 'line', smooth: true, symbolSize: 4, data: props.trend.map((d) => d.comments), itemStyle: { color: '#34d399' }, lineStyle: { width: 2 } },
+    { name: '评论', type: 'line', smooth: true, symbolSize: 4, data: props.trend.map((d) => d.comments), itemStyle: { color: '#C026D3' }, lineStyle: { width: 2 } },
   ],
 }))
 </script>

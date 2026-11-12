@@ -24,6 +24,6 @@
         </view>
       </view>
     </view>
-    <empty-state wx:if="{{posts.length === 0}}" text="还没有发布内容" customIcon="📝" btnText="去发布" bind:btntap="onGoPublish"></empty-state>
+    <empty-state wx:if="{{!loading && posts.length === 0}}" text="还没有发布内容" customIcon="📝" btnText="去发布" bind:btntap="onGoPublish"></empty-state>
   </view>
 </view>

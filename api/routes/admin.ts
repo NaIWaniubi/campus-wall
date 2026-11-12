@@ -6,10 +6,11 @@ import type { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
-import { success, fail, unauthorized, forbidden } from '../utils/response.js';
+import { success, fail, unauthorized, forbidden, toInt } from '../utils/response.js';
 import { cacheInvalidate } from '../utils/cache.js';
 import { validate, adminSchemas, commonSchemas } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
+import { growthMetrics } from '../utils/events.js';
 
 const router = Router();
 
@@ -56,8 +57,8 @@ router.get('/users', superOnly, (req, res) => {
     where += ` AND role = ?`;
     params.push(role);
   }
-  const p = parseInt(page as string);
-  const ps = parseInt(pageSize as string);
+  const p = toInt(page, 1, 1);
+  const ps = toInt(pageSize, 20, 1, 100);
   const offset = (p - 1) * ps;
 
   const users = db.prepare(`
@@ -97,10 +98,13 @@ router.put('/users/:id/ban', superOnly, validate({
   if (action === 'ban') {
     let banUntil = '';
     if (duration && duration !== 'forever') {
-      const days = parseInt(duration);
+      // 非数字/超大值会让 new Date(...).toISOString() 抛 "Invalid time value" → 500
+      const days = toInt(duration, 7, 1, 3650);
       banUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
     }
-    db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ? WHERE id = ?').run(
+    // 封禁同时递增 token_version：被封用户的现有会话立即失效，
+    // 否则旧 token 在有效期内仍可访问（WS 侧已单独回查 status，此处覆盖 REST）
+    db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ?, token_version = token_version + 1 WHERE id = ?').run(
       'banned', reason || '违规', banUntil, id
     );
     
@@ -184,8 +188,8 @@ router.get('/posts', sectionAllowed, (req, res) => {
     where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
     params.push(`%${keyword}%`, `%${keyword}%`);
   }
-  const p = parseInt(page as string);
-  const ps = parseInt(pageSize as string);
+  const p = toInt(page, 1, 1);
+  const ps = toInt(pageSize, 20, 1, 100);
   const offset = (p - 1) * ps;
 
   const posts = db.prepare(`
@@ -234,18 +238,26 @@ router.put('/posts/:id/audit', sectionAllowed, (req, res) => {
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
   if (action === 'approve') {
-    db.prepare("UPDATE posts SET status = 'published' WHERE id = ?").run(id);
+    // 记录审核完成时间，用于统计审核时效（提交→过审）
+    db.prepare("UPDATE posts SET status = 'published', audited_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
     cacheInvalidate('posts');
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
       post.user_id, 'system', `您发布的帖子「${post.title}」已通过审核`, id
     );
+    // 审计：审核动作必须留痕（此前审核/驳回/删评/举报处理都不写 admin_logs，审计链断裂）
+    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+      req.currentUser!.id, 'audit_approve', 'post', id, JSON.stringify({ from: post.status })
+    );
     success(res, null, '已通过审核');
   } else if (action === 'reject') {
     if (!reason) return fail(res, '请填写驳回原因');
-    db.prepare("UPDATE posts SET status = 'rejected', reject_reason = ? WHERE id = ?").run(reason, id);
+    db.prepare("UPDATE posts SET status = 'rejected', reject_reason = ?, audited_at = CURRENT_TIMESTAMP WHERE id = ?").run(reason, id);
     cacheInvalidate('posts');
     db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
       post.user_id, 'system', `您发布的帖子「${post.title}」被驳回，原因：${reason}`, id
+    );
+    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+      req.currentUser!.id, 'audit_reject', 'post', id, JSON.stringify({ from: post.status, reason })
     );
     success(res, null, '已驳回');
   } else {
@@ -285,8 +297,8 @@ router.get('/comments', sectionAllowed, (req, res) => {
     where += ` AND c.content LIKE ?`;
     params.push(`%${keyword}%`);
   }
-  const p = parseInt(page as string);
-  const ps = parseInt(pageSize as string);
+  const p = toInt(page, 1, 1);
+  const ps = toInt(pageSize, 20, 1, 100);
   const offset = (p - 1) * ps;
 
   const comments = db.prepare(`
@@ -323,8 +335,16 @@ router.delete('/comments/:id', sectionAllowed, (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
-  db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(id);
-  db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+
+  // 幂等：只有 active → deleted 才扣计数（重复删除不再把 comment_count 扣穿）
+  const marked = db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ? AND status = 'active'").run(id);
+  if (marked.changes > 0) {
+    db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+    // 只在真正发生状态变更时写审计，避免重复请求制造「删除了两次」的假记录
+    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+      req.currentUser!.id, 'delete_comment', 'comment', id, JSON.stringify({ postId: comment.post_id })
+    );
+  }
   cacheInvalidate('posts');
   success(res, null, '评论已删除');
 });
@@ -339,8 +359,8 @@ router.get('/reports', sectionAllowed, (req, res) => {
     where += ` AND r.status = ?`;
     params.push(status);
   }
-  const p = parseInt(page as string);
-  const ps = parseInt(pageSize as string);
+  const p = toInt(page, 1, 1);
+  const ps = toInt(pageSize, 20, 1, 100);
   const offset = (p - 1) * ps;
 
   const reports = db.prepare(`
@@ -429,7 +449,7 @@ router.put('/reports/:id', sectionAllowed, (req, res) => {
       const author = db.prepare('SELECT role FROM users WHERE id = ?').get(authorId) as any;
       // 不封禁超级管理员
       if (author && author.role !== 'super_admin') {
-        db.prepare("UPDATE users SET status = 'banned', ban_reason = ?, ban_until = '' WHERE id = ?").run(
+        db.prepare("UPDATE users SET status = 'banned', ban_reason = ?, ban_until = '', token_version = token_version + 1 WHERE id = ?").run(
           result || '因举报被封禁', authorId
         );
         db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
@@ -449,6 +469,15 @@ router.put('/reports/:id', sectionAllowed, (req, res) => {
   // 通知举报人
   db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
     report.reporter_id, 'system', `您的举报工单已处理，处理结果：${result || action}`
+  );
+
+  // 审计：每条举报工单的处理动作都留痕（驳回/删内容/封号三类）
+  db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+    req.currentUser!.id,
+    `handle_report:${action || 'reject'}`,
+    'report',
+    id,
+    JSON.stringify({ targetType: report.target_type, targetId: report.target_id, result: result || action || '' })
   );
 
   success(res, null, '举报已处理');
@@ -508,6 +537,18 @@ router.get('/stats', superOnly, (_req, res) => {
     trend,
     sectionDist,
     collegeDist,
+    // 增长与转化：评委看「实效验证」时最先问的数字都在这里
+    growth: growthMetrics(),
+    // 审核时效：提交→过审的平均耗时（小时），治理能力的量化指标
+    auditLatencyHours: (() => {
+      const row = db
+        .prepare(
+          `SELECT AVG((julianday(audited_at) - julianday(created_at)) * 24) AS h
+           FROM posts WHERE audited_at IS NOT NULL AND status = 'published'`
+        )
+        .get() as any;
+      return row?.h != null ? Math.round(row.h * 10) / 10 : null;
+    })(),
   });
 });
 
@@ -560,8 +601,8 @@ router.get('/feedbacks', superOnly, (req, res) => {
     where += ` AND (f.content LIKE ? OR f.contact LIKE ? OR u.nickname LIKE ? OR u.student_id LIKE ?)`;
     params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
   }
-  const p = parseInt(page as string);
-  const ps = parseInt(pageSize as string);
+  const p = toInt(page, 1, 1);
+  const ps = toInt(pageSize, 20, 1, 100);
   const offset = (p - 1) * ps;
 
   const base = `FROM feedback f LEFT JOIN users u ON f.user_id = u.id ${where}`;

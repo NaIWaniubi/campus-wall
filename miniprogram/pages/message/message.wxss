@@ -1,6 +1,8 @@
 .page-message {
   background: #F5F6F8;
   min-height: 100vh;
+  /* 底部留白避开自定义 tabBar，否则「全部标记为已读」被压住 */
+  padding-bottom: calc(176rpx + env(safe-area-inset-bottom));
 }
 
 .message-tabs {

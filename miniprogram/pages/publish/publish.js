@@ -25,6 +25,21 @@ const FORCED_ANONYMOUS_CATEGORIES = ['daily']
 const conditionList = ['全新', '99新', '9成新', '8成新', '7成新及以下']
 const tradeTypeList = ['出售', '求购', '以物换物']
 
+/**
+ * 判断图片是否已是远端 URL。
+ * 注意：微信开发者工具的 chooseMedia 临时路径形如 `http://tmp/xxx` / `wxfile://xxx`，
+ * 它们以 http 开头但并不是已上传地址。早期用 startsWith('http') 判断会把临时路径
+ * 直接提交入库，导致发布后图片全是坏链。
+ */
+function isAlreadyUploaded(img) {
+  if (!img || typeof img !== 'string') return false
+  if (img.indexOf('http://tmp/') === 0) return false
+  if (img.indexOf('http://usr/') === 0) return false
+  if (img.indexOf('wxfile://') === 0) return false
+  if (img.indexOf('file://') === 0) return false
+  return /^https?:\/\//.test(img)
+}
+
 Page({
   data: {
     categoryList: [],
@@ -418,7 +433,7 @@ Page({
     try {
       let uploadedImages = []
       for (const img of imageList) {
-        if (img.startsWith('http')) {
+        if (isAlreadyUploaded(img)) {
           uploadedImages.push(img)
         } else {
           const result = await this.compressThenUpload(img)
@@ -427,7 +442,9 @@ Page({
       }
 
       // 只提交白名单内的扩展键，避免脏数据入库
-      const whitelist = ['price', 'contact', 'location', 'tradeType', 'condition', 'time', 'itemType', 'organizer', 'direction']
+      // 校区随帖子落库（extra_fields.campus），供板块页「切换校区」筛选真正生效
+      if (!extraData.campus) extraData.campus = app.globalData.currentCampus || ''
+      const whitelist = ['price', 'contact', 'location', 'tradeType', 'condition', 'time', 'itemType', 'organizer', 'direction', 'campus']
       const cleanExtra = {}
       whitelist.forEach(key => {
         const v = extraData[key]
@@ -446,11 +463,13 @@ Page({
 
       if (isEdit) {
         await put('/posts/' + editId, postData)
-        showToast('修改成功', 'success')
       } else {
         await post('/posts', postData)
-        showToast('发布成功', 'success')
       }
+      // 必须先关 loading 再弹 toast：微信的 hideLoading 会把同层的 toast 一起关掉，
+      // 原顺序（先 toast 后 finally hideLoading）会让「发布成功」一闪而过甚至看不见
+      wx.hideLoading()
+      showToast(isEdit ? '修改成功' : '发布成功', 'success')
 
       wx.removeStorageSync('publishDraft')
       // 发布成功：云草稿一并清理（静默，失败由 10 条上限轮换兜底）
@@ -464,9 +483,9 @@ Page({
         wx.switchTab({ url: '/pages/index/index' })
       }, 1500)
     } catch (e) {
+      wx.hideLoading()
       showToast(isEdit ? '修改失败' : '发布失败')
     } finally {
-      wx.hideLoading()
       this.setData({ submitting: false })
     }
   }

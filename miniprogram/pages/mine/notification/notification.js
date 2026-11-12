@@ -7,6 +7,8 @@ const { getMessageTypeMeta } = require('../../../utils/constants')
 Page({
   data: {
     notifications: [],
+    loading: true,
+    loadFailed: false,
     activeTab: 'all',
     tabs: [
       { id: 'all', name: '全部' },
@@ -22,9 +24,10 @@ Page({
 
   async loadNotifications() {
     if (!app.checkLogin()) {
-      this.setData({ notifications: [] })
+      this.setData({ notifications: [], loading: false })
       return
     }
+    this.setData({ loading: true, loadFailed: false })
     try {
       const type = this.data.activeTab === 'all' ? '' : this.data.activeTab
       const list = await get('/notifications', type ? { type } : {}, false)
@@ -37,9 +40,11 @@ Page({
           timeAgoText: timeAgo(n.time)
         }
       })
-      this.setData({ notifications })
+      this.setData({ notifications, loading: false })
     } catch (e) {
       console.error('加载通知失败', e)
+      // 失败与「暂无消息」区分开，给出重试入口
+      this.setData({ loading: false, loadFailed: true })
     }
   },
 

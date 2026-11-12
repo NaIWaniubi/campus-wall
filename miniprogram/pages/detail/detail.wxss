@@ -435,3 +435,333 @@
 .match-author {
   font-size: 21rpx;
 }
+
+/* 🎯 智能雷达（失物招领 FTS5 反向高精度召回） */
+.radar-section {
+  margin: 0 24rpx 22rpx;
+  border-radius: 30rpx;
+  border: 1rpx solid rgba(16, 185, 129, 0.2);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0FDF4 100%);
+}
+
+.radar-header-icon {
+  font-size: 32rpx;
+}
+
+.radar-hint {
+  font-size: 22rpx;
+  color: #059669;
+  font-weight: 600;
+}
+
+.radar-list {
+  margin-top: 12rpx;
+}
+
+.radar-item {
+  padding: 20rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, 0.85);
+  margin-bottom: 14rpx;
+  border: 1rpx solid rgba(16, 185, 129, 0.15);
+  transition: transform 0.15s ease;
+}
+
+.radar-item:last-child {
+  margin-bottom: 0;
+}
+
+.radar-item:active {
+  transform: scale(0.98);
+}
+
+.radar-item-top {
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 8rpx;
+}
+
+.radar-score-badge {
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: #D1FAE5;
+  color: #047857;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
+.radar-item-title {
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radar-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 8rpx;
+}
+
+.radar-reason-tag {
+  font-size: 20rpx;
+  color: #047857;
+  background: rgba(5, 150, 105, 0.08);
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+}
+
+.radar-excerpt {
+  display: block;
+  font-size: 24rpx;
+  color: #4B5563;
+  line-height: 1.5;
+}
+
+/* 💰 意向出价（二手交易闪电撮合闭环） */
+.offers-section {
+  margin: 0 24rpx 22rpx;
+  border-radius: 30rpx;
+  border: 1rpx solid rgba(74, 144, 217, 0.15);
+}
+
+.offer-title-icon {
+  font-size: 30rpx;
+}
+
+.make-offer-btn {
+  background: linear-gradient(135deg, #4A90D9 0%, #357ABD 100%);
+  color: #FFFFFF;
+  font-size: 24rpx;
+  font-weight: 700;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  margin: 0;
+  line-height: 1.5;
+  border: none;
+}
+
+.offers-notice {
+  font-size: 23rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 14rpx;
+  margin-bottom: 16rpx;
+}
+
+.notice-locked {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+.notice-sold {
+  background: #F3F4F6;
+  color: #6B7280;
+}
+
+.offers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.offer-card {
+  padding: 18rpx 20rpx;
+  background: #F9FAFB;
+  border-radius: 20rpx;
+  border: 1rpx solid #E5E7EB;
+}
+
+.offer-card-top {
+  align-items: center;
+}
+
+.offer-price-row {
+  align-items: center;
+  gap: 12rpx;
+}
+
+.offer-price {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #2563EB;
+}
+
+.offer-status-badge {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-weight: 700;
+}
+
+.status-pending {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.status-accepted, .status-completed {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.status-rejected, .status-cancelled {
+  background: #F3F4F6;
+  color: #9CA3AF;
+}
+
+.offer-buyer {
+  font-size: 22rpx;
+  color: #6B7280;
+}
+
+.offer-actions {
+  display: flex;
+  gap: 10rpx;
+}
+
+.btn-offer-accept {
+  background: #10B981;
+  color: #FFFFFF;
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
+  margin: 0;
+  border: none;
+}
+
+.btn-offer-reject, .btn-offer-cancel {
+  background: #F3F4F6;
+  color: #EF4444;
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  line-height: 1.5;
+  margin: 0;
+  border: 1rpx solid #E5E7EB;
+}
+
+.offer-message {
+  margin-top: 10rpx;
+  font-size: 23rpx;
+  color: #4B5563;
+  line-height: 1.4;
+}
+
+.offers-empty {
+  text-align: center;
+  font-size: 24rpx;
+  color: #9CA3AF;
+  padding: 24rpx 0;
+}
+
+/* 出价弹窗 */
+.offer-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8rpx);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.offer-modal-content {
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 36rpx 36rpx 0 0;
+  padding: 36rpx 32rpx 48rpx;
+  box-sizing: border-box;
+}
+
+.offer-modal-header {
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.offer-modal-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #111827;
+}
+
+.offer-modal-close {
+  font-size: 32rpx;
+  color: #9CA3AF;
+  padding: 10rpx;
+}
+
+.offer-modal-body {
+  margin-bottom: 32rpx;
+}
+
+.offer-input-group {
+  margin-bottom: 24rpx;
+}
+
+.offer-input-label {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12rpx;
+}
+
+.offer-input-wrap {
+  align-items: center;
+  background: #F9FAFB;
+  border: 2rpx solid #E5E7EB;
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  height: 84rpx;
+}
+
+.currency-symbol {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #2563EB;
+  margin-right: 12rpx;
+}
+
+.offer-number-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: #111827;
+}
+
+.offer-text-input {
+  background: #F9FAFB;
+  border: 2rpx solid #E5E7EB;
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  height: 84rpx;
+  font-size: 28rpx;
+  color: #111827;
+}
+
+.offer-modal-footer {
+  padding-top: 12rpx;
+}
+
+.offer-submit-btn {
+  background: linear-gradient(135deg, #4A90D9 0%, #2563EB 100%);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 700;
+  border-radius: 999rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border: none;
+  box-shadow: 0 10rpx 24rpx rgba(37, 99, 235, 0.25);
+}
+

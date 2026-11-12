@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
-import { success, fail } from '../utils/response.js';
+import { success, fail, toInt } from '../utils/response.js';
 
 const router = Router();
 
@@ -13,8 +13,10 @@ router.get('/', authRequired, (req, res) => {
   const type = req.query.type as string;
   // 分页：page 从 1 起；pageSize 上限 100，默认 20。
   // 取 pageSize+1 用于判断 hasMore（多查一条，少一次 COUNT(*) 提速）
-  const page = Math.max(1, parseInt((req.query.page as string) || '1'));
-  const pageSize = Math.min(100, Math.max(1, parseInt((req.query.pageSize as string) || '20')));
+  // 用 toInt：?page=abc 时 parseInt 得 NaN，Math.max(1, NaN) 仍是 NaN，
+  // 进 SQL 的 OFFSET 会抛 datatype mismatch → 500
+  const page = toInt(req.query.page, 1, 1);
+  const pageSize = toInt(req.query.pageSize, 20, 1, 100);
   const offset = (page - 1) * pageSize;
 
   let where = `WHERE user_id = ?`;

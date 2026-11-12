@@ -1,0 +1,19 @@
+<view class="page-sub-category {{perfLowClass}}">
+  <view class="cat-head card"><text class="cat-head-title">校园活动</text><subscribe-btn section-id="6" /></view>
+  <view class="tab-bar flex-row">
+    <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
+    <view class="tab-item {{activeTab === 'show' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="show"><text>文体演出</text></view>
+    <view class="tab-item {{activeTab === 'lecture' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="lecture"><text>讲座论坛</text></view>
+    <view class="tab-item {{activeTab === 'club' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="club"><text>社团活动</text></view>
+    <view class="tab-item {{activeTab === 'match' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="match"><text>比赛赛事</text></view>
+  </view>
+  <view wx:if="{{loading}}" class="skeleton-wrap"><skeleton type="post" count="4"/></view>
+  <view class="post-list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost"></post-card>
+    <!-- 区分「加载失败」与「暂无内容」：失败给重试入口，不伪装成空态 -->
+    <empty-state wx:if="{{!loading && loadFailed && posts.length === 0}}" type="error" text="加载失败" bind:retry="onRetry"></empty-state>
+    <empty-state wx:elif="{{!loading && !loadFailed && posts.length === 0}}" text="暂无校园活动" customIcon="🎉"></empty-state>
+    <load-more wx:if="{{posts.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
+  </view>
+  <view class="fab-btn" bindtap="onGoPublish"><text class="fab-icon">+</text></view>
+</view>

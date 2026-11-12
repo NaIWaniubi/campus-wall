@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
-import { success, fail } from '../utils/response.js';
+import { success, fail, toInt } from '../utils/response.js';
 import { dispatchChatMessage } from '../ws/handlers/dispatcher.js';
 import { chatLimiter } from '../middleware/rateLimit.js';
 
@@ -88,9 +88,9 @@ router.get('/:id/messages', authRequired, (req, res) => {
   const found = getConvForUser(convId, req.currentUser!.id);
   if (!found) return fail(res, '会话不存在', 404, 404);
 
-  const afterId = Math.max(0, parseInt(req.query.afterId as string) || 0);
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+  const afterId = toInt(req.query.afterId, 0, 0);
+  const page = toInt(req.query.page, 1, 1);
+  const pageSize = toInt(req.query.pageSize, 20, 1, 100);
   const total = (db.prepare('SELECT COUNT(*) as total FROM chat_messages WHERE conversation_id = ?').get(convId) as any).total;
 
   let rows: any[];

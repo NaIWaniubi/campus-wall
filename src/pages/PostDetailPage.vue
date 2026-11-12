@@ -4,9 +4,9 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star } from '@lucide/vue'
+import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star, Sparkles, ShieldAlert, ChevronDown } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi, radarApi, type RadarMatchItem } from '@/utils/api'
+import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi, radarApi, aiApi, type RadarMatchItem } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -37,6 +37,30 @@ function onThumbError(e: Event, fallback: string) {
 const commentInputRef = ref<HTMLInputElement | null>(null)
 // 失物招领智能匹配：与本帖相似的候选帖列表
 const matches = ref<any[]>([])
+// ── AI 划重点（V3）：按需请求，点开才调模型，不拖慢首屏 ──
+const aiSummary = ref<{ points: string[]; risk: 'low' | 'medium' | 'high'; riskNote: string | null; offline: boolean } | null>(null)
+const aiSummaryOpen = ref(false)
+const aiSummaryLoading = ref(false)
+
+async function loadAiSummary() {
+  if (aiSummaryLoading.value) return
+  if (aiSummary.value) {
+    aiSummaryOpen.value = !aiSummaryOpen.value
+    return
+  }
+  aiSummaryOpen.value = true
+  aiSummaryLoading.value = true
+  try {
+    const res: any = await aiApi.summarize({ postId: postId.value })
+    aiSummary.value = res?.data ?? null
+  } catch {
+    aiSummaryOpen.value = false
+    toast.info('AI 划重点暂时不可用')
+  } finally {
+    aiSummaryLoading.value = false
+  }
+}
+
 // 从消息中心匹配通知跳入（?showMatches=1）：定位并短暂高亮匹配卡片
 const matchesCardRef = ref<HTMLElement | null>(null)
 const matchesHighlighted = ref(false)
@@ -816,6 +840,52 @@ function closeMoreMenu(e: MouseEvent) {
         >
           评价买家
         </button>
+      </div>
+
+      <!-- AI 划重点（V3）：一句话读懂帖子 + 交易风险提示 -->
+      <div class="card-premium rounded-[16px] mb-3 overflow-hidden ai-trail">
+        <button
+          class="w-full flex items-center gap-2 px-4 py-3 text-left"
+          :aria-expanded="aiSummaryOpen"
+          @click="loadAiSummary"
+        >
+          <span class="w-6 h-6 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+            style="background: var(--grad-brand)">
+            <Sparkles class="w-3.5 h-3.5" />
+          </span>
+          <span class="text-sm font-semibold text-zinc-800">AI 划重点</span>
+          <span class="text-[11px] text-zinc-400">要点 + 风险提示</span>
+          <Loader2 v-if="aiSummaryLoading" class="w-4 h-4 ml-auto animate-spin text-brand-500" />
+          <ChevronDown v-else-if="aiSummary" class="w-4 h-4 ml-auto text-zinc-400 transition-transform"
+            :class="aiSummaryOpen ? 'rotate-180' : ''" />
+        </button>
+
+        <div v-if="aiSummaryOpen" class="px-4 pb-3.5">
+          <div v-if="aiSummaryLoading" class="space-y-2" aria-live="polite">
+            <div class="h-3 rounded bg-zinc-100 animate-pulse"></div>
+            <div class="h-3 rounded bg-zinc-100 animate-pulse w-5/6"></div>
+            <div class="h-3 rounded bg-zinc-100 animate-pulse w-2/3"></div>
+          </div>
+          <template v-else-if="aiSummary">
+            <ul class="space-y-1.5">
+              <li v-for="(pt, i) in aiSummary.points" :key="i" class="flex gap-2 text-[13px] text-zinc-700 leading-relaxed">
+                <span class="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" :style="{ background: 'var(--grad-brand)' }"></span>
+                <span>{{ pt }}</span>
+              </li>
+            </ul>
+            <div
+              v-if="aiSummary.risk !== 'low' && aiSummary.riskNote"
+              class="mt-2.5 flex items-start gap-1.5 px-2.5 py-2 rounded-lg"
+              :class="aiSummary.risk === 'high' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'"
+            >
+              <ShieldAlert class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span class="text-xs leading-relaxed">{{ aiSummary.riskNote }}</span>
+            </div>
+            <p class="mt-2 text-[11px] text-zinc-400">
+              {{ aiSummary.offline ? '站内摘要模式' : 'AI 生成' }} · 仅供参考，交易请当面验货
+            </p>
+          </template>
+        </div>
       </div>
 
       <!-- 互动栏 -->

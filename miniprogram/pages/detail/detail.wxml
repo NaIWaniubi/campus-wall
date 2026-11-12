@@ -1,6 +1,10 @@
 <view class="page-detail {{perfLowClass}}">
   <scroll-view class="detail-scroll" scroll-y scroll-into-view="{{scrollIntoView}}">
     <skeleton wx:if="{{!post.id && !postLoadFailed}}" type="detail" />
+    <!-- 加载失败/帖子被删：给出明确文案与重试入口，避免整页空白 -->
+    <view wx:if="{{postLoadFailed && !post.id}}" class="post-detail card" style="padding: 100rpx 40rpx;">
+      <empty-state type="error" text="帖子不存在或已被删除" bind:retry="onRetryLoad"></empty-state>
+    </view>
     <view class="post-detail card" wx:if="{{post.id}}">
       <view class="post-header">
         <view class="post-author">
@@ -158,6 +162,83 @@
       </view>
     </view>
 
+    <!-- 智能雷达（失物招领 FTS5 反向高精度召回） -->
+    <view class="radar-section card" wx:if="{{radarMatches.length > 0}}">
+      <view class="section-header flex-between">
+        <view class="flex-row" style="align-items: center; gap: 8rpx;">
+          <text class="radar-header-icon">🎯</text>
+          <text class="section-title">智能雷达</text>
+        </view>
+        <text class="radar-hint">另发现 {{radarMatches.length}} 条高相似{{radarLabel}}</text>
+      </view>
+      <view class="radar-list">
+        <view class="radar-item" wx:for="{{radarMatches}}" wx:key="postId" bindtap="onTapRadarMatch" data-id="{{item.postId}}">
+          <view class="radar-item-top flex-between">
+            <view class="radar-score-badge">相似度 {{item.score}}</view>
+            <text class="radar-item-title">{{item.title}}</text>
+          </view>
+          <view class="radar-reasons" wx:if="{{item.reasons.length > 0}}">
+            <text class="radar-reason-tag" wx:for="{{item.reasons}}" wx:for-item="r" wx:key="*this">{{r}}</text>
+          </view>
+          <text class="radar-excerpt">{{item.excerpt}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 意向出价（二手交易闪电撮合闭环） -->
+    <view class="offers-section card" wx:if="{{isTradePost && !postLoadFailed}}">
+      <view class="section-header flex-between">
+        <view class="flex-row" style="align-items: center; gap: 8rpx;">
+          <text class="offer-title-icon">💰</text>
+          <text class="section-title">意向出价</text>
+        </view>
+        <button
+          wx:if="{{!offersState.isSeller && !offersState.myOffer && !offersState.hasAccepted && !post.extra.soldAt}}"
+          class="make-offer-btn"
+          bindtap="onOpenOfferModal"
+        >
+          出个价
+        </button>
+      </view>
+
+      <view class="offers-notice notice-locked" wx:if="{{offersState.hasAccepted && !post.extra.soldAt}}">
+        🔒 卖家已与买家达成意向，交易已锁定
+      </view>
+      <view class="offers-notice notice-sold" wx:elif="{{post.extra.soldAt}}">
+        ✓ 该物品已完成交易
+      </view>
+
+      <view class="offers-list" wx:if="{{offersState.offers && offersState.offers.length > 0}}">
+        <view class="offer-card" wx:for="{{offersState.offers}}" wx:key="id">
+          <view class="offer-card-top flex-between">
+            <view class="offer-price-row flex-row">
+              <text class="offer-price">¥{{item.offerPrice}}</text>
+              <text class="offer-status-badge status-{{item.status}}">
+                {{item.status === 'accepted' || item.status === 'completed' ? '已锁定' : (item.status === 'pending' ? '待确认' : (item.status === 'rejected' ? '已拒绝' : '已取消'))}}
+              </text>
+              <text class="offer-buyer" wx:if="{{item.buyer}}">{{item.buyer.nickname}}</text>
+            </view>
+            <view class="offer-actions">
+              <block wx:if="{{offersState.isSeller && item.status === 'pending'}}">
+                <button class="btn-offer-accept" bindtap="onActOffer" data-id="{{item.id}}" data-action="accept" disabled="{{offerBusy}}">接受</button>
+                <button class="btn-offer-reject" bindtap="onActOffer" data-id="{{item.id}}" data-action="reject" disabled="{{offerBusy}}">拒绝</button>
+              </block>
+              <block wx:elif="{{!offersState.isSeller && item.status === 'pending'}}">
+                <button class="btn-offer-cancel" bindtap="onActOffer" data-id="{{item.id}}" data-action="cancel" disabled="{{offerBusy}}">取消</button>
+              </block>
+            </view>
+          </view>
+          <view class="offer-message" wx:if="{{item.message}}">
+            附言：{{item.message}}
+          </view>
+        </view>
+      </view>
+
+      <view class="offers-empty" wx:if="{{(!offersState.offers || offersState.offers.length === 0) && !post.extra.soldAt}}">
+        暂无意向出价，点击右上角抢先出价
+      </view>
+    </view>
+
     <view class="comment-section card" id="comment-section">
       <view class="section-header flex-between">
         <text class="section-title">评论 ({{comments.length}})</text>
@@ -191,6 +272,32 @@
         <button class="bar-action share-btn" open-type="share">
           <image class="bar-icon" src="/images/icon_share.png" mode="aspectFit"></image>
         </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 意向出价弹窗 -->
+  <view class="offer-modal-mask" wx:if="{{showOfferModal}}" bindtap="onCloseOfferModal">
+    <view class="offer-modal-content" catchtap="onNoop">
+      <view class="offer-modal-header flex-between">
+        <text class="offer-modal-title">发起意向出价</text>
+        <text class="offer-modal-close" bindtap="onCloseOfferModal">✕</text>
+      </view>
+      <view class="offer-modal-body">
+        <view class="offer-input-group">
+          <text class="offer-input-label">出价金额 (元)</text>
+          <view class="offer-input-wrap flex-row">
+            <text class="currency-symbol">¥</text>
+            <input class="offer-number-input" type="digit" placeholder="输入期望购买价格" value="{{offerPriceInput}}" bindinput="onOfferPriceInput" />
+          </view>
+        </view>
+        <view class="offer-input-group">
+          <text class="offer-input-label">留言附言 (选填)</text>
+          <input class="offer-text-input" placeholder="如：可随时自提 / 诚意购买" value="{{offerMessageInput}}" bindinput="onOfferMessageInput" maxlength="100" />
+        </view>
+      </view>
+      <view class="offer-modal-footer">
+        <button class="offer-submit-btn" bindtap="onSubmitOffer" disabled="{{offerBusy}}" loading="{{offerBusy}}">确认出价</button>
       </view>
     </view>
   </view>

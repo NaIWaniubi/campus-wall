@@ -10,6 +10,10 @@ export default defineConfig({
     },
   },
   test: {
+    // 集成测试共享同一个 SQLite 文件（api/data.db，WAL 模式），文件级并行会互相踩踏：
+    // 一个用例删表/删行时另一个用例正在读，偶发出现「单跑绿、全量红」。
+    // 测试量很小（149 个用例约 20s），串行执行换取确定性，避免 CI 偶发红。
+    fileParallelism: false,
     projects: [
       {
         test: {
@@ -17,6 +21,7 @@ export default defineConfig({
           environment: 'node',
           include: ['api/tests/**/*.test.ts'],
           pool: 'threads',
+          poolOptions: { threads: { singleThread: true } },
         },
       },
       {

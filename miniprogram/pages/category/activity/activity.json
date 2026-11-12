@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "校园活动",
+  "usingComponents": {
+    "skeleton": "/components/skeleton/skeleton",
+    "post-card": "/components/post-card/post-card",
+    "empty-state": "/components/empty-state/empty-state",
+    "load-more": "/components/load-more/load-more",
+    "subscribe-btn": "/components/subscribe-btn/subscribe-btn"
+  }
+}

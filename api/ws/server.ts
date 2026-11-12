@@ -13,11 +13,38 @@ import { attach, detach, subscribeTopic, unsubscribeTopic } from './hub.js';
 import { handleMessage } from './handlers/message.js';
 
 const HELLO_TIMEOUT_MS = 10_000;
+/** 单帧上限：业务消息最长 2000 字，64KB 足够且能挡住大帧压内存（ws 默认 100MB） */
+const MAX_PAYLOAD_BYTES = 64 * 1024;
+/** 连接数上限：防止未认证连接耗尽内存；校园规模 2000 并发绰绰有余 */
+const MAX_CONNECTIONS = 2000;
+/** 心跳间隔：清理半开连接（手机端切网/锁屏后常见） */
+const HEARTBEAT_MS = 30_000;
 
 export function attachWebSocket(server: Server): WebSocketServer {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
+
+  // 心跳：给每个连接打标记，下个周期仍未收到 pong 的判定为死连接并断开
+  const alive = new WeakMap<object, boolean>();
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (alive.get(ws) === false) {
+        try { ws.terminate(); } catch { /* noop */ }
+        continue;
+      }
+      alive.set(ws, false);
+      try { ws.ping(); } catch { /* noop */ }
+    }
+  }, HEARTBEAT_MS);
+  heartbeat.unref?.();
+  wss.on('close', () => clearInterval(heartbeat));
 
   server.on('upgrade', (req, socket, head) => {
+    if (wss.clients.size >= MAX_CONNECTIONS) {
+      // 超限直接拒绝握手，避免继续分配连接对象
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     if (!req.url?.startsWith('/ws')) {
       socket.destroy();
       return;
@@ -26,13 +53,26 @@ export function attachWebSocket(server: Server): WebSocketServer {
   });
 
   wss.on('connection', (ws) => {
+    alive.set(ws, true);
+    ws.on('pong', () => alive.set(ws, true));
+
     let userId: number | null = null;
     let conn: ReturnType<typeof attach> | null = null;
+    // hello 之前的帧数上限：未认证连接只能试探有限次，防止刷帧耗 CPU
+    let preHelloFrames = 0;
     const helloTimer = setTimeout(() => {
       try { ws.close(4001, 'hello timeout'); } catch { /* noop */ }
     }, HELLO_TIMEOUT_MS);
 
     ws.on('message', async (raw) => {
+      if (userId === null) {
+        preHelloFrames++;
+        if (preHelloFrames > 5) {
+          try { ws.close(4008, 'too many frames before hello'); } catch { /* noop */ }
+          return;
+        }
+      }
+
       let parsed: TClientMsg;
       try {
         parsed = ClientMsg.parse(JSON.parse(raw.toString()));

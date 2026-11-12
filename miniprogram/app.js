@@ -60,11 +60,10 @@ App({
 
   globalData: {
     userInfo: null,
-    // 生产/真机应指向 HTTPS 后端域名；开发回退到本机。
-    // 构建时可通过条件编译注入（如 uni-app 的 process.env.API_BASE_URL 或自定义常量）。
-    baseUrl: (typeof process !== 'undefined' && process.env && process.env.API_BASE_URL) ||
-      (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '') ||
-      'http://localhost:3001/api',
+    // 后端地址由 miniprogram/config.js 按微信环境（develop/trial/release）提供。
+    // 这里刻意留空：留空才能让 request.js 回落到按环境配置；
+    // 若在此写死 localhost，真机会请求失败（localhost 指向手机自身）。
+    baseUrl: '',
     token: '',
     campusList: ['主校区', '南校区', '北校区', '东校区'],
     currentCampus: '主校区'

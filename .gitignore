@@ -81,3 +81,10 @@ docs/.vitepress/dist/
 
 # Coverage reports
 coverage/
+
+# ZCode Sites 部署工作区（含 node_modules，不入库）
+.zcode-site/
+
+# 部署打包产物（由 scripts/build-site-bundle.mjs 生成，不入库）
+api/server.bundle.mjs
+api/seed.bundle.mjs

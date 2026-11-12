@@ -11,12 +11,29 @@ export function fail(res: Response, message: string, code: number = 400, status:
   res.status(status).json({ code, message, data: null });
 }
 
+/**
+ * 401/403 使用真实 HTTP 状态码：body.code 保留给前端区分业务码（拦截器读的是 body.code），
+ * HTTP 状态码则供 nginx/WAF/监控识别鉴权失败，而不是把越权全记成 200（审计 P1-11）。
+ */
 export function unauthorized(res: Response, message: string = '未登录或登录已过期') {
-  res.status(200).json({ code: 401, message, data: null });
+  res.status(401).json({ code: 401, message, data: null });
 }
 
 export function forbidden(res: Response, message: string = '无权限访问') {
-  res.status(200).json({ code: 403, message, data: null });
+  res.status(403).json({ code: 403, message, data: null });
+}
+
+/**
+ * 安全整数解析：query/body 里传非数字（?page=abc）时 parseInt 得到 NaN，
+ * 而 Math.max(1, NaN) 仍是 NaN，直接进 SQL 的 LIMIT/OFFSET 会抛
+ * "datatype mismatch" 变成 500。所有分页/时长参数都走这里。
+ */
+export function toInt(value: unknown, fallback: number, min?: number, max?: number): number {
+  const n = Number.parseInt(String(value ?? ''), 10);
+  let out = Number.isFinite(n) ? n : fallback;
+  if (min !== undefined && out < min) out = min;
+  if (max !== undefined && out > max) out = max;
+  return out;
 }
 
 /**

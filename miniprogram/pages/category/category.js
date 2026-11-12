@@ -34,6 +34,7 @@ Page({
       trade: '/pages/category/trade/trade',
       carshare: '/pages/category/carshare/carshare',
       team: '/pages/category/team/team',
+      activity: '/pages/category/activity/activity',
       daily: '/pages/category/daily/daily'
     }
     wx.navigateTo({ url: `${urlMap[id]}?category=${id}` })

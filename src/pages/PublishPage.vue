@@ -4,10 +4,10 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText } from '@lucide/vue'
+import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText, Sparkles, Wand2 } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { postApi, uploadApi, draftApi } from '@/utils/api'
+import { postApi, uploadApi, draftApi, aiApi } from '@/utils/api'
 import { assessRisk } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -128,6 +128,45 @@ function applyDraftData(d: any) {
   form.images = d.images || []
   form.isAnonymous = !!d.isAnonymous
   form.extraFields = d.extraFields || {}
+}
+
+// ── AI 一键成稿（V3）：一句话 → 标题 / 正文 / 板块 / 价格 / 标签 ──
+const aiRaw = ref('')
+const aiWriting = ref(false)
+const aiTags = ref<string[]>([])
+
+async function aiCompose() {
+  if (!userStore.isLoggedIn) {
+    toast.info('登录后可用 AI 成稿')
+    return
+  }
+  const raw = (aiRaw.value || `${form.title} ${form.content}`).trim()
+  if (!raw) {
+    toast.info('先用一句话说清要点，例如：出一个九成新 iPad，1500 元，可小刀')
+    return
+  }
+  aiWriting.value = true
+  try {
+    const res: any = await aiApi.draft({ raw, sectionId: form.sectionId || undefined })
+    const d = res?.data
+    if (!d || !d.title) throw new Error('empty draft')
+    form.title = d.title
+    form.content = d.content || form.content
+    if (d.sectionId) form.sectionId = Number(d.sectionId)
+    // 价格只填空白项，避免覆盖用户已手填的值
+    if (d.price && !form.extraFields.price) setExtra('price', String(d.price))
+    aiTags.value = Array.isArray(d.tags) ? d.tags.slice(0, 4) : []
+    // 标签以话题形式挂在正文末尾（帖子模型无独立标签字段）
+    if (aiTags.value.length) {
+      const tagLine = aiTags.value.map((t: string) => `#${t}`).join(' ')
+      if (!form.content.includes(tagLine)) form.content = `${form.content}\n\n${tagLine}`
+    }
+    toast.success(d.offline ? '已按站内规则生成草稿，可继续修改' : 'AI 已生成，请按实际情况修改')
+  } catch {
+    toast.error('AI 成稿失败，请稍后重试或直接手写')
+  } finally {
+    aiWriting.value = false
+  }
 }
 
 watch(form, () => {
@@ -393,7 +432,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: var(--color-bg)" pb-24">
+  <div class="min-h-screen pb-24" style="background: var(--color-bg)">
     <!-- 顶部 -->
     <header class="hero sticky top-0 z-10">
       <div class="max-w-[960px] mx-auto flex items-center justify-between h-14 px-3">
@@ -426,6 +465,45 @@ async function handleSubmit() {
       <div v-if="editId && editingPost?.rejectReason" class="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs leading-relaxed">
         <ShieldAlert class="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span>该帖曾被驳回：{{ editingPost.rejectReason }}。请修改内容后保存，将重新提交审核</span>
+      </div>
+
+      <!-- AI 一键成稿（V3）：把大模型放进发布主链路，而不是角落聊天框 -->
+      <div class="ai-trail bg-white rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+            style="background: var(--grad-brand)">
+            <Wand2 class="w-3.5 h-3.5" />
+          </span>
+          <span class="text-sm font-semibold text-zinc-800">AI 一键成稿</span>
+          <span class="dopa-chip ml-auto">30 秒发一条</span>
+        </div>
+        <div class="flex gap-2">
+          <input
+            v-model="aiRaw"
+            type="text"
+            maxlength="120"
+            placeholder="一句话说清要点：出九成新 iPad，1500 元，可小刀"
+            class="flex-1 min-w-0 px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none text-sm"
+            @keyup.enter="aiCompose"
+          />
+          <button
+            type="button"
+            :disabled="aiWriting"
+            class="btn-grad px-4 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60 flex items-center gap-1.5 flex-shrink-0"
+            @click="aiCompose"
+          >
+            <Loader2 v-if="aiWriting" class="w-4 h-4 animate-spin" />
+            <Sparkles v-else class="w-4 h-4" />
+            {{ aiWriting ? '生成中' : '生成' }}
+          </button>
+        </div>
+        <p class="mt-2 text-[11px] text-zinc-400 leading-relaxed">
+          自动补全标题、正文、板块与价格；生成后请按实际情况修改再发布（未接入大模型时按站内规则生成）
+        </p>
+        <div v-if="aiTags.length" class="mt-2 flex flex-wrap gap-1.5">
+          <span v-for="t in aiTags" :key="t" class="cat-tag"
+            style="background: rgba(109,59,245,.1); color: var(--color-brand-500)">#{{ t }}</span>
+        </div>
       </div>
 
       <!-- 板块选择 -->

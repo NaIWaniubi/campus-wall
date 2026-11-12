@@ -7,7 +7,7 @@
   <block wx:if="{{loaded}}">
     <user-row wx:for="{{users}}" wx:key="id" user="{{item}}" data-id="{{item.id}}" bindtap="onTapUser"></user-row>
     <view class="list-end gray-color" wx:if="{{users.length > 0 && !hasMore}}">没有更多了</view>
-    <empty-state wx:if="{{users.length === 0}}" text="{{type === 'followers' ? '还没有粉丝' : '还没有关注的人'}}" subText="去帖子详情页关注感兴趣的同学吧" customIcon="👥"></empty-state>
+    <empty-state wx:if="{{!loading && users.length === 0}}" text="{{type === 'followers' ? '还没有粉丝' : '还没有关注的人'}}" subText="去帖子详情页关注感兴趣的同学吧" customIcon="👥"></empty-state>
   </block>
 
   <view class="list-loading gray-color" wx:if="{{loading}}">加载中...</view>

@@ -62,7 +62,8 @@ Page({
 
   /** 关键词搜索：GET /posts?keyword=&sectionId=（分页形状，hasMore 驱动加载更多） */
   async doSearch(keyword) {
-    this.setData({ loadMoreStatus: this.data.page > 1 ? 'loading' : 'more' })
+    // 首屏也要进入 loading：否则请求返回前会先闪一下「未找到相关内容」
+    this.setData({ loadMoreStatus: 'loading' })
     try {
       const params = { keyword, page: this.data.page, pageSize: this.data.pageSize }
       if (this.data.activeFilter !== 'all') params.category = this.data.activeFilter
@@ -76,6 +77,12 @@ Page({
     } catch (e) {
       this.setData({ results: this.data.page === 1 ? [] : this.data.results, hasMore: false, loadMoreStatus: 'error' })
     }
+  },
+
+  /** 搜索失败后的重试：保持当前关键词与筛选，重跑第一页 */
+  onRetrySearch() {
+    this.setData({ page: 1, results: [], hasMore: true })
+    this.doSearch(this.data.keyword.trim())
   },
 
   onLoadMore() {

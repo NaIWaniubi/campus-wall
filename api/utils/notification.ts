@@ -1,10 +1,11 @@
 /**
  * 通知去重工具：生成通知前检查同一 (user_id, type, related_id) 近期是否已存在，
  * 存在则更新原记录（刷新内容、置为未读、更新时间），避免重复刷屏。
- * 写入成功后向 WS notifications 主题广播 notification:push（仅在线订阅者收到，离线走 REST 拉取）。
+ * 写入成功后按 user_id 定向推送 notification:push（仅目标用户在线连接收到，离线走 REST 拉取）。
+ * 注意：不可用主题广播——订阅是客户端自选的，任何登录用户订阅该主题即可旁听他人通知。
  */
 import { db } from '../db.js';
-import { broadcastTopic } from '../ws/hub.js';
+import { sendTo } from '../ws/hub.js';
 import { NotificationPush } from '../ws/protocol.js';
 import { isPushEnabled, sendPushToUser } from './push.js';
 import { isWxPushEnabled, sendWxSubscribeMessage } from './wx-push.js';
@@ -46,9 +47,9 @@ export function upsertNotification(
     notificationId = Number(r.lastInsertRowid);
   }
 
-  // WS 实时广播：失败不影响通知落库（离线用户由 REST 拉取兜底）
+  // WS 实时推送：定向发给通知所属用户（失败不影响通知落库，离线用户由 REST 拉取兜底）
   try {
-    broadcastTopic('notifications', NotificationPush.parse({
+    sendTo(user_id, NotificationPush.parse({
       type: 'notification:push',
       notificationId,
       kind: type,

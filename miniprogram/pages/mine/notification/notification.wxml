@@ -5,6 +5,7 @@
     </view>
   </view>
   <view class="notification-list">
+    <skeleton wx:if="{{loading && !notifications.length}}" type="post" count="4" />
     <view class="notification-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}">
       <view class="notification-icon-wrap">
         <text class="notification-icon">{{item.iconText}}</text>
@@ -17,6 +18,7 @@
         <text class="notification-content text-ellipsis-2">{{item.content}}</text>
       </view>
     </view>
-    <empty-state wx:if="{{notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
+    <empty-state wx:if="{{loadFailed && notifications.length === 0}}" type="error" text="加载失败" bind:retry="loadNotifications"></empty-state>
+    <empty-state wx:elif="{{!loading && notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
   </view>
 </view>

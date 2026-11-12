@@ -4,7 +4,7 @@
 import { Router, type Request, type Response } from 'express';
 import fs from 'fs';
 import { getSetting, setSetting } from '../db.js';
-import { authRequired, adminRequired } from '../middleware/auth.js';
+import { authRequired, superAdminRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
 import { DEFAULT_MODELS } from '../utils/ai.js';
 import { aiStats, getKbWritePath } from './ai.js';
@@ -13,7 +13,7 @@ import { logger } from '../utils/logger.js';
 const KB_MAX_BYTES = 64 * 1024;
 
 const router = Router();
-router.use(authRequired, adminRequired);
+router.use(authRequired, superAdminRequired);
 
 // 读取官网知识库
 router.get('/knowledge', (_req: Request, res: Response) => {

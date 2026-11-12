@@ -98,12 +98,19 @@ async function main() {
     await stubAnnouncements(page)
     await login(page)
 
-    // Post detail: click first card on home
-    await page.goto(`${BASE}/`)
-    const firstCard = page.locator('div.cursor-pointer').first()
-    await firstCard.waitFor({ timeout: 20_000 })
-    await firstCard.click()
-    await page.waitForURL(/\/post\/\d+/, { timeout: 15_000 })
+    // Post detail: 动态挑一条互动最多的失物帖（有评论/点赞才有「有人在用」的说服力）
+    let detailId = 1
+    try {
+      const resp = await fetch(`${BASE}/api/posts?sectionId=2&pageSize=20`)
+      const json = await resp.json()
+      const list = (json && json.data && json.data.list) || []
+      const best = list
+        .filter((p) => !p.isAnonymous)
+        .sort((a, b) => (b.commentCount + b.likeCount) - (a.commentCount + a.likeCount))[0]
+      if (best) detailId = best.id
+    } catch { /* 回退到 1 */ }
+    await page.goto(`${BASE}/post/${detailId}`)
+    await page.waitForTimeout(2500)
     await shot(page, '03-post-detail.png')
 
     // AI assistant: floating bot appears after login

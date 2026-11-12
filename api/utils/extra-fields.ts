@@ -7,7 +7,7 @@
  */
 export const EXTRA_FIELD_WHITELIST = [
   'price', 'contact', 'location', 'tradeType',
-  'condition', 'time', 'itemType', 'organizer', 'direction',
+  'condition', 'time', 'itemType', 'organizer', 'direction', 'campus',
 ] as const;
 
 export const MAX_EXTRA_VALUE_LEN = 200;

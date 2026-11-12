@@ -64,11 +64,29 @@ describe('createRateLimiter 滑动窗口限流', () => {
     expect(run(limiter, req).passed).toBe(true);
   });
 
-  it('维度 key 隔离：不同 IP / 不同学号互不共享额度', () => {
+  it('维度 key 隔离：不同 IP 互不共享额度', () => {
     const limiter = createRateLimiter({ windowMs: 60_000, max: 1, name: 'dims' });
     expect(run(limiter, mockReq({ ip: '1.1.1.1' })).passed).toBe(true);
     expect(run(limiter, mockReq({ ip: '1.1.1.1' })).passed).toBe(false); // 同 IP 第 2 次 → 拦
     expect(run(limiter, mockReq({ ip: '2.2.2.2' })).passed).toBe(true);  // 换 IP → 独立额度
-    expect(run(limiter, mockReq({ ip: '2.2.2.2', studentId: '20230001' })).passed).toBe(true); // 换学号 → 独立额度
+  });
+
+  it('轮换 UA 不能绕过限流（UA 由客户端伪造，不得参与桶 key）', () => {
+    const limiter = createRateLimiter({ windowMs: 60_000, max: 2, name: 'ua' });
+    expect(run(limiter, mockReq({ ip: '3.3.3.3', ua: 'A' })).passed).toBe(true);
+    expect(run(limiter, mockReq({ ip: '3.3.3.3', ua: 'B' })).passed).toBe(true);
+    // 第 3 次换 UA 仍应被同一 IP 桶拦住
+    expect(run(limiter, mockReq({ ip: '3.3.3.3', ua: 'C' })).passed).toBe(false);
+  });
+
+  it('轮换学号不能无限摊薄单 IP 配额（IP 兜底桶 = max * 3）', () => {
+    const limiter = createRateLimiter({ windowMs: 60_000, max: 1, name: 'sid' });
+    const passed = [];
+    for (let i = 0; i < 6; i++) {
+      passed.push(run(limiter, mockReq({ ip: '4.4.4.4', studentId: `2023${i}` })).passed);
+    }
+    // 细分桶各放行 1 次，但 IP 兜底桶上限 3 次 → 前 3 次放行，其后全拦
+    expect(passed.filter(Boolean).length).toBe(3);
+    expect(passed[5]).toBe(false);
   });
 });

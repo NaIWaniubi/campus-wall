@@ -1,5 +1,5 @@
 /**
- * 生成演示帖子封面（抽象渐变海报风格，贴合 V2 极光视觉）
+ * 生成演示帖子封面（抽象渐变海报风格，贴合 V3 多巴胺视色）
  * 输出：api/demo-assets/cover-<id>.jpg + cover-<id>.jpg.thumb.webp
  * 仅开发机执行；产物随 seed 一起进部署包，运行时不需要 sharp 生成。
  *
@@ -18,15 +18,15 @@ fs.mkdirSync(OUT, { recursive: true });
 const COVERS = [
   { id: 'ipad', a: '#3B82F6', b: '#8B5CF6', c: '#22D3EE', motif: 'device' },
   { id: 'bike', a: '#F59E0B', b: '#EF4444', c: '#FDE68A', motif: 'rings' },
-  { id: 'books', a: '#0E7C67', b: '#16A085', c: '#A7F3D0', motif: 'stack' },
+  { id: 'books', a: '#7C3AED', b: '#4F46E5', c: '#DDD6FE', motif: 'stack' },
   { id: 'card', a: '#06B6D4', b: '#3B82F6', c: '#E0F2FE', motif: 'card' },
   { id: 'keys', a: '#8B5CF6', b: '#EC4899', c: '#FBCFE8', motif: 'rings' },
   { id: 'confession', a: '#FB7185', b: '#F43F5E', c: '#FFE4E6', motif: 'heart' },
   { id: 'rain', a: '#475569', b: '#0EA5E9', c: '#BAE6FD', motif: 'rain' },
   { id: 'stage', a: '#6D5BD0', b: '#C4538C', c: '#FDE68A', motif: 'stage' },
   { id: 'club', a: '#EC4899', b: '#8B5CF6', c: '#FCE7F3', motif: 'spark' },
-  { id: 'car', a: '#10B981', b: '#0EA5E9', c: '#D1FAE5', motif: 'road' },
-  { id: 'study', a: '#0E7C67', b: '#3FA9E0', c: '#E0F2FE', motif: 'grid' },
+  { id: 'car', a: '#C026D3', b: '#6D3BF5', c: '#F5D0FE', motif: 'road' },
+  { id: 'study', a: '#4F46E5', b: '#22D3EE', c: '#E0F2FE', motif: 'grid' },
   { id: 'food', a: '#F97316', b: '#EF4444', c: '#FED7AA', motif: 'bowl' },
 ];
 

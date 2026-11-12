@@ -28,13 +28,13 @@ export default defineConfig({
       // 单入口：重置隔离库 → 灌种子 → 起服务（顺序保证无文件锁冲突）
       command: 'node scripts/e2e-backend.mjs',
       url: 'http://localhost:3001/api/health',
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
     {
       command: 'npx vite --port 5173',
       url: 'http://localhost:5173',
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
   ],

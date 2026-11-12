@@ -1,5 +1,7 @@
 .page-category {
   padding: 24rpx;
+  /* 底部留白避开自定义 tabBar（104rpx + 安全区），否则「校园活动」卡与按钮被压住 */
+  padding-bottom: calc(176rpx + env(safe-area-inset-bottom));
   background: #F5F6F8;
   min-height: 100vh;
 }

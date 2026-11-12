@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 移动端底部 TabBar：首页 / 话题 / 发布 / 消息 / 我的
- * 逐项对齐原生小程序 app.json 的 tabBar（color #A4B0BE、selectedColor #16A085、白底）。
+ * V3：激活项用品牌紫渐变文字 + 紫色投影（原生小程序 tabBar 的青绿已弃用）。
  * 仅在 < 640px 显示，且只在主 Tab 页面出现（详情页/登录页/后台自带底部操作条，不显示）。
  */
 import { computed } from 'vue'
@@ -70,7 +70,7 @@ function go(to: string, key: string) {
               :is="t.icon"
               class="w-[22px] h-[22px] transition-transform"
               :style="isActive(t.key)
-                ? { color: 'var(--color-brand-400)', filter: 'drop-shadow(0 4px 8px rgba(22,160,133,.35))', transform: 'translateY(-1px)' }
+                ? { color: 'var(--color-brand-400)', filter: 'drop-shadow(0 4px 10px rgba(109,59,245,.45))', transform: 'translateY(-1px)' }
                 : { color: '#A4B0BE' }"
             />
             <span

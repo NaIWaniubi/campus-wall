@@ -64,7 +64,7 @@ function adaptQuery(oldUrl, params) {
     }
     if (q.sort === 'latest') q.sort = 'new'
     delete q.feed       // 关注流暂无对应能力，回退默认热度流
-    delete q.campus     // 校区筛选暂无对应参数
+    // campus 现由后端 extra_fields.campus 支持，不再丢弃
   }
   // 子类型裸值归一：发布层把旧 subType 存进 extraFields.itemType，
   // 新后端筛选用 key:val 形态，故裸值统一补 itemType: 前缀
@@ -175,7 +175,7 @@ function normalizePost(p) {
     subType: extra.itemType || extra.subType || '',
     extra,
     tags: p.tags || [],
-    campus: p.campus || '',
+    campus: extra.campus || p.campus || '',
     location: extra.location || '',
     isLiked: !!p.liked,
     likes: p.likeCount || 0,

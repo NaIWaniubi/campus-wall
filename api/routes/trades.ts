@@ -7,6 +7,7 @@ import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { upsertNotification } from '../utils/notification.js';
 import { cacheInvalidate } from '../utils/cache.js';
+import { trackEvent, touchActive } from '../utils/events.js';
 
 const router = Router();
 
@@ -21,7 +22,16 @@ function creditDelta(rating: number): number {
 }
 
 function getPost(id: number): any {
-  return db.prepare("SELECT id, user_id, title, status, extra_fields FROM posts WHERE id = ? AND status != 'deleted'").get(id);
+  return db.prepare(
+    `SELECT p.id, p.user_id, p.title, p.status, p.extra_fields, s.name AS section_name
+     FROM posts p LEFT JOIN sections s ON s.id = p.section_id
+     WHERE p.id = ? AND p.status != 'deleted'`
+  ).get(id);
+}
+
+/** 交易闭环只对二手交易类板块开放：否则任何帖子都能被"标记成交"，进而给任意用户打星刷/扣信誉分 */
+function isTradeSection(sectionName: string | null | undefined): boolean {
+  return /二手|交易|闲置|出售|转让/.test(sectionName || '');
 }
 
 // 标记交易完成（仅帖子作者；posts.extra_fields 写入 soldAt 与可选 soldTo 买家）
@@ -30,6 +40,9 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
   const post = getPost(postId);
   if (!post) return fail(res, '帖子不存在', 404, 404);
   if (post.user_id !== req.currentUser!.id) return forbidden(res, '只有发布者可以标记交易完成');
+  if (!isTradeSection(post.section_name)) {
+    return fail(res, '仅二手交易板块的帖子可以成交并互评');
+  }
 
   const extra = JSON.parse(post.extra_fields || '{}');
   if (extra.soldAt) return fail(res, '该交易已标记完成');
@@ -54,6 +67,8 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
     "UPDATE trade_offers SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'accepted'"
   ).run(postId);
 
+  trackEvent(req.currentUser!.id, 'trade_complete', postId, { soldTo: extra.soldTo ?? null });
+  touchActive(req.currentUser!.id);
   success(res, { postId, soldAt: extra.soldAt, soldTo: extra.soldTo ?? null }, '交易已完成');
 });
 
@@ -84,18 +99,37 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
 
   const post = getPost(postId);
   if (!post) return fail(res, '帖子不存在', 404, 404);
+  if (!isTradeSection(post.section_name)) return fail(res, '仅二手交易板块支持互评');
 
   // 仅已标记完成的交易可评价
   const extra = JSON.parse(post.extra_fields || '{}');
   if (!extra.soldAt) return fail(res, '交易完成后才能评价');
 
-  // 评价对象：作者优先用登记的买家(soldTo)，未登记则须显式指定；非作者固定评帖子作者
+  // 评价对象必须是交易对手方：卖家只能评登记的买家，买家只能评卖家。
+  // 未登记的第三方既不能评卖家（否则可批量扣分），也不能被卖家指定（否则可互刷信誉分）。
   const isAuthor = post.user_id === req.currentUser!.id;
+
+  // 成交买家：优先 extra_fields.soldTo，其次已接受的意向出价（撮合闭环的权威来源）
+  let buyerId = Number(extra.soldTo) || 0;
+  if (!buyerId) {
+    const accepted = db.prepare(
+      "SELECT buyer_id FROM trade_offers WHERE post_id = ? AND status IN ('accepted','completed') ORDER BY updated_at DESC LIMIT 1"
+    ).get(postId) as any;
+    buyerId = Number(accepted?.buyer_id) || 0;
+  }
+  if (!buyerId) return fail(res, '该交易未登记买家，无法评价');
+  if (buyerId === post.user_id) return fail(res, '买家与卖家不能是同一人');
+
   let rateeId: number;
   if (isAuthor) {
-    rateeId = Number(targetUserId) || Number(extra.soldTo) || 0;
-    if (!rateeId) return fail(res, '请先在标记完成时登记买家，或指定要评价的用户');
+    // 卖家评买家：targetUserId 若传入必须与登记买家一致，防止指定任意人刷分
+    if (targetUserId !== undefined && Number(targetUserId) !== buyerId) {
+      return forbidden(res, '只能评价本单登记的买家');
+    }
+    rateeId = buyerId;
   } else {
+    // 非卖家只有登记买家本人才有评价资格
+    if (req.currentUser!.id !== buyerId) return forbidden(res, '只有交易双方可以互评');
     rateeId = post.user_id;
   }
   if (rateeId === req.currentUser!.id) return fail(res, '不能评价自己');
@@ -207,6 +241,7 @@ router.post('/trades/:postId/offers', authRequired, (req, res) => {
   if (!post) return fail(res, '帖子不存在', 404, 404);
   if (post.status !== 'published') return fail(res, '帖子不可见，无法出价', 404, 404);
   if (post.user_id === req.currentUser!.id) return fail(res, '不能对自己的帖子出价');
+  if (!isTradeSection(post.section_name)) return fail(res, '仅二手交易板块支持意向出价');
 
   const extra = JSON.parse(post.extra_fields || '{}');
   if (extra.soldAt) return fail(res, '该物品已售出');
@@ -240,6 +275,7 @@ router.post('/trades/:postId/offers', authRequired, (req, res) => {
     postId
   );
 
+  trackEvent(req.currentUser!.id, 'offer_create', postId, { offerPrice: price });
   const offer = getOffer(result.lastInsertRowid as number);
   success(res, formatOffer(offer), '出价已发送，等待卖家确认');
 });
@@ -283,12 +319,20 @@ router.post('/trades/offers/:offerId/accept', authRequired, (req, res) => {
   if (offer.seller_id !== req.currentUser!.id) return forbidden(res, '只有卖家可以接受出价');
   if (offer.status !== 'pending') return fail(res, '该出价已处理');
 
-  db.transaction(() => {
-    db.prepare("UPDATE trade_offers SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(offer.id);
+  // 条件更新做 CAS：并发双接受时只有第一条 pending→accepted 生效，
+  // 先查后改在单/多实例下都会让同一出价被接受两次（changes 为 0 说明已被抢先）。
+  const claimed = db.transaction(() => {
+    const r = db.prepare(
+      "UPDATE trade_offers SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'"
+    ).run(offer.id);
+    if (r.changes === 0) return false;
     db.prepare(
       "UPDATE trade_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'pending' AND id != ?"
     ).run(offer.post_id, offer.id);
+    return true;
   })();
+
+  if (!claimed) return fail(res, '该出价已处理');
 
   upsertNotification(
     offer.buyer_id,

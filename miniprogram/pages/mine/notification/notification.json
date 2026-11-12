@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "消息通知",
   "usingComponents": {
-    "empty-state": "/components/empty-state/empty-state"
+    "empty-state": "/components/empty-state/empty-state",
+    "skeleton": "/components/skeleton/skeleton"
   }
 }

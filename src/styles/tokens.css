@@ -5,30 +5,37 @@
  */
 
 :root {
-  /* === 品牌色：校园墙青绿（对齐原生小程序 tokens: brand #16A085 / soft #20C4A4 / strong #0E7C67）
-     对比度约束（contrast.test.ts 守住）：brand-500 作为文字/白字底色必须 ≥4.5:1，
-     因此 500 取小程序里的 strong 档 #0E7C67（5.1:1）；小程序里的 #16A085 落在 400 档，
-     用于渐变、图标、浅底强调色，不承载白字正文。 */
-  --color-brand-50:  #E8F8F4;
-  --color-brand-100: #C9EFE7;
-  --color-brand-200: #9FE3D6;
-  --color-brand-300: #64D8CB;
-  --color-brand-400: #16A085;
-  --color-brand-500: #0E7C67;
-  --color-brand-600: #0A6A58;
-  --color-brand-700: #08574A;
-  --color-brand-800: #06453B;
-  --color-brand-900: #04352D;
+  /* === 品牌色：青春紫（V3）——彻底弃用「绿白」
+     主色 violet #6D3BF5（白字 5.9:1，过 WCAG AA），辅色品红/珊瑚/青柠做多巴胺层次。
+     contrast.test.ts 守住：brand-500/600 白字 ≥4.5:1、brand-500 作文字 ≥4.5:1。 */
+  --color-brand-50:  #F1ECFE;
+  --color-brand-100: #E0D5FD;
+  --color-brand-200: #C4B0FB;
+  --color-brand-300: #A88BF9;
+  --color-brand-400: #8B5CF6;
+  --color-brand-500: #6D3BF5;
+  --color-brand-600: #5B27D6;
+  --color-brand-700: #4A1DAF;
+  --color-brand-800: #3A1588;
+  --color-brand-900: #2A0F63;
 
-  /* === 彩色体系（V2：活泼多彩 + 高级质感） ===
-     aurora 极光渐变用于头部/装饰光斑；分类色用于标签、卡片描边与图标底。
-     白色文字只压在深色 stop 上（#0E7C67 / #5B4BD1 等对比度 ≥4.5:1）。 */
-  --grad-aurora: linear-gradient(125deg, #0E7C67 0%, #13A08A 26%, #3FA9E0 52%, #6D5BD0 76%, #C4538C 100%);
-  --grad-aurora-soft: linear-gradient(125deg, #16A085 0%, #3FA9E0 50%, #8B5CF6 100%);
-  --grad-warm: linear-gradient(135deg, #F59E0B 0%, #F97316 60%, #EF4444 100%);
-  --grad-cool: linear-gradient(135deg, #06B6D4 0%, #3B82F6 55%, #6D5BD0 100%);
-  --grad-candy: linear-gradient(135deg, #EC4899 0%, #C4538C 50%, #8B5CF6 100%);
-  --grad-mint: linear-gradient(135deg, #0E7C67 0%, #16A085 55%, #34D399 100%);
+  /* === 多巴胺辅助色（标签 / 图标底 / 装饰光斑） === */
+  --dopa-pink:    #FF4D8D;
+  --dopa-coral:   #FF7A45;
+  --dopa-cyan:    #22D3EE;
+  --dopa-lime:    #A3E635;
+  --dopa-amber:   #FBBF24;
+  --dopa-indigo:  #4F46E5;
+
+  /* === 彩色体系（V3：多巴胺青春感） ===
+     aurora 极光渐变（紫→品红→粉）用于头部与装饰光斑；八色轮分类色用于标签、
+     卡片描边与图标底。白色文字只压在深色 stop 上（各 stop 均 ≥4.5:1）。 */
+  --grad-aurora: linear-gradient(125deg, #5B21C9 0%, #7C3AED 30%, #C026D3 62%, #FF4D8D 100%);
+  --grad-aurora-soft: linear-gradient(125deg, #6D3BF5 0%, #A855F7 55%, #FF4D8D 100%);
+  --grad-warm: linear-gradient(135deg, #FF7A45 0%, #FF4D8D 60%, #DB2777 100%);
+  --grad-cool: linear-gradient(135deg, #22D3EE 0%, #4F46E5 55%, #6D3BF5 100%);
+  --grad-candy: linear-gradient(135deg, #FF4D8D 0%, #C026D3 55%, #7C3AED 100%);
+  --grad-mint: linear-gradient(135deg, #A3E635 0%, #22D3EE 55%, #4F46E5 100%);
 
   /* 彩色光晕阴影：悬浮/按钮用，比纯黑阴影更“高级” */
   --shadow-lift: 0 10px 30px -12px rgb(20 24 40 / 0.22), 0 2px 6px rgb(20 24 40 / 0.06);
@@ -37,16 +44,16 @@
   --shadow-glow-rose: 0 10px 26px -10px rgb(236 72 153 / 0.42);
 
   /* 玻璃拟态 */
-  --glass-bg: rgb(255 255 255 / 0.62);
+  --glass-bg: rgb(255 255 255 / 0.66);
   --glass-border: rgb(255 255 255 / 0.55);
   --glass-blur: 16px;
 
   /* 卡片渐变描边（1px） */
-  --card-border-grad: linear-gradient(140deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.15) 40%, rgb(22 160 133 / 0.25) 100%);
+  --card-border-grad: linear-gradient(140deg, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.2) 38%, rgb(168 85 247 / 0.35) 72%, rgb(255 77 141 / 0.3) 100%);
 
-  /* 原始界面主渐变（小程序 .header / 顶部导航栏同源） */
-  --grad-hero: linear-gradient(135deg, #16A085 0%, #64D8CB 58%, #74B9FF 100%);
-  --grad-brand: linear-gradient(135deg, #16A085 0%, #20C4A4 100%);
+  /* 头部主渐变：紫 → 品红 → 粉（全部 stop 均满足白字 AA） */
+  --grad-hero: linear-gradient(125deg, #5B21C9 0%, #7C3AED 34%, #A21CAF 68%, #DB2777 100%);
+  --grad-brand: linear-gradient(135deg, #6D3BF5 0%, #A855F7 60%, #FF4D8D 100%);
 
   /* === 强调 / 状态色 === */
   --color-accent-500:  #F59E0B;
@@ -67,7 +74,7 @@
   --color-text-soft:  #52525B;
   /* 原 #A1A1AA 在白底仅 2.56:1；#71717A 为 4.83:1，满足正文 AA */
   --color-text-mute:  #71717A;
-  --color-bg:         #F2F3F7;   /* 页面级背景（对齐原生小程序 #F2F3F7 / #F6F8F7） */
+  --color-bg:         #F7F5FF;   /* 页面级背景：淡紫调，替掉「灰白」底色 */
 
   /* === 间距 4-based === */
   --space-1:  4px;

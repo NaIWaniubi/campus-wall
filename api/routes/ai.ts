@@ -15,9 +15,10 @@ import { logger } from '../utils/logger.js';
 import {
   chatWithAI,
   chatWithAIStream,
-  isAiEnabled,
+  isAiUsable,
   buildModelChain,
   type AiMessage,
+  type AiCallOptions,
 } from '../utils/ai.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -298,7 +299,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
 
   const forums = searchForumSources(message);
 
-  if (!isAiEnabled()) {
+  if (!isAiUsable()) {
     return success(res, {
       reply: localRetrievalAnswer(message, loadKnowledge(), forums),
       forums,
@@ -349,7 +350,7 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
   // 在线模型不可用时用站内检索兜底（与 /chat 的 catch 行为一致），不丢上下文
   const fallbackReply = localRetrievalAnswer(message, loadKnowledge(), forums);
 
-  if (!isAiEnabled()) {
+  if (!isAiUsable()) {
     send('delta', { t: localRetrievalAnswer(message, loadKnowledge(), forums) });
     send('done', { ok: true });
     return res.end();
@@ -370,6 +371,389 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
     send('error', { message: fallbackReply });
   }
   res.end();
+});
+
+
+/* ==========================================================================
+ * V3 AI 产品层：把大模型用进「发帖 → 读帖 → 看今天」主链路，而不是角落里的聊天框。
+ * 三个能力，每个都有规则化离线兜底：没有 Key / 网关挂了 / 模型抽风时依然给出可用结果。
+ *   POST /ai/draft      发布助手：一句话 → 标题 / 正文 / 标签 / 板块 / 价格
+ *   POST /ai/summarize  帖子划重点：3 条要点 + 交易风险提示
+ *   GET  /ai/digest     今日简报：当日动态概览 + 最热板块 + 一条提醒
+ * ========================================================================== */
+
+/** 板块关键词表：用于「一句话 → 板块」的规则判定（离线可用） */
+export const SECTION_HINTS: Array<{ id: number; name: string; words: string[] }> = [
+  { id: 1, name: '二手交易', words: ['出', '出售', '转', '转让', '卖', '闲置', '求购', '收', '全新', '成新', '价格', '低价', '包邮'] },
+  { id: 2, name: '失物招领', words: ['丢', '丢失', '丢了', '捡', '捡到', '失物', '寻物', '认领', '钱包', '校园卡', '身份证', '钥匙', '耳机'] },
+  { id: 3, name: '表白墙', words: ['表白', '喜欢', '心动', '暗恋', '寻人', '祝福', 'crush', '想认识'] },
+  { id: 4, name: '吐槽树洞', words: ['吐槽', '无语', '难吃', '好吃', '食堂', '避雷', '红榜', '黑榜', 'emo', '破防', '宿舍'] },
+  { id: 5, name: '互助问答', words: ['怎么', '如何', '请问', '求教', '求助', '选课', '考试', '考研', '复习', '资料', '建议', '有没有人知道'] },
+  { id: 6, name: '校园活动', words: ['活动', '讲座', '演出', '比赛', '报名', '社团', '招新', '晚会', '志愿', '门票'] },
+  { id: 7, name: '拼车', words: ['拼车', '顺风', '返校', '机场', '高铁', '火车站', '搭车', '同路', '出发'] },
+  { id: 8, name: '组队', words: ['组队', '开黑', '搭子', '队友', '一起', '自习', '竞赛', '缺人', '找人一起'] },
+];
+
+/** 风险词：只做提示，不做拦截（拦截交给 sensitive.ts 的发布校验） */
+const RISK_PATTERNS: Array<{ re: RegExp; note: string }> = [
+  { re: /(押金|保证金|定金|手续费|解冻费|激活费|先付款|先转账)/, note: '出现「先交押金/保证金」类要求，二手交易中是典型骗局特征' },
+  { re: /(私下|加 ?wx|加微信|扫码|点链接|二维码|银行卡|转账|汇款|代付|口令红包)/, note: '引导离开平台私下转账或扫码，转账后资金无法追回' },
+  { re: /(刷单|兼职日结|返利|垫付|做任务|高回报|稳赚|投资|理财)/, note: '刷单返利类话术，属于高发诈骗类型' },
+  { re: /(裸聊|色情|约炮|贷款|套现|代开发票|代考|代写论文)/, note: '可能涉及违规内容，发布前请再确认' },
+];
+
+/** 基础停用词：标签提取时剔除 */
+const STOP_WORDS = new Set(['我们', '你们', '这个', '那个', '什么', '怎么', '可以', '有没有', '一个', '就是', '但是', '因为', '所以', '现在', '今天', '同学', '大家']);
+
+/** 用关键词命中数给板块打分，返回最可能的板块 id（无命中返回 fallbackId 或 null） */
+export function guessSectionId(raw: string, fallbackId?: number | null): number | null {
+  let best: { id: number; score: number } | null = null;
+  for (const s of SECTION_HINTS) {
+    let score = 0;
+    for (const w of s.words) if (raw.includes(w)) score += w.length >= 2 ? 1 : 0.5;
+    if (score > 0 && (!best || score > best.score)) best = { id: s.id, score };
+  }
+  return best?.id ?? fallbackId ?? null;
+}
+
+/**
+ * 校园词表：规则版标签的第一优先级。
+ * 之前直接拿 3~4 字滑窗会切出「出一个九」「成新元可」这种半截词，
+ * 换成「先认词表里的高频校园短语，再退到滑窗」才有可用标签。
+ */
+export const TAG_LEXICON = [
+  '全新', '九成新', '八成新', '七成新', '可小刀', '可议价', '当面交易', '包邮', '低价', '急出', '闲置',
+  '求购', '代取', '快递', '宿舍', '东门', '西门', '南门', '图书馆', '食堂', '校园卡', '身份证', '钥匙',
+  '耳机', '自行车', '电动车', '笔记本', '手机', '平板', '显示器', '考研', '四级', '六级', '选课', '实习',
+  '兼职', '家教', '搭子', '开黑', '拼车', '返校', '机场', '高铁', '演唱会', '讲座', '社团', '招新',
+  '志愿', '竞赛', '自习', '表白', '寻人', '失物招领', '二手交易',
+];
+
+/** 从文本里抽标签：词表短语 → ASCII 词块 → 价格 → 中文滑窗兜底 */
+export function extractTags(raw: string, limit = 4): string[] {
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  const push = (t: string) => {
+    if (!t || t.length < 2 || STOP_WORDS.has(t) || seen.has(t)) return;
+    seen.add(t);
+    tags.push(t);
+  };
+
+  // 1) 校园词表命中（最像标签）
+  for (const w of TAG_LEXICON) if (raw.includes(w)) push(w);
+  // 2) ASCII 词块（iPad / Air / GTX…）
+  for (const w of raw.match(/[A-Za-z][A-Za-z0-9+#.]{1,11}/g) ?? []) push(w);
+  // 3) 价格：¥1500
+  const price = extractPrice(raw);
+  if (price) push(`¥${price}`);
+
+  // 4) 兜底：中文 3~4 字块，跳过含虚词的窗口
+  if (tags.length < limit) {
+    const cjk = raw.replace(/[^\u4e00-\u9fa5]/g, '');
+    for (const m of cjk.match(/[\u4e00-\u9fa5]{3,4}/g) ?? []) {
+      if (/[了的 是在我你他也就都很多吗呢把被给和与]/.test(m)) continue;
+      push(m);
+      if (tags.length >= limit) break;
+    }
+  }
+  return tags.slice(0, limit);
+}
+
+/** 从文本里抽价格（返回数字或 null） */
+export function extractPrice(raw: string): number | null {
+  const m = raw.match(/(\d+(?:\.\d+)?)\s*(?:元|块|r|rmb)|\u00a5\s*(\d+(?:\.\d+)?)/i);
+  if (!m) return null;
+  const n = Number(m[1] ?? m[2]);
+  return Number.isFinite(n) && n > 0 && n < 1_000_000 ? n : null;
+}
+
+/** 离线划重点：标题 2 字滑窗命中 + 句长 + 位置权重，抽取式摘要 */
+export function extractiveSummary(title: string, text: string, limit = 3): string[] {
+  const titleGrams = new Set<string>();
+  const tc = title.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '');
+  for (let i = 0; i + 2 <= tc.length; i++) titleGrams.add(tc.slice(i, i + 2));
+
+  const sentences = text
+    .split(/[。！？!?；;\n]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 6);
+
+  const scored = sentences.map((sen, idx) => {
+    let hit = 0;
+    for (const g of titleGrams) if (sen.includes(g)) hit++;
+    const posBonus = idx === 0 ? 1.2 : idx === 1 ? 0.5 : 0;
+    return { sen, score: hit * 1.5 + Math.min(sen.length, 60) / 60 + posBonus };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const picked: string[] = [];
+  for (const { sen } of scored) {
+    if (picked.some((p) => p.includes(sen) || sen.includes(p))) continue;
+    picked.push(sen.length > 46 ? sen.slice(0, 46) + '…' : sen);
+    if (picked.length >= limit) break;
+  }
+  if (!picked.length && text.trim()) picked.push(text.trim().slice(0, 46) + '…');
+  return picked;
+}
+
+/** 风险提示：命中即给 note */
+export function detectRisk(text: string): { level: 'low' | 'medium' | 'high'; note: string | null } {
+  for (const p of RISK_PATTERNS) {
+    if (p.re.test(text)) return { level: 'high', note: p.note };
+  }
+  if (/\d{7,}|\bwx\b|微信/.test(text)) {
+    return { level: 'medium', note: '正文含联系方式，建议先在平台内沟通，避免私下先款' };
+  }
+  return { level: 'low', note: null };
+}
+
+/** 宽容 JSON 提取：模型爱把 JSON 包进 ```json 或前后多说话 */
+export function parseJsonLoose(text: string): any | null {
+  if (!text) return null;
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = (fenced && fenced[1] ? fenced[1] : text).trim();
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(body.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+/** 规则版成稿：首行截断做标题 + 抽标签 + 猜板块 + 抽价格 */
+export function ruleDraft(raw: string, sectionId?: number | null) {
+  const text = raw.replace(/\s+/g, ' ').trim();
+  const firstLine = (raw.split(/\n/)[0] || text).trim();
+  const title = (firstLine.length > 24 ? firstLine.slice(0, 24) + '…' : firstLine) || '新动态';
+  const sid = guessSectionId(text, sectionId);
+  const sectionName = SECTION_HINTS.find((s) => s.id === sid)?.name ?? null;
+  const price = extractPrice(text);
+  const content =
+    text.length < 12
+      ? text + '\n\n（还想补充：物品成色 / 期望价格 / 见面地点 / 联系方式）'
+      : text;
+  return { title, content, tags: extractTags(text), sectionId: sid, sectionName, price };
+}
+
+// ---------- 1. 发布助手：一句话 → 完整草稿 ----------
+router.post('/draft', authRequired, aiLimiter, async (req: Request, res: Response) => {
+  const raw = String(req.body?.raw || '').trim();
+  const sectionId = req.body?.sectionId ? Number(req.body.sectionId) : null;
+  if (!raw) return fail(res, '先写一句话，AI 才能帮你成稿');
+  if (raw.length > 600) return fail(res, '一句话最长 600 字');
+  if (getRiskLevel(raw) === 'reject') return fail(res, '内容包含违规词，请修改后再试');
+
+  const base = ruleDraft(raw, sectionId);
+  if (!isAiUsable()) return success(res, { ...base, offline: true });
+
+  try {
+    const sys = '你是校园墙的发布助手。把用户的一句话扩写成一条规范的校园墙帖子，只输出 JSON，不要解释。'
+      + 'JSON 字段：{"title":"不超过 24 字的标题","content":"80-200 字正文，口语化、信息完整（物品/时间/地点/价格/联系方式择要）","tags":["2-4 个标签"],"sectionName":"板块名","price":数字或 null}。'
+      + '可选板块：' + SECTION_HINTS.map((s) => s.name).join('、') + '。不要编造用户没提到的价格与联系方式。';
+    const out = await chatWithAI(
+      [
+        { role: 'system', content: sys },
+        { role: 'user', content: raw },
+      ],
+      1024,
+      currentModels(),
+      // 发布是「当着用户面等」的场景：超预算就交给规则兜底，不让用户干等
+      { budgetMs: 15_000, perModelTimeoutMs: 8_000 } satisfies AiCallOptions
+    );
+    bumpStats();
+    const j = parseJsonLoose(out);
+    if (!j || typeof j.title !== 'string' || typeof j.content !== 'string') {
+      return success(res, { ...base, offline: true });
+    }
+    const name = typeof j.sectionName === 'string' ? j.sectionName : null;
+    const sid = name ? SECTION_HINTS.find((s) => s.name === name)?.id ?? base.sectionId : base.sectionId;
+    const price = typeof j.price === 'number' && j.price > 0 ? j.price : base.price;
+    return success(res, {
+      title: j.title.slice(0, 40),
+      content: j.content.slice(0, 1200),
+      tags: Array.isArray(j.tags) ? j.tags.filter((t: any) => typeof t === 'string').slice(0, 4) : base.tags,
+      sectionId: sid,
+      sectionName: SECTION_HINTS.find((s) => s.id === sid)?.name ?? name,
+      price,
+      offline: false,
+    });
+  } catch (err: any) {
+    logger.error('AI 成稿失败', { error: err?.message });
+    return success(res, { ...base, offline: true });
+  }
+});
+
+// ---------- 2. 帖子划重点：3 条要点 + 风险提示 ----------
+router.post('/summarize', authRequired, aiLimiter, async (req: Request, res: Response) => {
+  let title = String(req.body?.title || '').trim();
+  let content = String(req.body?.content || '').trim();
+  const postId = req.body?.postId ? Number(req.body.postId) : null;
+
+  if ((!content || !title) && postId) {
+    const row = db
+      .prepare('SELECT title, content FROM posts WHERE id = ? AND status = \'published\'')
+      .get(postId) as { title: string; content: string } | undefined;
+    if (row) {
+      title = title || row.title;
+      content = content || row.content;
+    }
+  }
+  if (!content) return fail(res, '没有可总结的内容');
+  if (content.length > 6000) content = content.slice(0, 6000);
+
+  const full = title + '\n' + content;
+  const risk = detectRisk(full);
+  const base = { points: extractiveSummary(title, content), risk: risk.level, riskNote: risk.note };
+  if (!isAiUsable()) return success(res, { ...base, offline: true });
+
+  try {
+    const out = await chatWithAI(
+      [
+        {
+          role: 'system',
+          content:
+            '你是校园墙的阅读助手。读一条校园墙帖子，只输出 JSON：{"points":["要点1","要点2","要点3"],"risk":"low|medium|high","riskNote":"一句话风险提示，无风险填空字符串"}。要点必须来自原文，每条不超过 30 字，不要编造。risk 只在出现先交押金、私下转账、刷单返利、二维码链接等风险时标记 medium/high。',
+        },
+        { role: 'user', content: '标题：' + title + '\n正文：' + content },
+      ],
+      1024,
+      currentModels(),
+      // 划重点同样在阅读时同步等待：8 秒拿不到就退回抽取式摘要
+      { budgetMs: 10_000, perModelTimeoutMs: 7_000 } satisfies AiCallOptions
+    );
+    bumpStats();
+    const j = parseJsonLoose(out);
+    if (!j || !Array.isArray(j.points) || !j.points.length) return success(res, { ...base, offline: true });
+    const points = j.points
+      .filter((p: any) => typeof p === 'string' && p.trim())
+      .map((p: string) => (p.length > 40 ? p.slice(0, 40) + '…' : p))
+      .slice(0, 4);
+    const level = ['low', 'medium', 'high'].includes(j.risk) ? j.risk : risk.level;
+    const finalRisk = risk.level === 'high' ? 'high' : level;
+    return success(res, {
+      points,
+      risk: finalRisk,
+      riskNote:
+        typeof j.riskNote === 'string' && j.riskNote.trim() ? j.riskNote.trim().slice(0, 120) : risk.note,
+      offline: false,
+    });
+  } catch (err: any) {
+    logger.error('AI 划重点失败', { error: err?.message });
+    return success(res, { ...base, offline: true });
+  }
+});
+
+// ---------- 3. 今日简报（60 秒缓存，公开只读，只统计已发布内容） ----------
+const digestCache: { ts: number; data: any } = { ts: 0, data: null };
+const DIGEST_TTL_MS = 60_000;
+
+/** 简报统计窗口：优先「今天的 24 小时」，全站冷清时退到近 7 天，避免首页出现空白简报 */
+function digestWindow(): { since: string; label: string } {
+  const since24 = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const today = db
+    .prepare('SELECT COUNT(*) AS n FROM posts WHERE status = \'published\' AND created_at >= ?')
+    .get(since24) as { n: number };
+  if (today.n > 0) return { since: since24, label: '24 小时' };
+  return { since: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(), label: '近 7 天' };
+}
+
+export function ruleDigest() {
+  const win = digestWindow();
+  const since = win.since;
+  const posts = db
+    .prepare('SELECT COUNT(*) AS n FROM posts WHERE status = \'published\' AND created_at >= ?')
+    .get(since) as { n: number };
+  const comments = db
+    .prepare('SELECT COUNT(*) AS n FROM comments WHERE status = \'active\' AND created_at >= ?')
+    .get(since) as { n: number };
+  const hot = db
+    .prepare(
+      'SELECT p.id, p.title, p.like_count, s.name AS section_name' +
+        ' FROM posts p JOIN sections s ON s.id = p.section_id' +
+        ' WHERE p.status = \'published\'' +
+        ' ORDER BY p.is_top DESC, (p.like_count * 2 + p.comment_count) DESC, p.created_at DESC LIMIT 1'
+    )
+    .get() as { id: number; title: string; like_count: number; section_name: string } | undefined;
+  const sections = db
+    .prepare(
+      'SELECT s.name, COUNT(*) AS n FROM posts p JOIN sections s ON s.id = p.section_id' +
+        ' WHERE p.status = \'published\' AND p.created_at >= ? GROUP BY s.id ORDER BY n DESC LIMIT 3'
+    )
+    .all(since) as Array<{ name: string; n: number }>;
+
+  const bits: string[] = [];
+  if (posts.n > 0) bits.push(`${win.label}有 ${posts.n} 条新动态、${comments.n} 条评论`);
+  else bits.push('最近还没有新动态，等你发第一条');
+  const topSection = sections[0];
+  if (topSection) bits.push('最活跃的是「' + topSection.name + '」（' + topSection.n + ' 条）');
+  if (hot) {
+    bits.push('全站最热是《' + (hot.title.length > 18 ? hot.title.slice(0, 18) + '…' : hot.title) + '》');
+  }
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    window: win.label,
+    stats: { posts: posts.n, comments: comments.n },
+    sections,
+    hot: hot ? { id: hot.id, title: hot.title, section: hot.section_name, likes: hot.like_count } : null,
+    summary: bits.join('，') + '。',
+    tip: '提示：二手交易务必当面验货、平台内沟通，任何「先交押金 / 私下转账」都请直接举报。',
+    offline: true,
+  };
+}
+
+router.get('/digest', async (_req: Request, res: Response) => {
+  try {
+    if (digestCache.data && Date.now() - digestCache.ts < DIGEST_TTL_MS) {
+      return success(res, digestCache.data);
+    }
+    const base = ruleDigest();
+    let digest: any = base;
+    if (isAiUsable() && base.stats.posts > 0) {
+      try {
+        const out = await chatWithAI(
+          [
+            {
+              role: 'system',
+              content:
+                '你是校园墙的每日播报员。根据给定的统计数据，用一句不超过 60 字的简体中文播报今天校园里的情况，语气活泼但不夸张，只输出这一句话，不要引号、不要 emoji。',
+            },
+            {
+              role: 'user',
+              content:
+                base.window + '新动态：' + base.stats.posts + ' 条；评论：' + base.stats.comments + ' 条；活跃板块：' +
+                (base.sections.map((s) => s.name + '(' + s.n + ')').join('、') || '无') +
+                '；最热帖子：' + (base.hot?.title ?? '无') + '。',
+            },
+          ],
+          512,
+          currentModels(),
+          // 简报是首页首屏内容：拿不到就用统计版，绝不阻塞渲染
+          { budgetMs: 6_000, perModelTimeoutMs: 5_000 } satisfies AiCallOptions
+        );
+        bumpStats();
+        const line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
+        if (line.length >= 8) digest = { ...base, summary: line, offline: false };
+      } catch (err: any) {
+        logger.warn('AI 简报生成失败，退回规则版', { error: err?.message });
+      }
+    }
+    digestCache.ts = Date.now();
+    digestCache.data = digest;
+    return success(res, digest);
+  } catch (err: any) {
+    logger.error('今日简报失败', { error: err?.message });
+    return success(res, {
+      date: new Date().toISOString().slice(0, 10),
+      stats: { posts: 0, comments: 0 },
+      sections: [],
+      hot: null,
+      summary: '今天的简报暂时取不到，稍后再来看看。',
+      tip: '',
+      offline: true,
+    });
+  }
 });
 
 export default router;

@@ -26,6 +26,49 @@ export const db: BetterSqlite3.Database = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// 写锁等待：多进程/备份任务与业务写并发时，默认 0 会立刻抛 SQLITE_BUSY。
+// 5s 足够覆盖在线备份与迁移场景，超时仍抛错（不无限阻塞）。
+db.pragma('busy_timeout = 5000');
+// WAL 下 NORMAL 已能保证崩溃一致性（仅在断电时可能回滚最近事务），比 FULL 快一个数量级
+db.pragma('synchronous = NORMAL');
+
+// 接入 Prometheus 数据库查询监控指标
+import { measureDbQuery } from './utils/metrics.js';
+
+const origPrepare = db.prepare.bind(db);
+
+/**
+ * 预处理语句缓存：better-sqlite3 的 prepare 会编译 SQL，路由层每次请求都调用，
+ * 热路径上等于反复编译同一条语句。按 SQL 文本缓存已包装的 statement 即可。
+ * 上限 500 条，超出后整体清空（校园场景 SQL 形态有限，不会频繁触发）。
+ */
+const stmtCache = new Map<string, BetterSqlite3.Statement>();
+const STMT_CACHE_MAX = 500;
+
+(db as any).prepare = function (source: string) {
+  const cached = stmtCache.get(source);
+  if (cached) return cached;
+
+  const stmt = origPrepare(source);
+  const op = source.trim().match(/^([a-zA-Z]+)/)?.[1]?.toUpperCase() || 'QUERY';
+  const origAll = stmt.all.bind(stmt);
+  const origGet = stmt.get.bind(stmt);
+  const origRun = stmt.run.bind(stmt);
+
+  stmt.all = function (...args: any[]) {
+    return measureDbQuery(op, () => origAll(...args));
+  } as any;
+  stmt.get = function (...args: any[]) {
+    return measureDbQuery(op, () => origGet(...args));
+  } as any;
+  stmt.run = function (...args: any[]) {
+    return measureDbQuery(op, () => origRun(...args));
+  } as any;
+
+  if (stmtCache.size >= STMT_CACHE_MAX) stmtCache.clear();
+  stmtCache.set(source, stmt);
+  return stmt;
+};
 
 /**
  * CJK 二元分词自定义函数（供 FTS5 触发器使用）：
@@ -268,7 +311,10 @@ export function initDatabase() {
       tokenize='unicode61'
     );
   `);
-  // 双向同步触发器：业务写 posts 时 FTS 倒排索引由 SQLite 底层原子同步，业务层零心智负担
+  // 双向同步触发器：业务写 posts 时 FTS 倒排索引由 SQLite 底层原子同步。
+  // 关键：UPDATE 触发器限定列（OF title, content, extra_fields）。
+  // 不限定列时，浏览数 +1、点赞数 +1、状态变更都会触发整行重新分词 + 索引重建，
+  // 一次详情页浏览 = 一次全量 CJK 二元切分，是明确的写放大（实测 posts 热路径）。
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS posts_fts_insert AFTER INSERT ON posts BEGIN
       INSERT INTO posts_fts(rowid, title, content, extra_text)
@@ -276,7 +322,7 @@ export function initDatabase() {
     END;
   `);
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS posts_fts_update AFTER UPDATE ON posts BEGIN
+    CREATE TRIGGER IF NOT EXISTS posts_fts_update AFTER UPDATE OF title, content, extra_fields ON posts BEGIN
       DELETE FROM posts_fts WHERE rowid = OLD.id;
       INSERT INTO posts_fts(rowid, title, content, extra_text)
       VALUES (NEW.id, cjk_bigrams(NEW.title), cjk_bigrams(NEW.content), cjk_bigrams(NEW.extra_fields));
@@ -347,10 +393,16 @@ export function initDatabase() {
   ensureSection.run('拼车', 'car', 7, 0, '拼车');
   ensureSection.run('组队', 'users', 8, 0, '组队');
 
-  // 初始管理员账号
+  // 初始管理员账号：生产环境强制由 ADMIN_INITIAL_PASSWORD 提供，杜绝已知默认口令；
+  // 开发/测试环境保留 admin/admin123 以便本地与 e2e 开箱即用。
   const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'super_admin'").get() as { count: number };
   if (adminCount.count === 0) {
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
+    const isProd = process.env.NODE_ENV === 'production';
+    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || (isProd ? '' : 'admin123');
+    if (!initialPassword) {
+      throw new Error('生产环境首次启动必须设置 ADMIN_INITIAL_PASSWORD（禁止默认管理员口令）');
+    }
+    const hashedPassword = bcrypt.hashSync(initialPassword, 10);
     db.prepare('INSERT INTO users (student_id, password, nickname, college, grade, role, status, credit_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
       'admin', hashedPassword, '超级管理员', '信息学院', '2024', 'super_admin', 'active', 120
     );
@@ -510,6 +562,54 @@ if (!userCols.some((c) => c.name === 'openid')) {
 }
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_openid ON users (openid);
+`);
+
+// Token 吊销：users 表幂等补列 token_version。
+// 改密/封禁时 +1，鉴权比对 JWT 里的 ver 与库中值，旧 token 立即失效
+// （否则改密后旧 token 仍可用满 7 天，是审计明确点名的缺口）。
+if (!userCols.some((c) => c.name === 'token_version')) {
+  db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0');
+}
+
+/* ==========================================================================
+ * 运营埋点补列（评委最看重的「实效验证」的前提）
+ *
+ * 没有这些列，DAU / 留存 / 单校数据 / 审核时效都只能靠代理估算，
+ * 答辩时无法给出可信数字。均为幂等 ALTER，老库自动升级。
+ * ========================================================================== */
+if (!userCols.some((c) => c.name === 'school')) {
+  db.exec("ALTER TABLE users ADD COLUMN school TEXT DEFAULT ''");
+}
+if (!userCols.some((c) => c.name === 'last_active_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN last_active_at DATETIME');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active_at)');
+}
+
+const postCols = db.prepare('PRAGMA table_info(posts)').all() as { name: string }[];
+if (!postCols.some((c) => c.name === 'audited_at')) {
+  // 审核完成时间：用于统计审核时效（提交→过审的时长），是治理能力的量化指标
+  db.exec('ALTER TABLE posts ADD COLUMN audited_at DATETIME');
+}
+
+/**
+ * 行为事件表：轻量漏斗埋点（注册/激活/首帖/首评/成交/邀请）。
+ * 只记录关键转化事件，不写全量日志，避免库膨胀。
+ * 增长报表与留存分析都从这里出数。
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    ref_id INTEGER,
+    meta TEXT DEFAULT '{}',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_events_type_time ON events (type, created_at);
+  CREATE INDEX IF NOT EXISTS idx_events_user ON events (user_id, created_at);
 `);
 
 /**

@@ -11,6 +11,8 @@ import {
   assessRisk,
   getRiskLevel,
   findSensitiveHits,
+  normalizeForMatch,
+  sensitiveStats,
 } from '../../utils/sensitive.js';
 
 describe('sensitive ASCII 词边界匹配', () => {
@@ -55,5 +57,47 @@ describe('findSensitiveHits 位置提取', () => {
 
   it('词边界内不误报位置', () => {
     expect(findSensitiveHits('USB drive', ['sb'])).toEqual([]);
+  });
+});
+
+describe('变体绕过检测（谐音 / 全角 / 分隔符）', () => {
+  it('归一化：全角字母、分隔符、谐音都收敛到标准写法', () => {
+    expect(normalizeForMatch('ｓｂ')).toBe('sb');
+    expect(normalizeForMatch('傻 * 逼')).toBe('傻逼');
+    expect(normalizeForMatch('傻 B')).toBe('傻逼');
+    expect(normalizeForMatch('S-B')).toBe('sb');
+  });
+
+  it('「傻*逼」这类插入分隔符的写法仍被识别为 warn', () => {
+    const r = assessRisk('', '你就是个傻*逼');
+    expect(r.level).toBe('warn');
+  });
+
+  it('全角「ｓｂ」仍命中（不再靠肉眼判断全角）', () => {
+    const r = containsSensitiveWord('你真是个ｓｂ');
+    expect(r.hit).toBe(true);
+  });
+
+  it('谐音变体「煞笔」命中', () => {
+    expect(assessRisk('', '这人是个煞笔').level).toBe('warn');
+  });
+
+  it('拆字变体「傻 B」命中', () => {
+    expect(assessRisk('', '傻 B 行为').level).toBe('warn');
+  });
+
+  it('正常文本不被变体归一化误伤', () => {
+    // 正常英文型号（带词边界的 sb 不应命中）
+    expect(assessRisk('', 'The SB-1000 model is a device').level).toBe('pass');
+    // 正常中文句子
+    expect(assessRisk('', '周末一起去操场跑步，顺便聊聊实习的事').level).toBe('pass');
+  });
+
+  it('词库规模可查（答辩时说明覆盖面）', () => {
+    const s = sensitiveStats();
+    expect(s.total).toBeGreaterThan(40);
+    expect(s.review).toBeGreaterThan(15);
+    expect(s.warn).toBeGreaterThan(10);
+    expect(s.variants).toBeGreaterThan(10);
   });
 });

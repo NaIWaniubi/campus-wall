@@ -317,3 +317,38 @@ describe('骨架屏 loading 态接线（防「wxml 用 loading 但 js 未定义 
     expect(bad, `骨架屏接线不完整：\n${bad.join('\n')}`).toEqual([]);
   });
 });
+
+/**
+ * 事件绑定完整性：wxml 里的 bind 或 catch 事件必须指向 js 中真实存在的方法。
+ * 指向不存在的方法在微信里不会报错，只会静默失效（评审点「按钮点了没反应」）。
+ * 历史问题：detail.wxml 曾用 catchtap="true" 阻断冒泡，点击弹窗内容会冒泡关闭弹窗。
+ */
+describe('wxml 事件绑定与 js 方法一致性', () => {
+  const readAppPages = () => readJson('app.json').pages as string[];
+
+  it('所有 bind*/catch* handler 都在页面 js 中定义', () => {
+    const missing: string[] = [];
+    // bindtap / catchtap / bind:like / catch:touchmove / bindchange ...
+    const re = /\b(?:bind|catch)[:]?[a-zA-Z]+\s*=\s*"([^"{}]+)"/g;
+
+    for (const p of readAppPages()) {
+      const wxml = read(`${p}.wxml`);
+      const js = read(`${p}.js`);
+      for (const m of wxml.matchAll(re)) {
+        const handler = m[1].trim();
+        if (!handler) continue;
+        // 方法定义形态：`handler(` 或 `handler:`（对象属性）
+        const defined =
+          new RegExp(`(^|[^\\w.])${handler}\\s*\\(`, 'm').test(js) ||
+          new RegExp(`(^|[^\\w.])${handler}\\s*:`, 'm').test(js);
+        if (!defined) missing.push(`${p}.wxml -> ${handler}`);
+      }
+    }
+    expect(missing, `存在指向未定义方法的事件绑定：\n${missing.join('\n')}`).toEqual([]);
+  });
+
+  it('详情页出价弹窗用真实 handler 阻断冒泡（不得写 catchtap="true"）', () => {
+    const wxml = read('pages/detail/detail.wxml');
+    expect(wxml).not.toMatch(/catchtap\s*=\s*"true"/);
+  });
+});

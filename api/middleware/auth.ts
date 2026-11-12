@@ -51,9 +51,13 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
   if (!payload) {
     return unauthorized(res);
   }
-  const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until FROM users WHERE id = ?').get(payload.id) as any;
+  const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version FROM users WHERE id = ?').get(payload.id) as any;
   if (!user) {
     return unauthorized(res, '用户不存在');
+  }
+  // token 吊销：改密/封禁时 token_version 递增，旧 token 的 ver 不再匹配
+  if (Number(user.token_version ?? 0) !== payload.ver) {
+    return unauthorized(res, '登录状态已失效，请重新登录');
   }
   if (user.status === 'banned') {
     if (!liftExpiredBan(user)) {
@@ -80,8 +84,8 @@ export function authOptional(req: Request, _res: Response, next: NextFunction) {
   if (token) {
     const payload = verifyToken(token);
     if (payload) {
-      const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until FROM users WHERE id = ?').get(payload.id) as any;
-      if (user) {
+      const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version FROM users WHERE id = ?').get(payload.id) as any;
+      if (user && Number(user.token_version ?? 0) === payload.ver) {
         if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
         if (user.status !== 'banned') {
           req.currentUser = {

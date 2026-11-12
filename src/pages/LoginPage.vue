@@ -47,7 +47,7 @@ async function handleSubmit() {
 <template>
   <div class="min-h-screen pb-10 relative" style="background: var(--color-bg)">
     <div class="aurora-bg" aria-hidden="true"></div>
-    <!-- 渐变头（与首页同源，对齐原生小程序顶部导航栏 #16A085） -->
+    <!-- 渐变头（与首页同源：V3 紫→品红 多巴胺极光） -->
     <div class="hero pt-12 pb-14 px-6 rounded-b-[28px] text-center">
       <div class="w-[72px] h-[72px] mx-auto rounded-[22px] glass flex items-center justify-center shadow-lg">
         <GraduationCap class="w-9 h-9 text-white drop-shadow" />

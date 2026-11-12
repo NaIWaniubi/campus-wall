@@ -7,9 +7,11 @@
  * 上层 (legacy-adapter.js) 接管路径/字段映射；端点 (endpoints.js) 用 request() 组合业务调用。
  */
 const { showToast, showLoading, hideLoading } = require('./util')
+const { API_BASE_URL: CONFIG_BASE_URL, ENV_VERSION, isPlaceholderDomain } = require('../config')
 
-const DEFAULT_BASE_URL = 'http://localhost:3001/api'
-const DEFAULT_ORIGIN = 'http://localhost:3001'
+// 兜底值仅用于配置缺失的极端情况；正常路径由 config.js 按微信环境提供
+const DEFAULT_BASE_URL = CONFIG_BASE_URL || 'http://localhost:3001/api'
+const DEFAULT_ORIGIN = DEFAULT_BASE_URL.replace(/\/api\/?$/, '')
 
 function getAppSafe() {
   return typeof getApp === 'function' ? getApp() : null
@@ -17,8 +19,18 @@ function getAppSafe() {
 
 function getBaseUrl() {
   const app = getAppSafe()
-  return (app && app.globalData && app.globalData.baseUrl) || DEFAULT_BASE_URL
+  // 优先级：运行时覆盖（调试/灰度）> 按环境配置
+  const runtime = app && app.globalData && app.globalData.baseUrl
+  return runtime || DEFAULT_BASE_URL
 }
+
+// 启动自检：体验版/正式版仍指向占位域名时明确告警，避免带着 example.com 提审
+function checkBaseUrlConfig() {
+  if ((ENV_VERSION === 'trial' || ENV_VERSION === 'release') && isPlaceholderDomain()) {
+    console.error('[校园墙] 当前为 ' + ENV_VERSION + ' 环境，但后端域名仍是占位地址 api.example.com，请先修改 miniprogram/config.js')
+  }
+}
+checkBaseUrlConfig()
 
 function getServerOrigin() {
   const base = getBaseUrl()

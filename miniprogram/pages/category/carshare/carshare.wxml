@@ -2,8 +2,12 @@
   <view class="cat-head card"><text class="cat-head-title">拼车</text><subscribe-btn section-id="7" /></view>
   <view class="tab-bar flex-row">
     <view class="tab-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="all"><text>全部</text></view>
-    <view class="tab-item {{activeTab === 'car' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="car"><text>拼车</text></view>
-    <view class="tab-item {{activeTab === 'group' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="group"><text>拼单</text></view>
+    <!-- Tab 值必须是 utils/category.js 里 carshare.subTypes 的真实 id：
+         原 car/group 不在子类型表中，后端按 itemType 精确匹配 → 这两个 Tab 永远为空 -->
+    <view class="tab-item {{activeTab === 'campus_commute' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="campus_commute"><text>校区通勤</text></view>
+    <view class="tab-item {{activeTab === 'station' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="station"><text>高铁/机场</text></view>
+    <view class="tab-item {{activeTab === 'food_share' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="food_share"><text>外卖拼单</text></view>
+    <view class="tab-item {{activeTab === 'group_buy' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="group_buy"><text>零食团购</text></view>
   </view>
   <view wx:if="{{loading}}" class="skeleton-wrap"><skeleton type="post" count="4"/></view>
   <view class="post-list">

@@ -48,11 +48,11 @@ export function isLostFoundSection(name: string): boolean {
  * 按关键词命中得分降序返回前 MAX_MATCHES 条
  */
 export function findLostFoundMatches(
-  post: { id: number; user_id: number; title: string; content: string }
+  post: { id: number; user_id: number; title: string; content: string; extra_fields?: string | null }
 ) {
   // 失物招领类板块下近 N 天已发布的候选帖
   const rows = db.prepare(`
-    SELECT p.id, p.user_id, p.title, p.content, p.is_anonymous, p.created_at,
+    SELECT p.id, p.user_id, p.title, p.content, p.is_anonymous, p.created_at, p.extra_fields,
            s.name AS section_name, u.nickname AS author_nickname, u.avatar AS author_avatar
     FROM posts p
     JOIN sections s ON s.id = p.section_id
@@ -66,9 +66,28 @@ export function findLostFoundMatches(
   const keywords = extractKeywords(`${post.title} ${post.content}`);
   if (!keywords.length) return [];
 
+  // 方向必须相反：寻物帖只该匹配招领帖。早期只看板块不看 direction，
+  // 会导致「先丢了伞」的通知里出现「另一个人也丢了伞」。
+  const readExtra = (raw: string | null | undefined): Record<string, string> => {
+    try { return JSON.parse(raw || '{}') || {}; } catch { return {}; }
+  };
+  const myExtra = readExtra(post.extra_fields);
+  const myDirection = String(myExtra.direction || '');
+  const myItem = String(myExtra.itemType || '').trim().toLowerCase();
+
   // 打分：标题命中权重 2、正文命中权重 1
   const scored: any[] = [];
   for (const row of rows) {
+    const extra = readExtra(row.extra_fields);
+    const dir = String(extra.direction || '');
+    // 双方都有方向时必须相反；候选缺方向则放行（兼容老数据）
+    if (myDirection && dir && dir === myDirection) continue;
+
+    // 品类是失物场景最强的判别信号：双方都有 itemType 且不同，直接排除。
+    // 否则「校园卡」会因为共用「捡到/丢失」二字匹配到「钥匙」。
+    const item = String(extra.itemType || '').trim().toLowerCase();
+    if (myItem && item && item !== myItem) continue;
+
     let score = 0;
     for (const kw of keywords) {
       if (row.title.includes(kw)) score += 2;

@@ -1,3 +1,7 @@
+/* 自定义 TabBar：与全站视觉语言统一（白底 + 品牌绿），
+   去掉深色渐变、四色选中态、流光与呼吸动画——
+   深色渐变与青紫粉黄四色会让小程序看起来像另一个产品。 */
+
 .tabbar {
   position: fixed;
   right: 0;
@@ -8,22 +12,11 @@
   align-items: flex-end;
   height: 104rpx;
   padding: 10rpx 14rpx 12rpx;
-  background: linear-gradient(112deg, #16323F 0%, #27334A 34%, #573D69 67%, #71384B 100%);
-  border-top: 1rpx solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 -12rpx 34rpx rgba(25, 31, 44, 0.2);
+  background: #FFFFFF;
+  border-top: 1rpx solid #E8ECEF;
+  box-shadow: 0 -2rpx 12rpx rgba(17, 24, 39, 0.05);
   box-sizing: content-box;
-}
-
-.tabbar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2rpx;
-  background: linear-gradient(90deg, #2CC9DD, #9A7BE7, #F27886, #F5C860, #2CC9DD);
-  background-size: 180% 100%;
-  animation: navShimmer 5s linear infinite;
+  padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
 }
 
 .tab-item {
@@ -33,7 +26,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  color: rgba(255, 255, 255, 0.72);
+  color: #9CA3AF;
 }
 
 .tab-icon-wrap {
@@ -42,7 +35,8 @@
   justify-content: center;
   width: 48rpx;
   height: 48rpx;
-  border-radius: 16rpx;
+  border-radius: 14rpx;
+  transition: background-color .18s ease;
 }
 
 .tab-icon { width: 38rpx; height: 38rpx; }
@@ -54,25 +48,20 @@
   line-height: 1.2;
 }
 
-.is-active { color: #FFFFFF; font-weight: 800; }
-.is-active .tab-icon-wrap { background: #2CC9DD; box-shadow: 0 8rpx 18rpx rgba(44, 201, 221, .24); }
-.tab-item:nth-child(1).is-active .tab-icon-wrap { background: #2CC9DD; }
-.tab-item:nth-child(2).is-active .tab-icon-wrap { background: #9A7BE7; box-shadow: 0 8rpx 18rpx rgba(154, 123, 231, .26); }
-.tab-item:nth-child(4).is-active .tab-icon-wrap { background: #F27886; box-shadow: 0 8rpx 18rpx rgba(242, 120, 134, .26); }
-.tab-item:nth-child(5).is-active .tab-icon-wrap { background: #F5C860; box-shadow: 0 8rpx 18rpx rgba(245, 200, 96, .26); }
+/* 选中态统一为品牌绿 #16A085，不再按 Tab 位次变色 */
+.is-active { color: #16A085; font-weight: 700; }
+.is-active .tab-icon-wrap { background: rgba(22, 160, 133, 0.10); }
 
-.tab-publish { transform: translateY(-20rpx); }
+/* 中间发布键：品牌绿实心圆，去掉呼吸浮动动画 */
+.tab-publish { transform: translateY(-16rpx); }
 .tab-publish .tab-icon-wrap {
   width: 84rpx;
   height: 84rpx;
   border-radius: 50%;
-  background: #F27886;
-  box-shadow: 0 12rpx 26rpx rgba(242, 120, 134, 0.32);
-  animation: publishPulse 2.8s ease-in-out infinite;
+  background: #16A085;
+  box-shadow: 0 8rpx 20rpx rgba(22, 160, 133, 0.28);
 }
 .tab-publish .tab-icon { width: 42rpx; height: 42rpx; }
-.tab-publish .tab-label { margin-top: 6rpx; color: #FFFFFF; }
-.tab-publish.is-active .tab-icon-wrap { background: #F27886; }
-
-@keyframes navShimmer { to { background-position: -180% 0; } }
-@keyframes publishPulse { 0%, 100% { transform: translateY(0); box-shadow: 0 12rpx 26rpx rgba(242, 120, 134, .32); } 50% { transform: translateY(-4rpx); box-shadow: 0 17rpx 31rpx rgba(154, 123, 231, .3); } }
+.tab-publish .tab-label { margin-top: 6rpx; color: #6B7280; }
+.tab-publish.is-active .tab-icon-wrap { background: #16A085; }
+.tab-publish.is-active .tab-label { color: #16A085; }

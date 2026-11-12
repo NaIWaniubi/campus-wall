@@ -235,8 +235,8 @@ body {
 
 /* ==========================================================================
  * V2 视觉层：极光渐变头 / 玻璃拟态 / 彩色分类 / 高级质感
- * 保留原生小程序的骨架与配色基因（#16A085 系），叠加多层渐变、光斑、
- * 玻璃模糊与彩色光晕，做出「活泼多彩 + 高级质感」。
+ * V3 起弃用「绿白」：主色改青春紫，头部为紫→品红→粉的多巴胺极光，
+ * 叠加多层渐变、光斑、玻璃模糊与彩色光晕，做出「活泼多彩 + 高级质感」。
  * ========================================================================== */
 .hero {
   position: relative;
@@ -270,7 +270,7 @@ body {
   height: 300px;
   bottom: -160px;
   left: -80px;
-  background: radial-gradient(circle, rgb(116 185 255 / 0.55), transparent 70%);
+  background: radial-gradient(circle, rgb(255 122 69 / 0.6), transparent 70%);
 }
 @keyframes aurora-drift {
   0% { background-position: 0% 50%; }
@@ -450,7 +450,7 @@ body {
   width: 20px;
   height: 3px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #16A085, #64D8CB);
+  background: var(--grad-brand);
 }
 /* 分类色标签：底色为分类色 12% 透明度，文字用分类色 */
 .cat-tag {
@@ -463,8 +463,79 @@ body {
 .follow-mini {
   padding: 2px 10px;
   border-radius: var(--radius-full);
-  background: rgba(22, 160, 133, 0.1);
+  background: rgba(109, 59, 245, 0.1);
   color: var(--color-brand-500);
   font-size: 11px;
   line-height: 18px;
+}
+
+/* ==========================================================================
+ * V3 多彩青春层：彩虹分隔线 / 多巴胺胶囊 / 贴纸角标 / 彩色光轨
+ * ========================================================================== */
+.rainbow-line {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, #F59E0B 0%, #F43F5E 22%, #C026D3 44%, #6D3BF5 66%, #06B6D4 88%, #A3E635 100%);
+  background-size: 200% 100%;
+  animation: rainbow-slide 12s linear infinite;
+}
+@keyframes rainbow-slide {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@media (prefers-reduced-motion: reduce) { .rainbow-line { animation: none; } }
+
+/* 多巴胺胶囊：白底 + 彩色圆点，用于「今日校园」标签行 */
+.dopa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  box-shadow: 0 2px 8px -4px rgba(24, 24, 40, 0.25);
+}
+.dopa-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--grad-brand);
+}
+
+/* 贴纸角标：左上彩色斜切标签（“热帖 / 新”） */
+.sticker {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.3px;
+  box-shadow: 0 6px 14px -6px rgba(24, 24, 40, 0.5);
+}
+
+/* AI 卡片的彩色光轨（顶部 2px 走马灯） */
+.ai-trail {
+  position: relative;
+  overflow: hidden;
+}
+.ai-trail::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6D3BF5, #C026D3, #FF4D8D, #F59E0B, #06B6D4, #6D3BF5);
+  background-size: 300% 100%;
+  animation: trail-shift 6s linear infinite;
+}
+@keyframes trail-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
 }

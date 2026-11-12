@@ -7,6 +7,7 @@ import { authRequired, authOptional } from '../middleware/auth.js';
 import { commentLimiter } from '../middleware/rateLimit.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { trackEvent, trackFirstEvent, touchActive } from '../utils/events.js';
 import { upsertNotification } from '../utils/notification.js';
 import { cacheInvalidate } from '../utils/cache.js';
 import { validate, commonSchemas, commentSchemas } from '../utils/validation.js';
@@ -113,6 +114,9 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
 
   const commentId = result.lastInsertRowid as number;
   db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(postId);
+  trackEvent(req.currentUser!.id, 'comment_create', postId, {});
+  trackFirstEvent(req.currentUser!.id, 'first_comment', postId);
+  touchActive(req.currentUser!.id);
   cacheInvalidate('posts');
 
   // 通知作者（去重）
@@ -156,7 +160,9 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
   `).run(parent.post_id, req.currentUser!.id, commentId, content, anonymous);
 
   const replyId = result.lastInsertRowid as number;
-  cacheInvalidate('posts'); // 评论写路径统一失效（当前回复不改 comment_count，防御性保险）
+  // 回复也计入帖子评论数：否则「12 条评论」点进去有 20 层楼，展示与实际不符
+  db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(parent.post_id);
+  cacheInvalidate('posts');
 
   // 通知被回复者（去重）
   if (parent.user_id !== req.currentUser!.id) {
@@ -186,8 +192,12 @@ router.delete('/comments/:id', authRequired, validate({ params: commonSchemas.id
     return forbidden(res, '无权删除该评论');
   }
 
-  db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(id);
-  db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+  // 幂等删除：只有 active → deleted 的这一次才扣计数，
+  // 否则重复 DELETE 同一评论会每次都 comment_count-1，导致计数漂移
+  const marked = db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ? AND status = 'active'").run(id);
+  if (marked.changes > 0) {
+    db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+  }
   cacheInvalidate('posts');
 
   logger.info('用户删除评论', { userId: req.currentUser!.id, commentId: id });

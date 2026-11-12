@@ -238,7 +238,7 @@ watch(sectionId, () => {
             :key="p[0]"
             class="px-2 py-1 rounded-full border transition"
             :class="activePriceRange === p[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
-            :style="activePriceRange === p[0] ? { background: 'linear-gradient(135deg, #16A085, #20C4A4)' } : undefined"
+            :style="activePriceRange === p[0] ? { background: 'var(--grad-brand)' } : undefined"
             @click="setFilter(p[0], activeTimeRange, activeSubType)"
           >{{ p[1] }}</button>
           <span class="text-zinc-500 ml-1">时间</span>
@@ -247,7 +247,7 @@ watch(sectionId, () => {
             :key="t[0]"
             class="px-2 py-1 rounded-full border transition"
             :class="activeTimeRange === t[0] ? 'border-transparent text-white font-medium' : 'border-zinc-200 text-zinc-500'"
-            :style="activeTimeRange === t[0] ? { background: 'linear-gradient(135deg, #16A085, #20C4A4)' } : undefined"
+            :style="activeTimeRange === t[0] ? { background: 'var(--grad-brand)' } : undefined"
             @click="setFilter(activePriceRange, t[0], activeSubType)"
           >{{ t[1] }}</button>
         </div>

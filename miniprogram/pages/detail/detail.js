@@ -1,7 +1,7 @@
 const app = getApp()
 const { timeAgo } = require('../../utils/util')
 const { getCategoryById } = require('../../utils/category')
-const { get, post, followStatus } = require('../../utils/api')
+const { get, post, followStatus, trades, radar } = require('../../utils/api')
 const { showToast, showModal } = require('../../utils/util')
 const { optimisticToggle } = require('../../utils/optimistic')
 
@@ -21,6 +21,14 @@ Page({
     categoryColor: '#4A90D9',
     scrollIntoView: '',
     matches: [],
+    radarMatches: [],
+    radarLabel: '信息',
+    isTradePost: false,
+    offersState: { isSeller: false, hasAccepted: false, myOffer: null, offers: [] },
+    showOfferModal: false,
+    offerPriceInput: '',
+    offerMessageInput: '',
+    offerBusy: false,
     canFollowAuthor: false,
     canContactAuthor: false
   },
@@ -43,16 +51,31 @@ Page({
     }
   },
 
+  /** 空操作：用于 catchtap 阻断冒泡（微信要求 handler 必须是真实方法，写 "true" 会报错） */
+  onNoop() {},
+
+  /** 加载失败后的重试：清掉失败标记重新拉取 */
+  onRetryLoad() {
+    this.setData({ postLoadFailed: false })
+    this.loadPost()
+    this.loadComments()
+  },
+
   async loadPost() {
     try {
       const post = await get('/posts/' + this.data.postId, {}, false)
       const category = getCategoryById(post.category)
       const me = app.globalData.userInfo
+      const isTrade = post.category === 'trade' || !!(post.extra && post.extra.price)
+      const radarLabel = (post.extra && post.extra.direction === 'lost') ? '招领' : '寻物'
+
       this.setData({
         post,
         timeAgoText: timeAgo(post.time),
         categoryName: category ? category.name : '',
         categoryColor: category ? category.color : '#4A90D9',
+        isTradePost: isTrade,
+        radarLabel,
         // 匿名帖/自己 authored 的帖子不展示关注按钮
         canFollowAuthor: !!(post.author && post.author.id && !post.author.isAnonymous && (!me || me.id !== post.author.id)),
         // 私信作者入口：同口径（非匿名、有 id、非自己）——底部死文案「即将上线」下线
@@ -60,10 +83,132 @@ Page({
       })
       this.loadFollowStatus()
       // 「可能相关」仅失物招领板块请求（后端对其他板块返回空，省一次请求）
-      if (post.category === 'lost') this.loadMatches()
+      if (post.category === 'lost') {
+        this.loadMatches()
+        this.loadRadar()
+      }
+      if (isTrade) {
+        this.loadOffers()
+      }
     } catch (e) {
       this.setData({ postLoadFailed: true })
       showToast('加载失败')
+    }
+  },
+
+  /** 智能雷达：失物招领 FTS5 反向高精度召回 */
+  async loadRadar() {
+    try {
+      const res = await radar.matches(this.data.postId)
+      const all = (res && Array.isArray(res.matches)) ? res.matches : []
+      // 去重：关键词匹配（matches）与雷达会命中同一批帖子，同一张卡不应出现两次
+      const shown = new Set((this.data.matches || []).map((m) => m.id))
+      this.setData({ radarMatches: all.filter((m) => !shown.has(m.postId)) })
+    } catch (e) {
+      console.error('加载智能雷达失败', e)
+    }
+  },
+
+  onTapRadarMatch(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.navigateTo({ url: '/pages/detail/detail?id=' + id })
+  },
+
+  /** 意向出价列表拉取 */
+  async loadOffers() {
+    if (!this.data.isTradePost || !app.checkLogin()) return
+    try {
+      const res = await trades.offers(this.data.postId)
+      this.setData({
+        offersState: res || { isSeller: false, hasAccepted: false, myOffer: null, offers: [] }
+      })
+    } catch (e) {
+      console.error('加载出价列表失败', e)
+    }
+  },
+
+  onOpenOfferModal() {
+    if (!app.requireLogin(null, '发起出价')) return
+    if (this.data.post.extra && this.data.post.extra.soldAt) {
+      showToast('该物品已售出')
+      return
+    }
+    this.setData({
+      showOfferModal: true,
+      offerPriceInput: '',
+      offerMessageInput: ''
+    })
+  },
+
+  onCloseOfferModal() {
+    this.setData({ showOfferModal: false })
+  },
+
+  onOfferPriceInput(e) {
+    this.setData({ offerPriceInput: e.detail.value })
+  },
+
+  onOfferMessageInput(e) {
+    this.setData({ offerMessageInput: e.detail.value })
+  },
+
+  async onSubmitOffer() {
+    const price = parseFloat(this.data.offerPriceInput)
+    if (!price || isNaN(price) || price <= 0) {
+      showToast('请输入有效金额')
+      return
+    }
+    if (price > 1000000) {
+      showToast('出价金额超出上限')
+      return
+    }
+
+    this.setData({ offerBusy: true })
+    try {
+      await trades.createOffer(this.data.postId, {
+        offerPrice: price,
+        message: (this.data.offerMessageInput || '').trim()
+      })
+      showToast('出价成功')
+      this.setData({ showOfferModal: false, offerPriceInput: '', offerMessageInput: '' })
+      await this.loadOffers()
+    } catch (err) {
+      showToast((err && err.message) || '出价提交失败')
+    } finally {
+      this.setData({ offerBusy: false })
+    }
+  },
+
+  async onActOffer(e) {
+    const { id, action } = e.currentTarget.dataset
+    if (!id || !action || this.data.offerBusy) return
+
+    let confirmMsg = '确定执行此操作吗？'
+    if (action === 'accept') confirmMsg = '接受出价后将锁定交易并自动拒绝其他出价，确定接受吗？'
+    else if (action === 'reject') confirmMsg = '确定要拒绝该出价吗？'
+    else if (action === 'cancel') confirmMsg = '确定要取消您的出价吗？'
+
+    const ok = await showModal('确认提示', confirmMsg)
+    if (!ok) return
+
+    this.setData({ offerBusy: true })
+    try {
+      if (action === 'accept') {
+        await trades.acceptOffer(id)
+        showToast('已接受出价，交易锁定')
+      } else if (action === 'reject') {
+        await trades.rejectOffer(id)
+        showToast('已拒绝该出价')
+      } else if (action === 'cancel') {
+        await trades.cancelOffer(id)
+        showToast('已取消出价')
+      }
+      await this.loadOffers()
+    } catch (err) {
+      showToast((err && err.message) || '操作失败')
+    } finally {
+      this.setData({ offerBusy: false })
     }
   },
 

@@ -140,6 +140,23 @@ const drafts = {
   remove: (id) => del('/drafts/' + id, {}, false),
 }
 
+/* ---------- trades 意向出价与二手交易闭环 ---------- */
+const trades = {
+  complete: (postId, buyerId) => post('/trades/' + postId + '/complete', buyerId ? { buyerId: Number(buyerId) } : {}),
+  myRating: (postId) => get('/trades/' + postId + '/my-rating', {}, false),
+  rate: (postId, data) => post('/trades/' + postId + '/rate', data),
+  offers: (postId) => get('/trades/' + postId + '/offers', {}, false),
+  createOffer: (postId, data) => post('/trades/' + postId + '/offers', data),
+  acceptOffer: (offerId) => post('/trades/offers/' + offerId + '/accept', {}),
+  rejectOffer: (offerId) => post('/trades/offers/' + offerId + '/reject', {}),
+  cancelOffer: (offerId) => post('/trades/offers/' + offerId + '/cancel', {}),
+}
+
+/* ---------- radar 失物招领智能雷达 ---------- */
+const radar = {
+  matches: (postId) => get('/posts/' + postId + '/radar', {}, false),
+}
+
 /* ---------- upload（multipart） ---------- */
 const uploadFile = (filePath, name = 'file') => {
   return new Promise((resolve, reject) => {
@@ -162,10 +179,13 @@ const uploadFile = (filePath, name = 'file') => {
           return
         }
         if (data.code === 200) {
+          // 入库用相对路径：存绝对地址会把部署域名写进数据库，换域名后历史图片全部失效。
+          // 渲染侧（legacy-adapter.normalizePost）会统一 absUrl，预览也可直接用 previewUrl。
           resolve({
-            url: absUrl(data.data.url),
-            thumbUrl: absUrl(data.data.thumbUrl),
-            rawUrl: data.data.url
+            url: data.data.url,
+            thumbUrl: data.data.thumbUrl,
+            previewUrl: absUrl(data.data.url),
+            previewThumbUrl: absUrl(data.data.thumbUrl)
           })
         } else {
           showToast(data.message || '上传失败')
@@ -190,5 +210,5 @@ module.exports = {
   get, post, put, del, request, uploadFile,
   absUrl, toMs,
   followToggle, followingList, followersList, followStatus,
-  posts, users, follow, search, messages, sections, feedback, admin, drafts,
+  posts, users, follow, search, messages, sections, feedback, admin, drafts, trades, radar,
 }

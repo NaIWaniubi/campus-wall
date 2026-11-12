@@ -107,18 +107,19 @@ export const postSchemas = {
   // 创建帖子
   create: z.object({
     sectionId: z.number().int().min(1).max(8, '板块 ID 必须在 1-8 之间'),
-    title: z.string().min(1, '标题不能为空').max(100, '标题最多 100 字').transform((s) => s.trim()),
-    content: z.string().min(1, '内容不能为空').max(5000, '内容最多 5000 字').transform((s) => s.trim()),
-    images: z.array(z.string().url()).max(9, '最多上传 9 张图片').optional(),
+    title: z.string().min(1, '标题不能为空').max(50, '标题最多 50 字').transform((s) => s.trim()),
+    content: z.string().min(1, '内容不能为空').max(500, '内容最多 500 字').transform((s) => s.trim()),
+    images: z.array(z.string()).max(9, '最多上传 9 张图片').optional(),
     isAnonymous: z.boolean().default(false),
     extraFields: z.record(z.string(), z.unknown()).optional(),
   }),
   
   // 更新帖子
   update: z.object({
-    title: z.string().min(1).max(100).transform((s) => s.trim()).optional(),
-    content: z.string().min(1).max(5000).transform((s) => s.trim()).optional(),
-    images: z.array(z.string().url()).max(9, '最多上传 9 张图片').optional(),
+    title: z.string().min(1, '标题不能为空').max(50, '标题最多 50 字').transform((s) => s.trim()).optional(),
+    content: z.string().min(1, '内容不能为空').max(500, '内容最多 500 字').transform((s) => s.trim()).optional(),
+    images: z.array(z.string()).max(9, '最多上传 9 张图片').optional(),
+    isAnonymous: z.boolean().optional(),
     extraFields: z.record(z.string(), z.unknown()).optional(),
   }),
   
@@ -138,6 +139,7 @@ export const postSchemas = {
     minPrice: z.coerce.number().min(0).optional(),
     maxPrice: z.coerce.number().min(0).optional(),
     lostOrFound: z.enum(['lost', 'found']).optional(),
+    campus: z.string().max(30).optional(),
   }).passthrough(),
 };
 
@@ -204,9 +206,12 @@ export const userSchemas = {
   }),
   
   // 更新资料
+  // signature 是「一句话介绍」的正式字段：前端 SettingsPage 与 ProfilePage 都在读写它，
+  // 早期白名单误写成 bio 并默认 strip，导致保存签名静默失败（返回「无更新内容」）。
   updateProfile: z.object({
     nickname: z.string().min(1).max(20).optional(),
     avatar: z.string().url().optional(),
+    signature: z.string().max(100, '签名最多 100 字').optional(),
     bio: z.string().max(200).optional(),
     college: z.string().max(50).optional(),
     classInfo: z.string().max(50).optional(),

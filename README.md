@@ -5,6 +5,7 @@
 # 校园墙 Campus Wall
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
+> **V3 · AI 原生版**：紫粉多巴胺视觉（不再是绿白校园墙）+ AI 参与「发帖 → 读帖 → 看今天」主链路。
 
 校园墙按场景分类提供**二手交易、失物招领、表白墙、吐槽树洞、互助问答、校园活动、拼车、组队**八大垂直板块，支持 **Web 网页端 + 微信小程序**双端访问，解决校园信息碎片化、传播效率低、匿名表达需求强等痛点。
 
@@ -13,6 +14,16 @@
 ---
 
 ## ✨ 功能特性
+
+### AI 原生能力（V3）
+
+| 入口 | 能力 | 没有大模型时 |
+|---|---|---|
+| 发布页 · **AI 一键成稿** | 一句话 → 标题 / 正文 / 板块 / 价格 / 话题标签 | 校园词表抽标签 + 板块关键词判定 + 价格正则，同样能成稿 |
+| 详情页 · **AI 划重点** | 3 条要点 + 交易风险提示（押金/私下转账/刷单返利命中即高危） | 抽取式摘要（标题 2 字滑窗 + 句长 + 位置权重），风险词规则始终生效 |
+| 首页 · **今日校园简报** | 24h 动态数 / 最活跃板块 / 今日最热 / 安全提醒；冷清自动放宽到近 7 天 | SQL 统计 + 模板句，60s 缓存，永不空窗 |
+
+模型链带**总预算 + 单模型超时 + 5 分钟熔断**：全挂时不再是「白等 70 秒」，而是 6–15 秒内拿到规则版结果，熔断期内 0 网络直返。
 
 ### 用户端
 - **账号体系**：学号注册登录、个人中心、信誉分体系（0-120 分级权限）
@@ -28,7 +39,8 @@
 - **失物招领智能匹配**：发布时关键词打分自动匹配站内相似物品，双向站内通知
 - **板块订阅**：订阅感兴趣板块，每日定时摘要推送新帖数与最热帖
 - **二手交易互评**：交易完成后买卖双方星级互评，好评/差评联动信誉分升降
-- **AI 助手**：站内智能助手，基于知识库与帖子检索答疑（OpenRouter）
+- **AI 助手**：站内智能助手，基于知识库与帖子检索答疑（OpenRouter），未配置时走站内检索兜底
+- **AI 产品层**：一键成稿 / 帖子划重点 / 今日简报（详见上方「AI 原生能力」）
 - **意见反馈**：一键提交使用建议直达后台
 - **匿名合规**：匿名发布后台可溯源、强制匿名板块（树洞）、信誉分阈值控制
 
@@ -45,7 +57,7 @@
 - **AI 助手配置**：官方知识库维护、模型与开关设置
 
 ### 微信小程序端
-- **原生实现**：`miniprogram/` 目录，28 个页面，与 Web 共用同一套后端契约
+- **原生实现**：`miniprogram/` 目录，29 个页面，与 Web 共用同一套后端契约
 - **五大 Tab**：首页 / 话题（八板块分类页）/ 发布 / 消息 / 我的（自定义 TabBar）
 - **登录双通道**：学号密码 JWT；wx.login 静默登录（服务端未配置 `WX_APPID`/`WX_SECRET` 时自动回退表单登录）
 - **完整能力**：私信会话、关注体系、失物招领方向双 Tab（丢失/拾获）、我的点赞/收藏、内容审核、订阅按钮
@@ -54,19 +66,29 @@
 
 ### 内容安全
 - 前后端双重敏感词检测，风险三级评定：高风险直接驳回、中风险进人工审核队列、低风险正常发布
-- ASCII 敏感词按词边界匹配（`USB` 不会被 `sb` 子串误杀），后端支持命中位置提取供审核高亮
+- 词库 49 词 + 14 条变体规则，覆盖全角（`ｓｂ`）、插入分隔符（`傻*逼`）、谐音（`煞笔`）等绕过写法
+- ASCII 敏感词按词边界匹配（`USB`、`SB-1000` 不会被 `sb` 子串误杀），后端支持命中位置提取供审核高亮
+- 明确边界：图片/语音/拼音首字母组合由微信 `msgSecCheck` 与人工队列兜底
 - 信誉分阈值控制发帖/评论/匿名权限
+- **匿名信任层**：匿名帖不可按 `authorId` 反查、详情不返回作者、编辑不脱匿名；四路反查有回归测试
+- **失物匹配质控**：方向必须相反 + 品类不同即排除，避免「捡到校园卡」配到「捡到钥匙」
+- **Token 吊销**：改密/封禁递增 `token_version`，旧 token 立即失效（REST 与 WS 双通道校验）
 - 频控：发帖每日上限、评论 10s 频控、举报 24h 频控
 - 软删除机制，数据可追溯
 
 ### 可靠性与性能
-- **实时链路**：WebSocket 单连接承载私信与通知（hello 帧鉴权 + 心跳 + 指数退避重连），REST 永远兜底
+- **实时链路**：WebSocket 单连接承载私信与通知（hello 帧鉴权 + 心跳 + 指数退避重连 + 服务端频控），REST 永远兜底
 - 信息流读缓存：LRU（200 条）+ TTL（60s），写路径前缀失效，`X-Cache: HIT/MISS` 可观测
 - SQLite 在线热备份（WAL 安全），默认保留 7 份自动轮换；配置 `BACKUP_ENCRYPTION_KEY` 后落盘 AES-256-GCM 加密（恢复用 `api/scripts/decrypt-backup.mjs`）
-- **滑动窗口限流**：发帖 10/min、评论 30/min、上传 20/min、AI 10/min（IP/学号/UA 维度），登录注册另有失败锁定
+- **滑动窗口限流**：发帖 10/min、评论 30/min、上传 20/min、AI 10/min（IP + 学号双维度 + IP 兜底桶），登录注册另有失败锁定；UA 不参与桶 key（客户端可伪造）
 - **健康检查**：`/api/health` 返回 db/storage/ws 状态、uptime、版本与 5xx 计数
+- **运营埋点**：`events` 表记录注册/登录/首帖/首评/成交等转化事件；看板展示今日活跃、7 日活跃、激活率、成交闭环、审核时效
+- **管理审计**：封禁/解封/改信誉/重置密码/内容审核/删评/举报处理全部写 `admin_logs`，且仅在真实状态变更时记录
+- **算法回归门**：`npm run eval:radar -- --gate` 对失物雷达跑标注集，召回/误报/P@1 跌破阈值即 CI 失败
 - **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
-- 图片上传压缩管线：大图重编码 + WebP 缩略图
+- 图片上传压缩管线：大图重编码 + WebP 缩略图；解码像素上限 5000 万（防解压炸弹），失败即拒绝而非回落原图
+- **数据库**：WAL + `busy_timeout` + 预编译语句缓存；FTS 触发器按列触发（浏览/点赞不再重建索引，实测快约 19 倍）
+- **可访问性**：品牌色与次级文字对比度达 WCAG AA（4.5:1，单测守护）；帖子卡键盘可达；表单 label 关联；Toast `aria-live`；弹窗 `role=dialog` + Esc 关闭
 
 ---
 
@@ -131,7 +153,7 @@
 │   ├── utils/              # 工具（api/request/helpers）
 │   ├── App.vue
 │   └── main.ts
-├── miniprogram/              # 微信小程序端（原生，28 页）
+├── miniprogram/              # 微信小程序端（原生，29 页）
 │   ├── app.json              # 页面注册 + 自定义 TabBar
 │   ├── pages/                # 五大 Tab + 八板块分类页 + 我的子页 + 审核/协议页
 │   ├── components/           # post-card / comment-item / conversation-item / user-row / announce-dialog / skeleton / empty-state / load-more / subscribe-btn 共 9 组件
@@ -205,6 +227,17 @@ npm run dev
 | `npm run check` | TypeScript 类型检查 |
 | `npm run lint` | ESLint 代码检查 |
 | `npm run seed` | 灌入全板块演示数据种子（幂等；`--force` 重种） |
+| `npm test` | 全量单测 + 集成测试（干净库可直接通过，无需先 seed） |
+| `npm run test:coverage` | 生成覆盖率报告 |
+| `npm run e2e` | Playwright 端到端测试 |
+| `npm run eval:radar` | 失物雷达离线评测（P@1/P@3/MRR/召回/误报）；`-- --gate` 作为回归门 |
+| `npm run bench` | 接口性能基准（QPS + p50/p95/p99），独立临时库，不污染开发数据 |
+
+> **可复现的算法与性能证据**（本轮实测）：
+> - 雷达评测：21 组标注 query / 63 候选，P@1 100%、召回 100%、误报 7.1%、精确率 87.5%；
+>   纯关键词基线召回仅 19%。`npm run eval:radar -- --gate` 已接入 CI。
+> - 性能基准（单机单进程 SQLite，1000 请求/端点，并发 20）：
+>   信息流 p95 56ms / 详情 28ms / 全文搜索 31ms / 板块 18ms，错误率 0。
 
 ---
 
@@ -249,12 +282,16 @@ pm2 save && pm2 startup
 | 变量名 | 说明 | 默认值 |
 |---|---|---|
 | `PORT` | 后端服务端口 | `3001` |
+| `METRICS_TOKEN` | 配置后 `/metrics` 需请求头 `x-metrics-token` 才返回全量指标（选填） | 空 |
+| `RATE_LIMIT_ENABLED` | 设为 `0` 关闭全部限流，**仅供离线压测**使用 | 启用 |
 | `JWT_SECRET` | JWT 签名密钥（生产环境**必须**修改） | `campus-wall-dev-secret-key-2026` |
 | `JWT_EXPIRES_IN` | JWT 过期时间 | `7d` |
 | `DB_PATH` | SQLite 数据库文件路径 | `api/data.db` |
 | `NODE_ENV` | 运行环境 | `development` |
+| `ADMIN_INITIAL_PASSWORD` | 首次启动创建超管的口令。**生产环境必填**，缺失则拒绝启动；开发/测试默认 `admin123` | 空 |
+| `TRUST_PROXY` | 反向代理信任跳数。默认不信任（`X-Forwarded-For` 不可伪造）；部署在 nginx/Vercel 后必须显式设为真实跳数（单层 nginx = `1`） | 空（不信任） |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | AI 助手密钥与模型（选填） | 空 / `nvidia/nemotron-3-super-120b-a12b:free` |
-| `WX_APPID` / `WX_SECRET` | 小程序静默登录凭据（选填，不配则回退学号密码登录） | 空 |
+| `WX_APPID` / `WX_SECRET` | 小程序静默登录凭据（选填；不配时 `POST /api/auth/wx-login` 返回 501，端上静默回退学号密码登录） | 空 |
 
 ---
 
@@ -287,12 +324,12 @@ pm2 save && pm2 startup
 
 ## 🗄 数据模型
 
-共 **18 张表**，详见 [`架构文档`](docs/ARCHITECTURE.md)：
+共 **20 张业务表**（另有 `posts_fts*` 5 张 FTS5 全文索引表），详见 [`架构文档`](docs/ARCHITECTURE.md)：
 
 - 核心：`users` · `sections` · `posts` · `comments` · `likes` · `favorites` · `messages` · `reports` · `drafts` · `announcements` · `announcement_acks` · `settings`
-- 扩展：`subscriptions`（板块订阅）· `trade_ratings`（交易互评）· `feedback`（意见反馈）· `conversations` / `chat_messages`(私信会话) · `follows`(关注关系)
+- 扩展：`subscriptions`（板块订阅）· `trade_offers`（意向出价）· `trade_ratings`（交易互评）· `feedback`（意见反馈）· `conversations` / `chat_messages`（私信会话）· `follows`（关注关系）· `admin_logs`（管理审计）· `push_subscriptions`（Web Push）
 
-首次启动会自动建表并初始化 8 个板块与默认管理员账号；老库升级时拼车/组队板块幂等补种。
+首次启动会自动建表并初始化 8 个板块；管理员账号由 `ADMIN_INITIAL_PASSWORD` 提供（生产环境必填，缺失则拒绝启动）。老库升级时拼车/组队板块幂等补种。
 
 ---
 

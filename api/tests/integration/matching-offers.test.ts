@@ -42,12 +42,16 @@ function auth(userId: number): string {
 
 afterAll(() => {
   // 清理测试数据（FTS 触发器同步删除倒排索引）
+  // 先删引用 posts 的子表（trade_ratings / trade_offers / messages），否则外键约束失败
   for (const id of createdPostIds) {
+    db.prepare('DELETE FROM trade_ratings WHERE post_id = ?').run(id);
     db.prepare('DELETE FROM trade_offers WHERE post_id = ?').run(id);
     db.prepare('DELETE FROM messages WHERE related_id = ?').run(id);
     db.prepare('DELETE FROM posts WHERE id = ?').run(id);
   }
   for (const id of createdUserIds) {
+    db.prepare('DELETE FROM trade_ratings WHERE rater_id = ? OR ratee_id = ?').run(id, id);
+    db.prepare('DELETE FROM events WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   }
 });
@@ -181,5 +185,68 @@ describe('撮合引擎与意向出价闭环 · 集成', () => {
       .set('Authorization', auth(seller));
     expect(reject.status).toBe(200);
     expect(reject.body.data.status).toBe('rejected');
+  });
+
+  it('互评权限：交易第三方不能评卖家，卖家不能指定任意用户（防刷信誉分）', async () => {
+    const tradeSection = db.prepare("SELECT id FROM sections WHERE name LIKE '%二手%'").get() as any;
+    const post = createPost(seller, tradeSection.id, `出一台显示器 ${TAG}`, `${TAG}，标价300`);
+
+    const offer = await request(app)
+      .post(`/api/trades/${post}/offers`)
+      .set('Authorization', auth(buyerA))
+      .send({ offerPrice: 260 });
+    await request(app)
+      .post(`/api/trades/offers/${offer.body.data.id}/accept`)
+      .set('Authorization', auth(seller));
+    await request(app)
+      .post(`/api/trades/${post}/complete`)
+      .set('Authorization', auth(seller))
+      .send({});
+
+    // 未参与交易的第三方评卖家 → 403
+    const byThird = await request(app)
+      .post(`/api/trades/${post}/rate`)
+      .set('Authorization', auth(buyerB))
+      .send({ rating: 1, comment: '恶意差评' });
+    expect(byThird.status).toBe(403);
+
+    // 卖家指定任意第三方为被评人 → 403
+    const bySeller = await request(app)
+      .post(`/api/trades/${post}/rate`)
+      .set('Authorization', auth(seller))
+      .send({ targetUserId: buyerB, rating: 5 });
+    expect(bySeller.status).toBe(403);
+
+    // 合法双向互评可用
+    const buyerRates = await request(app)
+      .post(`/api/trades/${post}/rate`)
+      .set('Authorization', auth(buyerA))
+      .send({ rating: 5, comment: '交易顺利' });
+    expect(buyerRates.body.code).toBe(200);
+
+    const sellerRates = await request(app)
+      .post(`/api/trades/${post}/rate`)
+      .set('Authorization', auth(seller))
+      .send({ rating: 5 });
+    expect(sellerRates.body.code).toBe(200);
+  });
+
+  it('并发接受同一出价只生效一次（CAS 条件更新）', async () => {
+    const tradeSection = db.prepare("SELECT id FROM sections WHERE name LIKE '%二手%'").get() as any;
+    const post = createPost(seller, tradeSection.id, `出一台旧相机 ${TAG}`, `${TAG}，标价500`);
+    const offer = await request(app)
+      .post(`/api/trades/${post}/offers`)
+      .set('Authorization', auth(buyerA))
+      .send({ offerPrice: 420 });
+
+    const offerId = offer.body.data.id;
+    const results = await Promise.all([
+      request(app).post(`/api/trades/offers/${offerId}/accept`).set('Authorization', auth(seller)),
+      request(app).post(`/api/trades/offers/${offerId}/accept`).set('Authorization', auth(seller)),
+    ]);
+    const succeeded = results.filter((r) => r.body.code === 200);
+    const rejected = results.filter((r) => r.body.code !== 200);
+    expect(succeeded.length).toBe(1);
+    expect(rejected.length).toBe(1);
   });
 });

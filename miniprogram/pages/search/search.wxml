@@ -46,7 +46,9 @@
     <view class="result-list">
       <skeleton wx:if="{{loadMoreStatus === 'loading' && !results.length}}" type="post" count="{{3}}" />
       <post-card wx:for="{{results}}" wx:key="id" post="{{item}}" current-user-id="{{currentUserId}}" bind:tap="onTapPost" bind:like="onLikePost" bind:comment="onCommentPost" bind:favorite="onFavoritePost" bind:follow="onFollowAuthor"></post-card>
-      <empty-state wx:if="{{results.length === 0 && loadMoreStatus !== 'loading'}}" text="未找到相关内容" customIcon="🔍"></empty-state>
+      <!-- 失败与「无结果」区分：失败给重试入口，不伪装成空态 -->
+      <empty-state wx:if="{{loadMoreStatus === 'error' && results.length === 0}}" type="error" text="搜索失败" bind:retry="onRetrySearch"></empty-state>
+      <empty-state wx:elif="{{results.length === 0 && loadMoreStatus !== 'loading'}}" text="未找到相关内容" customIcon="🔍"></empty-state>
       <load-more wx:if="{{results.length > 0}}" status="{{loadMoreStatus}}" bind:loadmore="onLoadMore"></load-more>
     </view>
   </view>

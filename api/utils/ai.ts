@@ -57,6 +57,43 @@ export function isAiEnabled(): boolean {
   return !!getAiApiKey();
 }
 
+/* ==========================================================================
+ * 熔断（durability）：整条模型链都失败后，5 分钟内不再排队重试网络，
+ * 直接让调用方走各自的离线兜底 —— 用户端从「白等 70 秒」变成「立刻有结果」。
+ * ========================================================================== */
+const BREAKER_MS = 5 * 60_000;
+let breakerUntil = 0;
+
+/** 熔断是否已恢复（到期自动放行，再试一次） */
+export function aiReachable(): boolean {
+  return Date.now() >= breakerUntil;
+}
+
+/** 配置具备 AI 能力 且 未处于熔断窗口 */
+export function isAiUsable(): boolean {
+  return isAiEnabled() && aiReachable();
+}
+
+function tripBreaker(reason: string): void {
+  breakerUntil = Date.now() + BREAKER_MS;
+  logger.warn('AI 熔断开启：短期连续调用失败，改用站内兜底', {
+    reason,
+    until: new Date(breakerUntil).toISOString(),
+  });
+}
+
+function resetBreaker(): void {
+  breakerUntil = 0;
+}
+
+/** 调用预算：整链最多花多少时间、单模型最多等多久 */
+export interface AiCallOptions {
+  /** 整条模型链的总时间预算（毫秒），超出即停手交给兜底 */
+  budgetMs?: number;
+  /** 单个模型的等待上限（毫秒） */
+  perModelTimeoutMs?: number;
+}
+
 /**
  * 组装本次调用的模型列表：数据库设置 > 环境变量 > 默认链
  */
@@ -164,23 +201,36 @@ async function requestOnce(
 }
 
 /**
- * 非流式调用：按模型链依次尝试，全部失败抛最后一个错误
+ * 非流式调用：按模型链依次尝试，全部失败抛最后一个错误。
+ * 带总时间预算与单模型超时；整链失败则开熔断，后续请求直接走兜底。
  */
 export async function chatWithAI(
   messages: AiMessage[],
   maxTokens = 1024,
-  models: string[] = buildModelChain()
+  models: string[] = buildModelChain(),
+  opts: AiCallOptions = {}
 ): Promise<string> {
   if (!isAiEnabled()) throw new Error('AI 未配置');
+  if (!aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
+
+  const started = Date.now();
+  const budgetMs = opts.budgetMs ?? 30_000;
+  const perModelTimeoutMs = opts.perModelTimeoutMs ?? 20_000;
   let lastError: Error = new Error('无可用模型');
+
   for (const model of models) {
+    const remain = budgetMs - (Date.now() - started);
+    if (remain <= 500) break; // 预算耗尽，交给兜底，不再等
     try {
-      return await requestOnce(model, messages, maxTokens);
+      const out = await requestOnce(model, messages, maxTokens, undefined, Math.min(perModelTimeoutMs, remain));
+      resetBreaker();
+      return out;
     } catch (err: any) {
       lastError = err;
       logger.error('AI 模型调用失败', { model, error: err?.message });
     }
   }
+  tripBreaker(lastError.message);
   throw lastError;
 }
 
@@ -192,22 +242,43 @@ export async function chatWithAIStream(
   messages: AiMessage[],
   onDelta: (text: string) => void,
   maxTokens = 1024,
-  models: string[] = buildModelChain()
+  models: string[] = buildModelChain(),
+  opts: AiCallOptions = {}
 ): Promise<string> {
   if (!isAiEnabled()) throw new Error('AI 未配置');
+  if (!aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
+
+  const started = Date.now();
+  const budgetMs = opts.budgetMs ?? 45_000;
+  const perModelTimeoutMs = opts.perModelTimeoutMs ?? 30_000;
   let lastError: Error = new Error('无可用模型');
+
   for (const model of models) {
-    let started = false;
+    const remain = budgetMs - (Date.now() - started);
+    if (remain <= 500) break;
+    let started_ = false;
     try {
-      return await requestOnce(model, messages, maxTokens, (t) => {
-        started = true;
-        onDelta(t);
-      });
+      const out = await requestOnce(
+        model,
+        messages,
+        maxTokens,
+        (t) => {
+          started_ = true;
+          onDelta(t);
+        },
+        Math.min(perModelTimeoutMs, remain)
+      );
+      resetBreaker();
+      return out;
     } catch (err: any) {
       lastError = err;
       logger.error('AI 流式模型调用失败', { model, error: err?.message });
-      if (started) throw err;
+      if (started_) {
+        tripBreaker(err?.message ?? 'stream failed');
+        throw err;
+      }
     }
   }
+  tripBreaker(lastError.message);
   throw lastError;
 }

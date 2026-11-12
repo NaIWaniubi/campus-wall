@@ -161,9 +161,50 @@ export interface AiForumItem {
   createdAt: string
   type: 'post' | 'comment'
 }
+/** AI 成稿结果（/ai/draft） */
+export interface AiDraftResult {
+  title: string
+  content: string
+  tags: string[]
+  sectionId: number | null
+  sectionName: string | null
+  price: number | null
+  /** true = 未接入大模型，按站内规则生成 */
+  offline: boolean
+}
+
+/** AI 划重点结果（/ai/summarize） */
+export interface AiSummaryResult {
+  points: string[]
+  risk: 'low' | 'medium' | 'high'
+  riskNote: string | null
+  offline: boolean
+}
+
+/** 今日简报（/ai/digest） */
+export interface AiDigestResult {
+  date: string
+  /** 统计窗口文案：'24 小时' 或 '近 7 天'（冷清时自动放宽） */
+  window?: string
+  stats: { posts: number; comments: number }
+  sections: Array<{ name: string; n: number }>
+  hot: { id: number; title: string; section: string; likes: number } | null
+  summary: string
+  tip: string
+  offline: boolean
+}
+
 export const aiApi = {
   chat: (data: { message: string; history?: { role: 'user' | 'assistant'; content: string }[] }) =>
     request.post<{ reply: string; forums: AiForumItem[] }>('/ai/chat', data, { timeout: 65000 }),
+  /** 发布助手：一句话 → 标题 / 正文 / 标签 / 板块 / 价格 */
+  draft: (data: { raw: string; sectionId?: number }) =>
+    request.post<AiDraftResult>('/ai/draft', data, { timeout: 65000 }),
+  /** 帖子划重点：要点 + 风险提示（只传 postId，服务端取正文） */
+  summarize: (data: { postId?: number; title?: string; content?: string }) =>
+    request.post<AiSummaryResult>('/ai/summarize', data, { timeout: 65000 }),
+  /** 今日简报：当日动态概览 */
+  digest: () => request.get<AiDigestResult>('/ai/digest', { timeout: 20000 }),
 }
 
 // 管理端 AI 设置

@@ -69,28 +69,28 @@
         <text class="menu-icon">📝</text>
         <text class="menu-text">我的发布</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
     <view class="menu-item flex-between" bindtap="onGoDrafts">
       <view class="menu-left flex-row">
         <text class="menu-icon">📋</text>
         <text class="menu-text">草稿箱</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
     <view class="menu-item flex-between" bindtap="onGoMyFavorites">
       <view class="menu-left flex-row">
         <text class="menu-icon">⭐</text>
         <text class="menu-text">我的收藏</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
     <view class="menu-item flex-between" bindtap="onGoMyLikes">
       <view class="menu-left flex-row">
         <text class="menu-icon">👍</text>
         <text class="menu-text">我的点赞</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
   </view>
 
@@ -102,7 +102,7 @@
       </view>
       <view class="flex-row">
         <view class="unread-badge" wx:if="{{unreadCount > 0}}">{{unreadCount}}</view>
-        <text class="menu-arrow gray-color">></text>
+        <view class="menu-arrow"></view>
       </view>
     </view>
     <view class="menu-item flex-between" bindtap="onGoSettings">
@@ -110,7 +110,7 @@
         <text class="menu-icon">⚙️</text>
         <text class="menu-text">设置</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
   </view>
 
@@ -120,14 +120,14 @@
         <text class="menu-icon">ℹ️</text>
         <text class="menu-text">关于我们</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
     <view class="menu-item flex-between" bindtap="onFeedback">
       <view class="menu-left flex-row">
         <text class="menu-icon">📮</text>
         <text class="menu-text">意见反馈</text>
       </view>
-      <text class="menu-arrow gray-color">></text>
+      <view class="menu-arrow"></view>
     </view>
   </view>
 </view>

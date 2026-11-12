@@ -25,7 +25,7 @@
                └────────────┬──────────────────┘
                     ┌───────▼────────┐
                     │ SQLite (WAL)   │ api/data.db  ← 单文件嵌入式
-                    │ 18 张表        │
+                    │ 20 张表        │
                     └────────────────┘
 ```
 
@@ -53,7 +53,7 @@
 │  ├─ server.ts              # 本地入口：listen 3001 + SIGTERM/SIGINT 优雅退出
 │  ├─ index.ts               # Vercel Serverless 入口
 │  ├─ app.ts                 # ★ 核心：中间件链 + 路由挂载 + 错误/404 兜底
-│  ├─ db.ts                  # SQLite 初始化、建表、种子数据（18 张表）
+│  ├─ db.ts                  # SQLite 初始化、建表、种子数据（20 张表）
 │  ├─ middleware/auth.ts     # authRequired / authOptional / adminRequired / superAdminRequired
 │  ├─ routes/                # 17 个路由模块（auth/posts/comments/users/messages/
 │  │                         #   sections/upload/drafts/announcements/ai/adminAi/
@@ -148,7 +148,7 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 
 ### 4.3 数据层（better-sqlite3）
 - 同步 API、单连接，性能足够校园规模；**WAL 模式** + 外键开启
-- **18 张表**：users、sections、posts、comments、likes、favorites、messages、reports、drafts、announcements、announcement_acks、settings、subscriptions（板块订阅）、trade_ratings（交易互评）、feedback（意见反馈）、conversations / chat_messages（私信会话）、follows（关注关系）
+- **20 张业务表**（另有 `posts_fts*` 5 张 FTS5 索引表）：users、sections、posts、comments、likes、favorites、messages、reports、drafts、announcements、announcement_acks、settings、subscriptions（板块订阅）、trade_offers（意向出价）、trade_ratings（交易互评）、feedback（意见反馈）、conversations / chat_messages（私信会话）、follows（关注关系）、admin_logs（管理审计）、push_subscriptions（Web Push）
 - 启动时幂等建表（CREATE TABLE IF NOT EXISTS）+ 种子数据
 - DB 路径可用 `DB_PATH` 环境变量重定向（绝对/相对均支持），默认 `api/data.db`
 
@@ -174,7 +174,7 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 | 关注体系 ×4 | `POST /api/users/:id/follow`、`GET .../following`、`GET .../followers`、`GET .../follow-status` | follow 为 toggle 语义；列表含昵称+信誉分（供 CreditBadge 渲染）；status 供详情页按钮回显 |
 | 我的点赞 | `GET /api/users/me/likes` | 返回 `{list,total,page,pageSize,hasMore}` 标准分页 |
 | 意见反馈 ×2 | `POST /api/feedback`、`GET /api/admin/feedbacks` | 提交校验 content≤500 必填、contact≤100 选填；后台分页检索 |
-| 微信登录 | `POST /api/auth/wx-login` | code 换 session（jscode2session，https.get 5s 超时）→ 签发 JWT；`WX_APPID`/`WX_SECRET` 未配置返回 **501**，小程序静默回退学号密码登录 |
+| 微信登录 | `POST /api/auth/wx-login` | code 换 session（jscode2session，运行时读取 WX_APPID/WX_SECRET）→ 已绑定 openid 直接签发 JWT，未绑定创建占位账号；`WX_APPID`/`WX_SECRET` 未配置返回 **501**，小程序静默回退学号密码登录 |
 | 失物方向过滤 | `GET /api/posts?sectionId=2&direction=lost\|found` | SQL 层 `json_extract(p.extra_fields,'$.direction')` 精确过滤，仅失物板块生效 |
 
 **extraFields 浅合并编辑语义**（`PUT /api/posts/:id`）：请求携带的扩展键经白名单清洗（`sanitizeExtraFields`）后逐键覆盖库中现有值，未携带的键原样保留。
@@ -220,7 +220,7 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 
 ## 6. 质量工具链
 
-- **类型检查**：vue-tsc 3（Vue SFC + TS 全覆盖），`strict: false` 宽松模式（存量代码现状）
+- **类型检查**：vue-tsc 3（Vue SFC + TS 全覆盖），`strict: true` 严格模式
 - **ESLint 9 扁平配置**（eslint.config.js）：
   - eslint-plugin-vue `flat/essential`（只保留错误级规则，避免对存量模板做风格重排）
   - typescript-eslint recommended；关闭 no-explicit-any（配合宽松 TS）
@@ -256,7 +256,7 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 
 ### 8.1 结构
 
-- `app.json`：**26 个页面**注册 + `custom-tab-bar` 五 Tab（首页 / 话题 / 发布 / 消息 / 我的）
+- `app.json`：**29 个页面**注册 + `custom-tab-bar` 五 Tab（首页 / 话题 / 发布 / 消息 / 我的）
 - `pages/`：index · category（八板块分类页：trade/lost/confession/daily/help/activity/carshare/team）· publish · message（+ chat 私信）· mine（myPosts / myFavorites / myLikes / follows / profile / notification / feedback / settings）· search · detail · legal（协议）· admin/moderation（内容审核）
 - `components/` 7 个：post-card、comment-item、conversation-item、user-row、subscribe-btn、empty-state、load-more
 - `utils/`：api.js 适配层、constants.js 板块映射、auth / cache / optimistic / share 等

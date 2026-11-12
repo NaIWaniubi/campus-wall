@@ -13,8 +13,9 @@ import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/match
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
 import { applyDirectionFilter } from '../utils/direction-filter.js';
 import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
-import { validate, postSchemas } from '../utils/validation.js';
+import { validate, postSchemas, commonSchemas } from '../utils/validation.js';
 import { safeJsonParse, logger } from '../utils/logger.js';
+import { trackEvent, trackFirstEvent, touchActive } from '../utils/events.js';
 
 const router = Router();
 
@@ -112,10 +113,17 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
     params.push(sectionId);
   }
   // 按作者筛选（公开主页用；配合 status=published 即该作者的公开可见帖）
+  // 匿名帖必须排除：否则任何人可用 ?authorId=N 把该用户发过的匿名帖逐条筛出来，
+  // 匿名承诺在列表接口层面直接失效（只有本节作者或管理员能看到自己的匿名帖）。
   const authorId = req.query.authorId ? parseInt(req.query.authorId as string) : 0;
   if (authorId > 0) {
     where += ` AND p.user_id = ?`;
     params.push(authorId);
+    const viewerIsOwner = currentUserId === authorId;
+    const viewerIsAdmin = req.currentUser?.role === 'super_admin' || req.currentUser?.role === 'section_admin';
+    if (!viewerIsOwner && !viewerIsAdmin) {
+      where += ` AND p.is_anonymous = 0`;
+    }
   }
   if (keyword) {
     // FTS5 全文检索：unicode61 分词 + BM25，避免 LIKE 全表扫描；空词回退 LIKE 兜底
@@ -165,6 +173,13 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
       params.push(safePath, val);
     }
   }
+  // 校区筛选：小程序「我的」与板块页的校区 picker 传 campus。
+  // 之前适配层直接丢弃该参数，导致切校区完全无效——这里落到 extra_fields.campus 上。
+  const campus = (req.query.campus as string) || '';
+  if (campus) {
+    where += ` AND json_extract(p.extra_fields, '$.campus') = ?`;
+    params.push(campus);
+  }
   // 失物方向筛选：仅当目标板块为失物招领类时生效（lost=丢失 / found=拾到）
   const directionRaw = (req.query.direction as string) || '';
   let directionApplied = '';
@@ -207,9 +222,12 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
     `sort=${sort}`, `page=${page}`, `pageSize=${pageSize}`,
     `sectionId=${sectionId}`, `keyword=${keyword}`,
     `priceRange=${priceRange}`, `timeRange=${timeRange}`, `subType=${subType}`,
-    `direction=${directionApplied}`,
+    `direction=${directionApplied}`, `campus=${campus}`,
     // authorId 是 WHERE 条件，漏进 key 会让不同作者的主页命中同一份缓存行
     `authorId=${authorId}`,
+    // 匿名可见性随查看者身份变化（作者/管理员能看到自己的匿名帖，陌生人不能）。
+    // 不把可见性维度写进 key，会让游客结果与作者结果互相复用 → 匿名帖串号泄露。
+    `anon=${authorId > 0 ? (currentUserId === authorId || req.currentUser?.role === 'super_admin' || req.currentUser?.role === 'section_admin' ? 'own' : 'public') : 'all'}`,
   ].join(':');
 
   let posts: any[];
@@ -271,7 +289,7 @@ router.get('/:id/matches', authOptional, (req, res) => {
   if (!id) return fail(res, '帖子不存在', 404, 404);
 
   const post = db.prepare(`
-    SELECT p.id, p.user_id, p.title, p.content, s.name AS section_name
+    SELECT p.id, p.user_id, p.title, p.content, p.extra_fields, s.name AS section_name
     FROM posts p LEFT JOIN sections s ON p.section_id = s.id
     WHERE p.id = ? AND p.status = 'published'
   `).get(id) as any;
@@ -318,6 +336,15 @@ router.get('/:id', authOptional, (req, res) => {
     return fail(res, '帖子不存在', 404, 404);
   }
 
+  // 作者已封禁：列表接口已过滤（见 where 条件 u.status != 'banned'），
+  // 详情也必须一致，否则匿名访客仍可直读被封用户的昵称/学院/信誉分
+  if (post.status === 'published' && !isAdmin) {
+    const author = db.prepare('SELECT status FROM users WHERE id = ?').get(post.author_id) as any;
+    if (author && author.status === 'banned' && post.author_id !== currentUserId) {
+      return fail(res, '帖子不存在', 404, 404);
+    }
+  }
+
   // 增加浏览量
   db.prepare('UPDATE posts SET view_count = view_count + 1 WHERE id = ?').run(id);
 
@@ -328,14 +355,8 @@ router.get('/:id', authOptional, (req, res) => {
 });
 
 // 发布帖子
-router.post('/', authRequired, postLimiter, (req, res) => {
+router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create }), (req, res) => {
   const { sectionId, title, content, images, isAnonymous, extraFields } = req.body;
-
-  if (!sectionId) return fail(res, '请选择板块');
-  if (!title || !title.trim()) return fail(res, '标题不能为空');
-  if (!content || content.length < 10) return fail(res, '正文至少10字');
-  if (content.length > 500) return fail(res, '正文最多500字');
-  if (title.length > 50) return fail(res, '标题最多50字');
 
   const section = db.prepare('SELECT * FROM sections WHERE id = ? AND is_active = 1').get(sectionId) as any;
   if (!section) return fail(res, '板块不存在或已停用');
@@ -394,7 +415,14 @@ router.post('/', authRequired, postLimiter, (req, res) => {
   let matchedCount = 0;
   if (status === 'published') {
     try {
-      const newPost = { id: postId, user_id: req.currentUser!.id, title: title.trim(), content };
+      // 传 extra_fields：匹配器要靠 direction/itemType 排除同向帖与不同品类
+      const newPost = {
+        id: postId,
+        user_id: req.currentUser!.id,
+        title: title.trim(),
+        content,
+        extra_fields: JSON.stringify({ ...extra, riskFlag: undefined }),
+      };
       const matches = findLostFoundMatches(newPost);
       if (matches.length) {
         notifyLostFoundMatch(newPost, matches);
@@ -420,13 +448,18 @@ router.post('/', authRequired, postLimiter, (req, res) => {
     );
   }
 
+  // 埋点：发帖 + 首次发帖（激活标志，漏斗核心指标）
+  trackEvent(req.currentUser!.id, 'post_create', postId, { sectionId, status });
+  trackFirstEvent(req.currentUser!.id, 'first_post', postId);
+  touchActive(req.currentUser!.id);
+
   success(res, { id: postId, status, matchedCount }, status === 'published' ? '发布成功'
     : status === 'pending_review' ? '内容待审核，请等待管理员审核'
     : '发布成功，内容正在审核中');
 });
 
 // 编辑帖子（24小时内可编辑1次）
-router.put('/:id', authRequired, (req, res) => {
+router.put('/:id', authRequired, validate({ params: commonSchemas.id, body: postSchemas.update }), (req, res) => {
   const id = Number(req.params.id);
   const { title, content, images, isAnonymous, extraFields } = req.body;
 
@@ -445,6 +478,20 @@ router.put('/:id', authRequired, (req, res) => {
 
   // status 始终由服务端规则推导，禁止客户端修改（防止越权改状态）
   const section = db.prepare('SELECT * FROM sections WHERE id = ?').get(post.section_id) as any;
+
+  // 匿名状态：未传则沿用原值（缺省写 0 会把匿名帖一键脱匿名并暴露作者）；
+  // 显式变更时复用创建侧门槛：强制匿名板块不可改公开、信誉分<90 不可改匿名
+  const wasAnonymous = Number(post.is_anonymous) === 1;
+  const nextAnonymous = isAnonymous === undefined ? wasAnonymous : isAnonymous;
+  if (nextAnonymous !== wasAnonymous) {
+    if (section?.force_anonymous && !nextAnonymous) {
+      return fail(res, '该板块必须匿名发布');
+    }
+    if (nextAnonymous && req.currentUser!.creditScore < 90) {
+      return fail(res, '信誉分低于90，不可匿名发布');
+    }
+  }
+
   let status = post.status === 'published' ? 'published' : 'pending';
   if (risk.level === 'review') {
     status = 'pending_review';
@@ -471,7 +518,7 @@ router.put('/:id', authRequired, (req, res) => {
     title?.trim() || post.title,
     content || post.content,
     JSON.stringify(Array.isArray(images) ? images.slice(0, 9) : JSON.parse(post.images)),
-    isAnonymous ? 1 : 0,
+    nextAnonymous ? 1 : 0,
     JSON.stringify(finalExtra),
     status,
     id
@@ -560,6 +607,10 @@ router.post('/:id/report', authRequired, (req, res) => {
   const id = Number(req.params.id);
   const { reason } = req.body;
   if (!reason) return fail(res, '请选择举报原因');
+  // 长度上限：举报原因会进管理端列表与通知，不设上限可被灌入超长文本（实测 5000 字入库）
+  if (typeof reason !== 'string' || reason.length > 200) {
+    return fail(res, '举报原因最多 200 字');
+  }
 
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);

@@ -15,7 +15,7 @@
     <block wx:if="{{isLoggedIn}}">
       <skeleton wx:if="{{loading && !conversations.length}}" type="post" count="{{3}}" />
       <conversation-item wx:for="{{conversations}}" wx:key="id" item="{{item}}" bind:tap="onOpenConversation"></conversation-item>
-      <empty-state wx:if="{{conversations.length === 0}}" text="暂无私信" subText="在帖子详情点「联系TA」即可发起私信" customIcon="💬"></empty-state>
+      <empty-state wx:if="{{!loading && conversations.length === 0}}" text="暂无私信" subText="在帖子详情点「联系TA」即可发起私信" customIcon="💬"></empty-state>
     </block>
   </view>
 
@@ -35,7 +35,7 @@
       </view>
     </view>
 
-    <empty-state wx:if="{{notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
+    <empty-state wx:if="{{!loading && notifications.length === 0}}" text="暂无消息" customIcon="🔔"></empty-state>
   </view>
 
   <view class="read-all" wx:if="{{isLoggedIn && activeTab !== 'chat' && notifications.length > 0}}" bindtap="onMarkAllRead">

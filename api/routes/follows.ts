@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
-import { success, fail } from '../utils/response.js';
+import { success, fail, toInt } from '../utils/response.js';
 import { followLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -54,8 +54,8 @@ function followList(res: any, sql: string, params: any[], page: number, pageSize
 router.get('/:id/following', (req, res) => {
   const id = Number(req.params.id);
   if (!id) return fail(res, '用户不存在', 404, 404);
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+  const page = toInt(req.query.page, 1, 1);
+  const pageSize = toInt(req.query.pageSize, 20, 1, 50);
   followList(
     res,
     `SELECT u.id, u.nickname, u.avatar, u.credit_score FROM follows f INNER JOIN users u ON f.following_id = u.id WHERE f.follower_id = ? ORDER BY f.created_at DESC`,
@@ -69,8 +69,8 @@ router.get('/:id/following', (req, res) => {
 router.get('/:id/followers', (req, res) => {
   const id = Number(req.params.id);
   if (!id) return fail(res, '用户不存在', 404, 404);
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+  const page = toInt(req.query.page, 1, 1);
+  const pageSize = toInt(req.query.pageSize, 20, 1, 50);
   followList(
     res,
     `SELECT u.id, u.nickname, u.avatar, u.credit_score FROM follows f INNER JOIN users u ON f.follower_id = u.id WHERE f.following_id = ? ORDER BY f.created_at DESC`,

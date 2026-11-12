@@ -15,6 +15,7 @@
     "pages/category/trade/trade",
     "pages/category/carshare/carshare",
     "pages/category/team/team",
+    "pages/category/activity/activity",
     "pages/category/daily/daily",
     "pages/mine/myPosts/myPosts",
     "pages/mine/myFavorites/myFavorites",

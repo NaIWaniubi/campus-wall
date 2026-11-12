@@ -8,11 +8,13 @@ import { success, fail, toCamel } from '../utils/response.js';
 import { formatPost } from './posts.js';
 import { validate, userSchemas, commonSchemas } from '../utils/validation.js';
 import { logger, safeJsonParse } from '../utils/logger.js';
+import { readLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
 // 按学号查用户最小公开信息（标记交易买家等场景；仅暴露 id+昵称，须置于 /:id 之前）
-router.get('/lookup', authRequired, (req, res) => {
+// readLimiter：学号查询可被用来枚举「哪些学号已注册」，必须限速
+router.get('/lookup', authRequired, readLimiter, (req, res) => {
   const studentId = (req.query.studentId as string) || '';
   if (!studentId.trim()) return fail(res, '请提供学号');
   const user = db.prepare("SELECT id, nickname FROM users WHERE student_id = ? AND status != 'banned'").get(studentId.trim()) as any;
@@ -21,7 +23,7 @@ router.get('/lookup', authRequired, (req, res) => {
 });
 
 // 用户公开信息
-router.get('/:id', validate({ params: commonSchemas.id }), (req, res) => {
+router.get('/:id', readLimiter, validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const user = db.prepare('SELECT id, nickname, avatar, college, grade, signature, credit_score, created_at FROM users WHERE id = ? AND status != \'banned\'').get(id) as any;
   if (!user) return fail(res, '用户不存在', 404, 404);

@@ -17,7 +17,7 @@ describe('openapi 文档结构', () => {
     expect(doc.info.title).toContain('校园墙');
   });
 
-  it('四域 12 个端点全部登记', () => {
+  it('五域 13 个端点全部登记', () => {
     const paths = Object.keys(doc.paths);
     for (const p of [
       '/api/auth/login',
@@ -30,6 +30,9 @@ describe('openapi 文档结构', () => {
       '/api/conversations/{id}/messages',
       '/api/drafts',
       '/api/drafts/{id}',
+      '/api/push/public-key',
+      '/api/push/subscribe',
+      '/api/push/unsubscribe',
     ]) {
       expect(paths, `缺路径 ${p}`).toContain(p);
     }
@@ -38,6 +41,8 @@ describe('openapi 文档结构', () => {
     expect(doc.paths['/api/posts']).toHaveProperty('get');
     expect(doc.paths['/api/drafts']).toHaveProperty('put');
     expect(doc.paths['/api/drafts']).toHaveProperty('delete');
+    // V5：push 域的 501 语义（未配置 VAPID 不骗订阅）必须写进契约
+    expect(doc.paths['/api/push/subscribe'].post.responses).toHaveProperty('501');
   });
 
   it('每个 operation 都声明 responses', () => {

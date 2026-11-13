@@ -12,6 +12,7 @@ import {
   PostBody, PostListData, PostDetailData, PostListQuery,
   ConversationItem, ConversationCreateBody, ChatMessageListData, ChatSendBody, PageQuery,
   DraftBody, DraftItem, DraftSaved,
+  PushSubscribeBody, PushUnsubscribeBody,
 } from './schemas.js';
 
 type JsonSchema = Record<string, unknown>;
@@ -188,14 +189,39 @@ export function buildOpenApiDocument() {
         responses: { 200: ok() },
       },
     },
+
+    /* ---------- push（Web Push 订阅，V5） ---------- */
+    '/api/push/public-key': {
+      get: {
+        summary: 'VAPID 公钥（匿名可查；enabled=false 时客户端自动隐藏推送入口）',
+        tags: ['push'],
+        responses: { 200: ok({ type: 'object', properties: { publicKey: { type: ['string', 'null'] }, enabled: { type: 'boolean' } }, required: ['publicKey', 'enabled'] }) },
+      },
+    },
+    '/api/push/subscribe': {
+      post: {
+        summary: '落库浏览器推送订阅（需登录；同 endpoint 再授权视为刷新归属与 keys）',
+        tags: ['push'],
+        requestBody: body(PushSubscribeBody),
+        responses: { 200: ok(), 501: { description: '服务端未配置 VAPID，推送未开启' } },
+      },
+    },
+    '/api/push/unsubscribe': {
+      post: {
+        summary: '按 endpoint 退订并删除订阅（需登录）',
+        tags: ['push'],
+        requestBody: body(PushUnsubscribeBody),
+        responses: { 200: ok() },
+      },
+    },
   };
 
   return {
     openapi: '3.1.0',
     info: {
       title: '校园墙 API',
-      version: '4.0.0',
-      description: '契约文档（裁剪版：auth/posts/conversations/drafts 四域）。zod schema 为唯一契约源。',
+      version: '5.0.0',
+      description: '契约文档（裁剪版：auth/posts/conversations/drafts/push 五域）。zod schema 为唯一契约源。',
     },
     paths,
     components: { schemas: components },

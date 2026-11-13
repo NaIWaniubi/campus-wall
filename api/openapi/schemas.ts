@@ -134,3 +134,18 @@ export const DraftItem = z.object({
   createdAt: IsoTime,
 });
 export const DraftSaved = z.object({ id: z.number().int() });
+
+/* ---------- push（Web Push 订阅，V5） ---------- */
+export const PushSubscriptionKeys = z.object({
+  p256dh: z.string().min(8),
+  auth: z.string().min(8),
+});
+export const PushSubscribeBody = z.object({
+  subscription: z.object({
+    endpoint: z.string().min(10),
+    keys: PushSubscriptionKeys,
+  }),
+});
+export const PushUnsubscribeBody = z.object({
+  endpoint: z.string().min(10),
+});

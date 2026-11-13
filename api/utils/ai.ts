@@ -285,7 +285,8 @@ export async function chatWithAI(
       logger.error('AI 模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
     }
   }
-  tripBreaker(lastError.message);
+  // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
+  if (models.length > 0) tripBreaker(lastError.message);
   throw lastError;
 }
 
@@ -341,6 +342,7 @@ export async function chatWithAIStream(
       }
     }
   }
-  tripBreaker(lastError.message);
+  // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
+  if (models.length > 0) tripBreaker(lastError.message);
   throw lastError;
 }

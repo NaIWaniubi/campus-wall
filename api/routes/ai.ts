@@ -283,8 +283,15 @@ function validateInput(message: string): string | null {
   return null;
 }
 
-function currentModels(): string[] {
-  return buildModelChain(getSetting('ai_model'));
+/**
+ * 当前可用模型链。
+ * @param fastOnly 前台「当面等」场景传 true：剔除 :free 慢推理档（实测 ~35s），
+ *   让请求在 auth 短路后 1–2s 内落到离线套版，而不是干等满预算。
+ *   后台任务（简报）不传，保留免费档真实出稿。
+ */
+function currentModels(fastOnly = false): string[] {
+  const chain = buildModelChain(getSetting('ai_model'));
+  return fastOnly ? chain.filter((m) => !m.endsWith(':free')) : chain;
 }
 
 // ---------- 非流式对话 ----------
@@ -309,7 +316,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
 
   try {
     const messages = buildMessages(message, history, loadKnowledge(), forums);
-    const reply = await chatWithAI(messages, 1024, currentModels());
+    const reply = await chatWithAI(messages, 1024, currentModels(true));
     bumpStats();
     return success(res, { reply, forums });
   } catch (err: any) {
@@ -363,7 +370,7 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
       messages,
       (t) => send('delta', { t }),
       1024,
-      currentModels()
+      currentModels(true)
     );
     bumpStats();
     send('done', { ok: true });
@@ -649,7 +656,7 @@ router.post('/draft', authRequired, aiLimiter, async (req: Request, res: Respons
         { role: 'user', content: raw },
       ],
       1024,
-      currentModels(),
+      currentModels(true),
       // 发布是「当着用户面等」的场景：超预算就交给规则兜底，不让用户干等
       { budgetMs: 15_000, perModelTimeoutMs: 8_000 } satisfies AiCallOptions
     );
@@ -710,7 +717,7 @@ router.post('/summarize', authRequired, aiLimiter, async (req: Request, res: Res
         { role: 'user', content: '标题：' + title + '\n正文：' + content },
       ],
       1024,
-      currentModels(),
+      currentModels(true),
       // 划重点同样在阅读时同步等待：8 秒拿不到就退回抽取式摘要
       { budgetMs: 10_000, perModelTimeoutMs: 7_000 } satisfies AiCallOptions
     );

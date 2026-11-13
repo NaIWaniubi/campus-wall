@@ -30,6 +30,11 @@ function onThumbError(e: Event, fallback: string) {
   if (el.src.endsWith('.thumb.webp')) el.src = fallback
 }
 
+/** 解码完成 → 挂淡入类（纯 DOM 操作免每卡状态；缓存竞态时最坏不播动画，绝不影响显示） */
+function onImgLoad(e: Event) {
+  (e.target as HTMLImageElement | null)?.classList?.add('pc-img-ready')
+}
+
 function goDetail() {
   router.push(`/post/${props.post.id}`)
 }
@@ -90,13 +95,14 @@ function highlight(text: string): string {
     <p class="text-[14px] leading-[1.7] mb-2.5 post-content" style="color: var(--ink-soft)" :class="post.title ? 'line-clamp-2' : 'line-clamp-3'" v-html="highlight(post.content)"></p>
 
     <!-- 图片 -->
+    <!-- 图片：单图也走等高封面带（消除解码前塌高的 CLS 抖动），纸色占位底防白闪 -->
     <div v-if="images.length > 0" class="mb-2.5">
-      <div v-if="images.length === 1" class="overflow-hidden max-h-[220px]" style="border: 1.5px solid var(--ink); border-radius: 12px">
-        <img :src="thumbs[0] || images[0]" class="w-full object-cover" loading="lazy" alt="" @error="onThumbError($event, images[0])" />
+      <div v-if="images.length === 1" class="overflow-hidden h-[200px]" style="border: 1.5px solid var(--ink); border-radius: 12px; background: var(--color-surface-2, #EFE9DC)">
+        <img :src="thumbs[0] || images[0]" class="w-full h-full object-cover pc-img" loading="lazy" decoding="async" alt="" @load="onImgLoad" @error="onThumbError($event, images[0])" />
       </div>
       <div v-else class="grid grid-cols-3 gap-1">
-        <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="h-[100px] overflow-hidden relative group" style="border: 1.5px solid var(--ink); border-radius: 10px">
-          <img :src="thumbs[i] || img" class="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500" loading="lazy" alt="" @error="onThumbError($event, img)" />
+        <div v-for="(img, i) in images.slice(0, 3)" :key="i" class="h-[100px] overflow-hidden relative group" style="border: 1.5px solid var(--ink); border-radius: 10px; background: var(--color-surface-2, #EFE9DC)">
+          <img :src="thumbs[i] || img" class="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-500 pc-img" loading="lazy" decoding="async" alt="" @load="onImgLoad" @error="onThumbError($event, img)" />
           <!-- 第三张上叠加 +N 提示还有更多图片 -->
           <div v-if="i === 2 && images.length > 3" class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-medium text-lg">
             +{{ images.length - 3 }}

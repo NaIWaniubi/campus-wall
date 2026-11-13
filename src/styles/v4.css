@@ -629,3 +629,19 @@ select:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── 卡片图淡入（V5 CLS 修复配套）──────────────────────────────
+ * 图片容器已等高预留（单图 200px / 三图 100px），解码前不塌高；
+ * 解码完成后触发一次淡入，把「突然出现」变成「柔和浮现」。
+ * 关键：默认就是可见态，animation 只是增强——缓存图不触发 @load 也绝不会被藏起来。
+ */
+@keyframes pc-img-fade {
+  from { opacity: 0.35; }
+  to   { opacity: 1; }
+}
+.pc-img-ready {
+  animation: pc-img-fade 0.28s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-img-ready { animation: none; }
+}

@@ -60,3 +60,60 @@ describe('AI Assistant Utilities', () => {
     expect(new Set(customChain).size).toBe(customChain.length); // no duplicates
   });
 });
+
+describe('网关级 auth 短路（V5）', () => {
+  const originalEnv = { ...process.env };
+  const origFetch = globalThis.fetch;
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.AI_BASE_URL = 'https://gw.test/v1';
+    process.env.AI_API_KEY = 'gwkey_abc123456';
+    process.env.OPENROUTER_API_KEY = 'orkey_xyz789';
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    globalThis.fetch = origFetch;
+  });
+
+  it('isAuthError 识别 401/403 与 Invalid token 类文案', async () => {
+    const { isAuthError } = await import('../../utils/ai.js');
+    const e401 = Object.assign(new Error('AI 服务响应异常 (401)'), { status: 401 });
+    expect(isAuthError(e401)).toBe(true);
+    expect(isAuthError(new Error('Invalid token (request id: 123)'))).toBe(true);
+    expect(isAuthError(new Error('Incorrect API key provided'))).toBe(true);
+    expect(isAuthError(new Error('upstream timeout'))).toBe(false);
+    expect(isAuthError(undefined)).toBe(false);
+  });
+
+  it('endpointKeyFor：免费档与自建网关是两个端点；同网关模型指纹相同且不含完整 key', async () => {
+    const { endpointKeyFor } = await import('../../utils/ai.js');
+    const gw = endpointKeyFor('gemini-3.8-flash');
+    const gw2 = endpointKeyFor('glm-5.3');
+    const free = endpointKeyFor('nvidia/nemotron-3.5-lightning:free');
+    expect(gw).toBe(gw2);
+    expect(free).not.toBe(gw);
+    expect(gw).not.toContain('gwkey_abc123456');
+    expect(gw).toContain('123456'); // 只含尾 6 位
+  });
+
+  it('自建网关首个模型 401 后，其余同网关模型零网络调用，直接试免费档；全链失败才抛', async () => {
+    const { chatWithAI } = await import('../../utils/ai.js');
+    const calls: { url: string; model: string }[] = [];
+    globalThis.fetch = (async (url: any, init: any) => {
+      const body = JSON.parse(String(init.body));
+      calls.push({ url: String(url), model: body.model });
+      if (String(url).includes('gw.test')) {
+        return new Response(JSON.stringify({ error: { message: 'Invalid token (request id: test)' } }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ error: { message: 'no capacity' } }), { status: 503 });
+    }) as any;
+
+    await expect(chatWithAI([{ role: 'user', content: 'hi' }])).rejects.toThrow(/Invalid token|no capacity/);
+    // 自建网关只被打 1 次（第一个模型 401 → 同端点其余 4 个被跳过）
+    const gwCalls = calls.filter((c) => c.url.includes('gw.test'));
+    expect(gwCalls.length).toBe(1);
+    // 免费档端点全部被尝试过（4 个 :free 模型）
+    const freeCalls = calls.filter((c) => c.model.endsWith(':free'));
+    expect(freeCalls.length).toBe(4);
+  });
+});

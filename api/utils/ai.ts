@@ -30,6 +30,25 @@ export function routeFor(model: string): { url: string; key: string } {
   return { url: getAiApiUrl(), key: getAiApiKey() };
 }
 
+/**
+ * 端点指纹（url + key 尾 6 位，绝不回显完整 key）：用于「同一网关一旦认证失败，
+ * 就不再逐个重试该网关下的其它模型」。key 尾几位足以区分不同 key，且不泄露凭据。
+ */
+export function endpointKeyFor(model: string): string {
+  const r = routeFor(model);
+  return `${r.url}|${r.key.slice(-6)}`;
+}
+
+const AUTH_ERR_RE =
+  /invalid token|incorrect api key|invalid api key|unauthorized|authentication|permission denied|api key not|invalid authentication/i;
+
+/** 是否为「网关/凭据级」认证错误（应跳过同端点其余模型，而非逐个重试） */
+export function isAuthError(err: any): boolean {
+  if (!err) return false;
+  if (err.status === 401 || err.status === 403) return true;
+  return AUTH_ERR_RE.test(String(err.message ?? err));
+}
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -112,7 +131,9 @@ export function buildModelChain(settingModel?: string | null): string[] {
 
 async function toApiError(resp: Response): Promise<Error> {
   const json: any = await resp.json().catch((): null => null);
-  return new Error(json?.error?.message || `AI 服务响应异常 (${resp.status})`);
+  const err = new Error(json?.error?.message || `AI 服务响应异常 (${resp.status})`);
+  (err as any).status = resp.status;
+  return err;
 }
 
 /** 解析 OpenRouter / OpenAI 兼容 SSE 流，回调内容增量；返回完整文本 */
@@ -217,17 +238,25 @@ export async function chatWithAI(
   const budgetMs = opts.budgetMs ?? 30_000;
   const perModelTimeoutMs = opts.perModelTimeoutMs ?? 20_000;
   let lastError: Error = new Error('无可用模型');
+  // 认证失败是网关级信号：同端点（url+key）的其余模型不必再逐个空耗预算重试
+  const deadEndpoints = new Set<string>();
 
   for (const model of models) {
     const remain = budgetMs - (Date.now() - started);
     if (remain <= 500) break; // 预算耗尽，交给兜底，不再等
+    const ep = endpointKeyFor(model);
+    if (deadEndpoints.has(ep)) {
+      logger.warn('AI 跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
+      continue;
+    }
     try {
       const out = await requestOnce(model, messages, maxTokens, undefined, Math.min(perModelTimeoutMs, remain));
       resetBreaker();
       return out;
     } catch (err: any) {
       lastError = err;
-      logger.error('AI 模型调用失败', { model, error: err?.message });
+      if (isAuthError(err)) deadEndpoints.add(ep);
+      logger.error('AI 模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
     }
   }
   tripBreaker(lastError.message);
@@ -252,10 +281,16 @@ export async function chatWithAIStream(
   const budgetMs = opts.budgetMs ?? 45_000;
   const perModelTimeoutMs = opts.perModelTimeoutMs ?? 30_000;
   let lastError: Error = new Error('无可用模型');
+  const deadEndpoints = new Set<string>();
 
   for (const model of models) {
     const remain = budgetMs - (Date.now() - started);
     if (remain <= 500) break;
+    const ep = endpointKeyFor(model);
+    if (deadEndpoints.has(ep)) {
+      logger.warn('AI 流式跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
+      continue;
+    }
     let started_ = false;
     try {
       const out = await requestOnce(
@@ -272,7 +307,8 @@ export async function chatWithAIStream(
       return out;
     } catch (err: any) {
       lastError = err;
-      logger.error('AI 流式模型调用失败', { model, error: err?.message });
+      if (isAuthError(err)) deadEndpoints.add(ep);
+      logger.error('AI 流式模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
       if (started_) {
         tripBreaker(err?.message ?? 'stream failed');
         throw err;

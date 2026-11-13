@@ -25,9 +25,9 @@ async function load() {
 }
 
 function statusOf(a: any): { label: string; cls: string } {
-  if (!a.is_active) return { label: '已下线', cls: 'bg-zinc-100 text-zinc-500' }
-  if (a.expires_at && new Date(a.expires_at).getTime() < Date.now()) return { label: '已过期', cls: 'bg-amber-100 text-amber-600' }
-  return { label: '生效中', cls: 'bg-green-100 text-green-600' }
+  if (!a.is_active) return { label: '已下线', cls: 'st-off' }
+  if (a.expires_at && new Date(a.expires_at).getTime() < Date.now()) return { label: '已过期', cls: 'st-exp' }
+  return { label: '生效中', cls: 'st-on' }
 }
 function fmtDate(v: string) {
   if (!v) return '-'
@@ -88,84 +88,90 @@ onMounted(load)
   <div class="space-y-4">
     <!-- 工具栏 -->
     <div class="flex items-center justify-between">
-      <p class="text-sm text-zinc-500">共 {{ list.length }} 条公告</p>
-      <button class="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium" @click="openCreate">
+      <p class="text-[12.5px] ds-num" style="color: var(--ink-mute)">共 {{ list.length }} 条公告</p>
+      <button type="button" class="ds-btn ds-btn--primary !py-2" @click="openCreate">
         <Plus class="w-4 h-4" />发布公告
       </button>
     </div>
 
     <!-- 列表 -->
     <div class="space-y-3">
-      <div v-for="a in list" :key="a.id" class="bg-white rounded-xl p-4 border border-zinc-100 shadow-sm">
+      <div v-for="a in list" :key="a.id" class="ds-card p-4">
         <div class="flex items-start justify-between gap-3 mb-1">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="text-sm font-medium text-zinc-900 truncate">{{ a.title }}</span>
-            <span v-if="a.target_user_id" class="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-600 whitespace-nowrap shrink-0">定向 #{{ a.target_user_id }}</span>
-            <span class="px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap shrink-0" :class="statusOf(a).cls">{{ statusOf(a).label }}</span>
+          <div class="flex items-center gap-2 min-w-0 flex-wrap">
+            <span class="text-[13.5px] font-extrabold truncate" style="color: var(--ink)">{{ a.title }}</span>
+            <span v-if="a.target_user_id" class="ds-tag whitespace-nowrap shrink-0" style="color: var(--violet)">定向 #{{ a.target_user_id }}</span>
+            <span class="ds-tag whitespace-nowrap shrink-0" :class="statusOf(a).cls">{{ statusOf(a).label }}</span>
           </div>
           <button
             v-if="a.is_active"
-            class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 whitespace-nowrap shrink-0"
+            type="button"
+            class="ds-btn ds-btn--sm ds-btn--danger whitespace-nowrap shrink-0"
             @click="offlineTarget = a"
           >
             <MegaphoneOff class="w-3 h-3" />下线
           </button>
         </div>
-        <p class="text-sm text-zinc-600 whitespace-pre-wrap break-words">{{ a.content }}</p>
-        <div class="flex items-center gap-4 mt-2 text-xs text-zinc-400">
+        <p class="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style="color: var(--ink-soft)">{{ a.content }}</p>
+        <div class="flex items-center gap-4 mt-2 text-[11.5px] ds-num" style="color: var(--ink-mute)">
           <span>发布于 {{ fmtDate(a.createdAt) }}</span>
           <span v-if="a.expires_at">到期 {{ fmtDate(a.expires_at) }}</span>
         </div>
       </div>
       <EmptyState v-if="!loading && !list.length" text="暂无公告" />
-      <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>
+      <div v-if="loading" class="py-10 text-center text-sm" style="color: var(--ink-mute)">加载中...</div>
     </div>
 
     <!-- 发布公告弹窗 -->
     <Teleport to="body">
       <div v-if="createModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="createModal.visible = false">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-md p-6">
-          <h3 class="text-lg font-semibold mb-4">发布公告</h3>
+        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="relative ds-card w-full max-w-md p-6">
+          <span class="ds-sticker ds-sticker--coral">NOTICE</span>
+          <h3 class="ds-title mt-2 mb-4" style="color: var(--ink)">发布公告</h3>
           <div class="mb-3">
-            <label class="block text-sm text-zinc-600 mb-1">标题<span class="text-red-500">*</span></label>
+            <label for="ann-title" class="ds-label block mb-1.5">标题 <span style="color: var(--coral)">*</span></label>
             <input
+              id="ann-title"
               v-model="createModal.title"
               placeholder="公告标题"
               maxlength="50"
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+              class="ds-input"
             />
           </div>
           <div class="mb-3">
-            <label class="block text-sm text-zinc-600 mb-1">内容<span class="text-red-500">*</span></label>
+            <label for="ann-content" class="ds-label block mb-1.5">内容 <span style="color: var(--coral)">*</span></label>
             <textarea
+              id="ann-content"
               v-model="createModal.content"
               placeholder="公告内容"
               rows="5"
               maxlength="2000"
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm resize-none"
+              class="ds-input resize-none"
             ></textarea>
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-zinc-600 mb-1">到期时间（选填，到期后不再弹出）</label>
+            <label for="ann-expires" class="ds-label block mb-1.5">到期时间（选填，到期后不再弹出）</label>
             <input
+              id="ann-expires"
               v-model="createModal.expiresAt"
               type="datetime-local"
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+              class="ds-input"
             />
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-zinc-600 mb-1">定向用户ID（选填，仅该用户可见此公告）</label>
+            <label for="ann-target" class="ds-label block mb-1.5">定向用户ID（选填，仅该用户可见此公告）</label>
             <input
+              id="ann-target"
               v-model="createModal.targetUserId"
               placeholder="留空则全员可见"
               maxlength="10"
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+              class="ds-input"
             />
           </div>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="createModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="submitting" @click="submitCreate">
+            <button type="button" class="flex-1 ds-btn" @click="createModal.visible = false">取消</button>
+            <button type="button" class="flex-1 ds-btn ds-btn--primary" :disabled="submitting" @click="submitCreate">
               {{ submitting ? '发布中...' : '发布' }}
             </button>
           </div>
@@ -176,16 +182,22 @@ onMounted(load)
     <!-- 下线确认弹窗 -->
     <Teleport to="body">
       <div v-if="offlineTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="offlineTarget = null">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-3">下线公告</h3>
-          <p class="text-sm text-zinc-500 mb-4">确定下线「{{ offlineTarget.title }}」？下线后用户端不再展示。</p>
+        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="relative ds-card w-full max-w-sm p-6">
+          <h3 class="ds-title mb-3" style="color: var(--ink)">下线公告</h3>
+          <p class="text-[13px] leading-relaxed mb-4" style="color: var(--ink-soft)">确定下线「{{ offlineTarget.title }}」？下线后用户端不再展示。</p>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="offlineTarget = null">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm" @click="submitOffline">确认下线</button>
+            <button type="button" class="flex-1 ds-btn" @click="offlineTarget = null">取消</button>
+            <button type="button" class="flex-1 ds-btn ds-btn--danger" @click="submitOffline">确认下线</button>
           </div>
         </div>
       </div>
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.st-on { background: var(--lime); color: var(--ink); border-color: var(--ink); }
+.st-off { background: var(--color-surface); color: var(--ink-mute); }
+.st-exp { background: var(--coral); color: var(--paper); border-color: var(--ink); }
+</style>

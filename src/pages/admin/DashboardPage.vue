@@ -3,6 +3,7 @@
  * 数据总览：六项指标卡（可点击下钻到对应预置筛选页）
  * + 近7天三系列趋势折线图（echarts）
  * + 板块帖子分布 / 学院用户分布 横向条形图（echarts）
+ * V4：纸感控制台 —— ds-card 指标卡 + 编号章节头 + 四色调色板
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -53,6 +54,16 @@ interface StatsData {
 const stats = ref<StatsData | null>(null)
 const loading = ref(true)
 
+// V4 四色：荧光块（底 + 字），语义 —— 待办用珊瑚、增长用天蓝、总量用紫、通过用墨底荧光
+const TONES = {
+  coral: { background: 'var(--coral)', color: '#FFFFFF' },
+  sky: { background: 'var(--sky)', color: 'var(--ink)' },
+  violet: { background: 'var(--violet)', color: '#FFFFFF' },
+  lime: { background: 'var(--lime)', color: 'var(--ink)' },
+  ink: { background: 'var(--ink)', color: 'var(--lime)' },
+} as const
+type Tone = keyof typeof TONES
+
 // 卡片下钻目标：与 ContentPage(?tab=) / ReportsPage(?status=) 的 query 初始化约定对齐
 const cards = computed(() => {
   const c = stats.value?.cards
@@ -61,42 +72,42 @@ const cards = computed(() => {
       label: '待审内容',
       value: c?.pendingPosts ?? 0,
       icon: FileCheck,
-      color: 'text-amber-600 bg-amber-50',
+      tone: 'coral' as Tone,
       to: { path: '/admin/posts', query: { tab: 'pending_review' } },
     },
     {
       label: '待处理举报',
       value: c?.pendingReports ?? 0,
       icon: Flag,
-      color: 'text-red-600 bg-red-50',
+      tone: 'coral' as Tone,
       to: { path: '/admin/reports', query: { status: 'pending' } },
     },
     {
       label: '用户总数',
       value: c?.totalUsers ?? 0,
       icon: Users,
-      color: 'text-brand-600 bg-brand-50',
+      tone: 'sky' as Tone,
       to: { path: '/admin/users' },
     },
     {
       label: '帖子总数',
       value: c?.totalPosts ?? 0,
       icon: FileText,
-      color: 'text-purple-600 bg-purple-50',
+      tone: 'violet' as Tone,
       to: { path: '/admin/posts' },
     },
     {
       label: '今日新增',
       value: (c?.todayUsers ?? 0) + (c?.todayPosts ?? 0) + (c?.todayComments ?? 0),
       icon: UserPlus,
-      color: 'text-blue-600 bg-blue-50',
+      tone: 'lime' as Tone,
       to: { path: '/admin/users' },
     },
     {
       label: '审核通过率',
       value: (c?.auditPassRate ?? 0) + '%',
       icon: CheckCircle,
-      color: 'text-emerald-600 bg-emerald-50',
+      tone: 'ink' as Tone,
       to: { path: '/admin/posts', query: { tab: 'published' } },
     },
   ]
@@ -146,56 +157,81 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
-    <!-- 指标卡片（点击下钻） -->
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-      <div
-        v-for="card in cards"
-        :key="card.label"
-        class="bg-white rounded-xl p-4 border border-zinc-100 shadow-sm cursor-pointer transition hover:border-brand-200 hover:shadow-md"
-        @click="goCard(card)"
-      >
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs text-zinc-500">{{ card.label }}</span>
-          <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="card.color">
-            <component :is="card.icon" class="w-4 h-4" />
-          </div>
-        </div>
-        <div class="text-2xl font-bold text-zinc-900">{{ card.value }}</div>
-      </div>
-    </div>
-
-    <!-- 增长与转化（答辩时最先被问的数字） -->
-    <div class="bg-white rounded-xl p-4 md:p-6 border border-zinc-100 shadow-sm">
-      <div class="flex items-baseline gap-2 mb-3">
-        <h2 class="text-sm font-medium text-zinc-900">增长与转化</h2>
-        <span class="text-xs text-zinc-400">来自 events 行为埋点，非估算</span>
+    <!-- 01 指标卡片（点击下钻） -->
+    <section>
+      <div class="ds-section-head mb-3">
+        <span class="ds-section-head__num">01</span>
+        <h2 class="ds-title">治理看板</h2>
+        <span class="ds-section-head__line"></span>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        <div v-for="g in growthCards" :key="g.label" class="rounded-lg bg-zinc-50 p-3">
-          <div class="text-xs text-zinc-500">{{ g.label }}</div>
-          <div class="text-xl font-bold text-zinc-900 mt-1">{{ g.value }}</div>
-          <div class="text-[11px] text-zinc-400 mt-0.5">{{ g.hint }}</div>
+        <button
+          v-for="card in cards"
+          :key="card.label"
+          type="button"
+          class="ds-card ds-card--hover p-4 text-left transition active:translate-x-[2px] active:translate-y-[2px]"
+          @click="goCard(card)"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="ds-label" style="color: var(--ink-mute)">{{ card.label }}</span>
+            <span
+              class="w-8 h-8 rounded-[9px] flex items-center justify-center shrink-0"
+              :style="TONES[card.tone]"
+            >
+              <component :is="card.icon" class="w-4 h-4" />
+            </span>
+          </div>
+          <div class="ds-display ds-num text-[26px] leading-none" style="color: var(--ink)">{{ card.value }}</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 02 增长与转化（答辩时最先被问的数字） -->
+    <section class="ds-card p-4 md:p-5">
+      <div class="ds-section-head mb-3">
+        <span class="ds-section-head__num">02</span>
+        <h2 class="ds-title">增长与转化</h2>
+        <span class="ds-section-head__line"></span>
+        <span class="ds-tag shrink-0"><span class="ds-tag-dot" style="background: var(--sky)"></span>行为埋点实测</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div v-for="g in growthCards" :key="g.label" class="p-3" style="background: var(--color-surface); border: 1px solid var(--hairline); border-radius: 12px">
+          <div class="ds-label" style="color: var(--ink-mute)">{{ g.label }}</div>
+          <div class="ds-display ds-num text-[22px] mt-1 leading-none" style="color: var(--ink)">{{ g.value }}</div>
+          <div class="text-[11px] mt-1" style="color: var(--ink-mute)">{{ g.hint }}</div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 近7天三系列趋势（echarts 折线） -->
-    <div class="bg-white rounded-xl p-4 md:p-6 border border-zinc-100 shadow-sm">
-      <h2 class="text-sm font-medium text-zinc-900 mb-4">近7天趋势</h2>
+    <!-- 03 近7天三系列趋势（echarts 折线） -->
+    <section class="ds-card p-4 md:p-5">
+      <div class="ds-section-head mb-4">
+        <span class="ds-section-head__num">03</span>
+        <h2 class="ds-title">近 7 天趋势</h2>
+        <span class="ds-section-head__line"></span>
+      </div>
       <TrendChart :trend="stats?.trend || []" :loading="loading" />
-    </div>
+    </section>
 
-    <!-- 分布横条图（echarts）：板块帖子 / 学院用户 -->
+    <!-- 04 分布横条图（echarts）：板块帖子 / 学院用户 -->
     <div class="grid md:grid-cols-2 gap-4">
-      <div class="bg-white rounded-xl p-4 md:p-6 border border-zinc-100 shadow-sm">
-        <h2 class="text-sm font-medium text-zinc-900 mb-4">板块帖子分布</h2>
-        <DistBarChart :data="sectionDist" color="#8b5cf6" :loading="loading" />
-      </div>
+      <section class="ds-card p-4 md:p-5">
+        <div class="ds-section-head mb-4">
+          <span class="ds-section-head__num">04</span>
+          <h2 class="ds-title">板块帖子分布</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <DistBarChart :data="sectionDist" color="#6D3BF5" :loading="loading" />
+      </section>
 
-      <div class="bg-white rounded-xl p-4 md:p-6 border border-zinc-100 shadow-sm">
-        <h2 class="text-sm font-medium text-zinc-900 mb-4">学院用户分布 Top10</h2>
-        <DistBarChart :data="collegeDist" color="#38bdf8" :loading="loading" />
-      </div>
+      <section class="ds-card p-4 md:p-5">
+        <div class="ds-section-head mb-4">
+          <span class="ds-section-head__num">05</span>
+          <h2 class="ds-title">学院用户分布 Top10</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <DistBarChart :data="collegeDist" color="#38D6F5" :loading="loading" />
+      </section>
     </div>
   </div>
 </template>

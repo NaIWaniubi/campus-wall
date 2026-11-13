@@ -82,15 +82,17 @@ onMounted(load)
     <!-- 双 tab -->
     <div class="flex items-center gap-2">
       <button
-        class="px-4 py-2 rounded-full text-sm font-medium transition"
-        :class="activeTab === 'open' ? 'bg-brand-500 text-white' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'"
+        type="button"
+        class="ds-chip"
+        :class="{ 'is-active': activeTab === 'open' }"
         @click="switchTab('open')"
       >
         待处理
       </button>
       <button
-        class="px-4 py-2 rounded-full text-sm font-medium transition"
-        :class="activeTab === 'closed' ? 'bg-brand-500 text-white' : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'"
+        type="button"
+        class="ds-chip"
+        :class="{ 'is-active': activeTab === 'closed' }"
         @click="switchTab('closed')"
       >
         已关闭
@@ -99,25 +101,27 @@ onMounted(load)
 
     <!-- 列表 -->
     <div class="space-y-3">
-      <div v-for="f in list" :key="f.id" class="bg-white rounded-xl p-4 border border-zinc-100 shadow-sm">
+      <div v-for="f in list" :key="f.id" class="ds-card p-4">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2 min-w-0">
-            <div class="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+            <div class="w-7 h-7 flex items-center justify-center text-[12px] font-black overflow-hidden shrink-0" style="background: var(--lime); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 9px">
               <img v-if="f.avatar" :src="f.avatar" class="w-full h-full object-cover" alt="" />
               <span v-else>{{ f.nickname?.charAt(0) }}</span>
             </div>
-            <span class="text-sm text-zinc-900 truncate">{{ f.nickname || '未知用户' }}</span>
-            <span class="text-xs text-zinc-400">{{ f.studentId }}</span>
+            <span class="text-[13px] font-bold truncate" style="color: var(--ink)">{{ f.nickname || '未知用户' }}</span>
+            <span class="text-[11.5px] ds-num" style="color: var(--ink-mute)">{{ f.studentId }}</span>
           </div>
-          <span class="text-xs text-zinc-400 whitespace-nowrap ml-2">{{ formatTime(f.createdAt) }}</span>
+          <span class="text-[11.5px] ds-num whitespace-nowrap ml-2" style="color: var(--ink-mute)">{{ formatTime(f.createdAt) }}</span>
         </div>
-        <p class="text-sm text-zinc-700 whitespace-pre-wrap break-words">{{ f.content }}</p>
+        <p class="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style="color: var(--ink-soft)">{{ f.content }}</p>
         <div class="flex items-center justify-between mt-2">
-          <p v-if="f.contact" class="text-xs text-zinc-400">联系方式：{{ f.contact }}</p>
+          <p v-if="f.contact" class="text-[11.5px]" style="color: var(--ink-mute)">联系方式：{{ f.contact }}</p>
           <span v-else></span>
           <button
             v-if="activeTab === 'open'"
-            class="px-3 py-1.5 rounded-lg text-xs bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50 whitespace-nowrap"
+            type="button"
+            class="ds-btn ds-btn--sm whitespace-nowrap"
+            style="background: var(--lime); color: var(--ink); border-color: var(--ink)"
             :disabled="closingId === f.id"
             @click="openCloseConfirm(f)"
           >
@@ -126,29 +130,30 @@ onMounted(load)
         </div>
       </div>
       <EmptyState v-if="!loading && !list.length" :text="activeTab === 'open' ? '暂无待处理反馈' : '暂无已关闭反馈'" />
-      <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>
+      <div v-if="loading" class="py-10 text-center text-sm" style="color: var(--ink-mute)">加载中...</div>
     </div>
 
     <!-- 二次确认：标记已处理 -->
     <Teleport to="body">
       <div v-if="closeConfirm.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="cancelCloseConfirm">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-3">标记为已处理？</h3>
-          <div v-if="closeConfirm.feedback" class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl mb-3">
-            <div class="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="relative ds-card w-full max-w-sm p-6">
+          <span class="ds-sticker ds-sticker--sky">CLOSE</span>
+          <h3 class="ds-title mt-2 mb-3" style="color: var(--ink)">标记为已处理？</h3>
+          <div v-if="closeConfirm.feedback" class="flex items-center gap-3 p-3 mb-3" style="background: var(--color-surface); border: 1px solid var(--hairline); border-radius: 12px">
+            <div class="w-9 h-9 flex items-center justify-center text-[13px] font-black overflow-hidden shrink-0" style="background: var(--lime); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 10px">
               <img v-if="closeConfirm.feedback.avatar" :src="closeConfirm.feedback.avatar" class="w-full h-full object-cover" alt="" />
               <span v-else>{{ closeConfirm.feedback.nickname?.charAt(0) }}</span>
             </div>
             <div class="min-w-0 flex-1">
-              <div class="text-sm font-medium text-zinc-900 truncate">{{ closeConfirm.feedback.nickname || '未知用户' }}</div>
-              <div class="text-xs text-zinc-500 truncate">学号 {{ closeConfirm.feedback.studentId }} · {{ formatTime(closeConfirm.feedback.createdAt) }}</div>
+              <div class="text-[13px] font-bold truncate" style="color: var(--ink)">{{ closeConfirm.feedback.nickname || '未知用户' }}</div>
+              <div class="text-[11.5px] ds-num truncate" style="color: var(--ink-mute)">账号 {{ closeConfirm.feedback.studentId }} · {{ formatTime(closeConfirm.feedback.createdAt) }}</div>
             </div>
           </div>
-          <p class="text-sm text-zinc-600 mb-4">将该条反馈从「待处理」移入「已关闭」。如有需要请先在外部与用户沟通后再操作。</p>
+          <p class="text-[13px] leading-relaxed mb-4" style="color: var(--ink-soft)">将该条反馈从「待处理」移入「已关闭」。如有需要请先在外部与用户沟通后再操作。</p>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="cancelCloseConfirm">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="closingId === closeConfirm.feedback?.id" @click="confirmCloseFeedback">
+            <button type="button" class="flex-1 ds-btn" @click="cancelCloseConfirm">取消</button>
+            <button type="button" class="flex-1 ds-btn ds-btn--primary" :disabled="closingId === closeConfirm.feedback?.id" @click="confirmCloseFeedback">
               {{ closingId === closeConfirm.feedback?.id ? '提交中…' : '确定' }}
             </button>
           </div>
@@ -157,13 +162,13 @@ onMounted(load)
     </Teleport>
 
     <!-- 分页 -->
-    <div v-if="total > pageSize" class="flex items-center justify-between text-sm text-zinc-500">
-      <span>共 {{ total }} 条，第 {{ page }} 页 / 共 {{ totalPages() }} 页</span>
+    <div v-if="total > pageSize" class="flex items-center justify-between text-[12.5px]" style="color: var(--ink-mute)">
+      <span class="ds-num">共 {{ total }} 条，第 {{ page }} / {{ totalPages() }} 页</span>
       <div class="flex gap-2">
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page <= 1" @click="prevPage">
+        <button type="button" class="ds-icon-btn !w-8 !h-8" aria-label="上一页" :disabled="page <= 1" @click="prevPage">
           <ChevronLeft class="w-4 h-4" />
         </button>
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page * pageSize >= total" @click="nextPage">
+        <button type="button" class="ds-icon-btn !w-8 !h-8" aria-label="下一页" :disabled="page * pageSize >= total" @click="nextPage">
           <ChevronRight class="w-4 h-4" />
         </button>
       </div>

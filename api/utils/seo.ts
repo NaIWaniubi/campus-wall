@@ -160,9 +160,12 @@ export function spaHandler(indexPath: string) {
       res.type('html').set('Cache-Control', 'public, max-age=120').send(html)
     } catch (err) {
       // 兜底：查库失败也要把页面吐出去，宁可没卡片不能白屏
-      fs.readFile(indexPath, 'utf8').then((html) => {
+      try {
+        const html = await fs.readFile(indexPath, 'utf8')
         res.type('html').send(html)
-      }).catch(() => next(err))
+      } catch {
+        next(err)
+      }
     }
   }
 }

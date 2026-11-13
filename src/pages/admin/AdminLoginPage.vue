@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * 管理员登录页：学号 + 密码，校验管理员角色
+ * 管理员登录页：账号 + 密码，校验管理员角色
+ * V4：墨色海报头 + 白纸卡；账号文案与前台统一（不再叫学号）
  */
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -17,7 +18,7 @@ const showPassword = ref(false)
 const loading = ref(false)
 
 async function handleSubmit() {
-  if (!form.studentId.trim()) return toast.error('请输入学号')
+  if (!form.studentId.trim()) return toast.error('请输入管理员账号')
   if (!form.password) return toast.error('请输入密码')
   if (loading.value) return
   loading.value = true
@@ -40,41 +41,55 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-b from-brand-50 to-white px-4 py-8">
-    <div class="w-full max-w-sm">
-      <div class="text-center mb-8">
-        <div class="w-20 h-20 mx-auto rounded-3xl bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4">
-          <Shield class="w-11 h-11 text-white" />
-        </div>
-        <h1 class="text-2xl font-bold text-zinc-900">校园墙管理后台</h1>
-        <p class="text-sm text-zinc-400 mt-1">仅限管理员登录</p>
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
+    <!-- 墨色海报头 -->
+    <header class="hero px-5 pt-9 pb-12 rounded-b-[24px] text-center">
+      <div class="flex items-center justify-center gap-2">
+        <span class="ds-sticker ds-sticker--coral">ADMIN</span>
+        <span class="ds-label" style="color: rgb(247 242 232 / 0.5)">仅限管理员</span>
       </div>
+      <h1 class="ds-display ds-display-xl mt-3 text-white flex items-center justify-center gap-2.5">
+        <span class="w-8 h-8 rounded-[10px] inline-flex items-center justify-center shrink-0" style="background: var(--lime)">
+          <Shield class="w-5 h-5" style="color: var(--ink)" />
+        </span>
+        管理后台
+      </h1>
+      <p class="mt-2 text-[13px]" style="color: rgb(247 242 232 / 0.65)">内容治理 · 用户管理 · 数据总览</p>
+    </header>
 
-      <div class="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+    <div class="px-4 mt-3 max-w-sm mx-auto space-y-3">
+      <section class="ds-card p-5 space-y-4">
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">学号</label>
+          <label for="admin-account" class="ds-label block mb-1.5">管理员账号</label>
           <input
+            id="admin-account"
             v-model="form.studentId"
             type="text"
-            placeholder="请输入学号"
-            class="w-full px-4 py-3 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-zinc-900 placeholder-zinc-400"
+            autocomplete="username"
+            placeholder="请输入管理员账号"
+            class="ds-input"
             @keyup.enter="handleSubmit"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-zinc-700 mb-1.5">密码</label>
+          <label for="admin-password" class="ds-label block mb-1.5">密码</label>
           <div class="relative">
             <input
+              id="admin-password"
               v-model="form.password"
               :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
               placeholder="请输入密码"
-              class="w-full px-4 py-3 pr-11 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-zinc-900 placeholder-zinc-400"
+              class="ds-input !pr-11"
               @keyup.enter="handleSubmit"
             />
             <button
               type="button"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5"
+              style="color: var(--ink-mute)"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              :aria-pressed="showPassword"
               @click="showPassword = !showPassword"
             >
               <Eye v-if="showPassword" class="w-5 h-5" />
@@ -86,21 +101,21 @@ async function handleSubmit() {
         <button
           type="button"
           :disabled="loading"
-          class="w-full py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 disabled:bg-brand-300 text-white rounded-full font-medium transition flex items-center justify-center gap-2"
+          class="ds-btn ds-btn--primary w-full !py-3.5"
           @click="handleSubmit"
         >
           <Loader2 v-if="loading" class="w-5 h-5 animate-spin" />
           {{ loading ? '登录中...' : '登录' }}
         </button>
-      </div>
+      </section>
 
-      <div class="mt-6 p-3 rounded-xl bg-brand-50/60 border border-brand-100 text-xs text-brand-700 text-center">
-        默认账号见 README
-      </div>
-      <p class="text-center text-sm text-zinc-500 mt-4">
-        <router-link to="/" class="text-brand-600 font-medium hover:text-brand-700">返回前台</router-link>
+      <section class="ds-card ds-card--flat px-4 py-3 text-[12px] leading-relaxed" style="color: var(--ink-mute)">
+        默认账号见 README（超管 23770001 / 密码 admin123）
+      </section>
+
+      <p class="text-center text-[13px] pt-1">
+        <router-link to="/" class="font-bold underline underline-offset-2" style="color: var(--violet)">返回前台</router-link>
       </p>
     </div>
   </div>
 </template>
-

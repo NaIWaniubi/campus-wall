@@ -126,83 +126,159 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="min-h-screen space-y-4">
+    <!-- 页头：海报式标题 + 统计数字 -->
+    <header class="flex flex-wrap items-end justify-between gap-3 pb-3" style="border-bottom: 1.5px solid var(--ink)">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="ds-sticker ds-sticker--violet">REPORTS</span>
+          <span class="ds-label">内容治理</span>
+        </div>
+        <h1 class="ds-display ds-display-lg" style="color: var(--ink)">举报处理</h1>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="ds-display ds-display-lg ds-num" style="color: var(--ink)">{{ total }}</span>
+        <span class="ds-label">TICKETS</span>
+      </div>
+    </header>
+
     <!-- 状态 chips -->
-    <div class="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm flex items-center gap-1 overflow-x-auto scrollbar-hide">
+    <section class="ds-card p-3 md:p-4 flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
       <button
         v-for="c in chips"
         :key="c.value"
-        class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition"
-        :class="activeChip === c.value ? 'bg-brand-500 text-white font-medium' : 'text-zinc-500 hover:bg-zinc-100'"
+        type="button"
+        class="ds-chip"
+        :class="{ 'is-active': activeChip === c.value }"
         @click="switchChip(c.value)"
       >
         {{ c.label }}
       </button>
-    </div>
+    </section>
 
-    <!-- 工单列表 -->
-    <div class="space-y-3">
-      <div v-for="r in list" :key="r.id" class="bg-white rounded-xl border border-zinc-100 shadow-sm p-4 space-y-2">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0" :class="r.targetType === 'post' ? 'bg-brand-50 text-brand-600' : 'bg-violet-50 text-violet-600'">
-              {{ targetText(r) }}
-            </span>
-            <span v-if="r.status === 'pending'" class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-600">待处理</span>
-            <span v-else class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-600">已处理</span>
-          </div>
-          <span class="text-xs text-zinc-400 whitespace-nowrap">{{ formatTime(r.createdAt) }}</span>
-        </div>
+    <!-- 工单列表：纸感表格 -->
+    <section class="ds-card ds-card--flat overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
+              <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">工单</th>
+              <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">举报原因</th>
+              <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">举报人</th>
+              <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">时间</th>
+              <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="r in list"
+              :key="r.id"
+              class="align-top hover:bg-[var(--paper)]"
+              style="border-bottom: 1px solid var(--hairline)"
+            >
+              <!-- 工单：目标类型 + 状态标签 -->
+              <td class="px-3 py-2.5 whitespace-nowrap">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="ds-tag">
+                    <span class="ds-tag-dot" :style="{ background: r.targetType === 'post' ? 'var(--sky)' : 'var(--violet)' }"></span>
+                    {{ targetText(r) }}
+                  </span>
+                  <span v-if="r.status === 'pending'" class="ds-tag">
+                    <span class="ds-tag-dot" style="background: var(--coral)"></span>待处理
+                  </span>
+                  <span v-else class="ds-tag">
+                    <span class="ds-tag-dot" style="background: var(--lime)"></span>已处理
+                  </span>
+                </div>
+              </td>
 
-        <p class="text-sm text-zinc-700"><span class="text-zinc-400">举报原因：</span>{{ r.reason || '-' }}</p>
+              <!-- 举报原因 + 匿名阈值警示 + 处理结果 -->
+              <td class="px-3 py-2.5 min-w-[220px]">
+                <p class="leading-relaxed" style="color: var(--ink)">
+                  <span style="color: var(--ink-mute)">举报原因：</span>{{ r.reason || '-' }}
+                </p>
 
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
-          <span>举报人：{{ r.reporter?.nickname || '未知用户' }}<template v-if="r.reporter?.studentId">（{{ r.reporter.studentId }}）</template></span>
-          <span class="text-red-500 font-medium">{{ r.reportCount }} 人举报该内容</span>
-        </div>
+                <!-- 匿名帖达举报阈值：后端仅在此场景附加 revealedAuthor -->
+                <div
+                  v-if="r.revealedAuthor"
+                  class="mt-2 px-3 py-2 text-xs leading-relaxed"
+                  style="background: var(--coral); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm); border-radius: 10px"
+                >
+                  ⚠ 匿名帖已达举报阈值({{ r.reportCount }}人)，作者：{{ r.revealedAuthor.nickname }}({{ r.revealedAuthor.studentId }})
+                </div>
 
-        <!-- 匿名帖达举报阈值：后端仅在此场景附加 revealedAuthor -->
-        <div v-if="r.revealedAuthor" class="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-sm text-orange-600">
-          ⚠ 匿名帖已达举报阈值({{ r.reportCount }}人)，作者：{{ r.revealedAuthor.nickname }}({{ r.revealedAuthor.studentId }})
-        </div>
+                <p v-if="r.status === 'handled'" class="mt-1.5 text-xs" style="color: var(--ink-mute)">
+                  处理结果：{{ r.handleResult || '-' }}
+                </p>
+              </td>
 
-        <p v-if="r.status === 'handled'" class="text-xs text-zinc-400">处理结果：{{ r.handleResult || '-' }}</p>
+              <!-- 举报人 + 举报人数 -->
+              <td class="px-3 py-2.5 min-w-[160px]">
+                <p style="color: var(--ink-soft)">
+                  {{ r.reporter?.nickname || '未知用户' }}<template v-if="r.reporter?.studentId">（{{ r.reporter.studentId }}）</template>
+                </p>
+                <p class="mt-1.5 text-xs font-bold ds-num" style="color: var(--ink)">
+                  <span class="ds-tag-dot inline-block align-middle mr-1" style="background: var(--coral)"></span>{{ r.reportCount }} 人举报该内容
+                </p>
+              </td>
 
-        <div v-if="r.status === 'pending'" class="flex flex-wrap items-center gap-2 pt-1">
-          <button
-            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-brand-500 hover:bg-brand-600 text-white font-medium"
-            @click="openHandle(r, 'resolve')"
-          >
-            <Check class="w-3 h-3" />{{ actions.resolve?.label }}
-          </button>
-          <button
-            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-            @click="openHandle(r, 'dismiss')"
-          >
-            <XCircle class="w-3 h-3" />{{ actions.dismiss?.label }}
-          </button>
-          <button
-            v-if="r.targetType === 'post'"
-            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-600"
-            @click="viewDetail(r)"
-          >
-            <ExternalLink class="w-3 h-3" />查看内容
-          </button>
-        </div>
+              <td class="px-3 py-2.5 whitespace-nowrap ds-num text-xs" style="color: var(--ink-mute)">{{ formatTime(r.createdAt) }}</td>
+
+              <!-- 操作：仅在待处理时出现；查看内容仅帖子目标 -->
+              <td class="px-3 py-2.5">
+                <div v-if="r.status === 'pending'" class="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
+                  <button
+                    type="button"
+                    class="ds-btn ds-btn--sm ds-btn--primary"
+                    @click="openHandle(r, 'resolve')"
+                  >
+                    <Check class="w-3 h-3" />{{ actions.resolve?.label }}
+                  </button>
+                  <button
+                    type="button"
+                    class="ds-btn ds-btn--sm"
+                    @click="openHandle(r, 'dismiss')"
+                  >
+                    <XCircle class="w-3 h-3" />{{ actions.dismiss?.label }}
+                  </button>
+                  <button
+                    v-if="r.targetType === 'post'"
+                    type="button"
+                    class="ds-btn ds-btn--sm"
+                    @click="viewDetail(r)"
+                  >
+                    <ExternalLink class="w-3 h-3" />查看内容
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
       <EmptyState v-if="!loading && !list.length" text="暂无举报工单" />
-      <div v-if="loading" class="py-10 text-center text-sm text-zinc-400 bg-white rounded-xl border border-zinc-100">加载中...</div>
-    </div>
+      <div v-if="loading" class="py-10 text-center ds-sub">加载中...</div>
+    </section>
 
     <!-- 分页 -->
-    <div class="flex items-center justify-between text-sm text-zinc-500">
-      <span>共 {{ total }} 条，第 {{ page }} 页 / 共 {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span>
+    <div class="flex flex-wrap items-center justify-between gap-2 ds-sub">
+      <span class="ds-num">共 {{ total }} 条，第 {{ page }} 页 / 共 {{ Math.max(1, Math.ceil(total / pageSize)) }} 页</span>
       <div class="flex gap-2">
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page <= 1" @click="prevPage">
+        <button
+          type="button"
+          class="ds-btn ds-btn--sm"
+          aria-label="上一页"
+          :disabled="page <= 1"
+          @click="prevPage"
+        >
           <ChevronLeft class="w-4 h-4" />
         </button>
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page * pageSize >= total" @click="nextPage">
+        <button
+          type="button"
+          class="ds-btn ds-btn--sm"
+          aria-label="下一页"
+          :disabled="page * pageSize >= total"
+          @click="nextPage"
+        >
           <ChevronRight class="w-4 h-4" />
         </button>
       </div>

@@ -84,53 +84,81 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- 工具栏 -->
-    <div class="flex items-center justify-between">
-      <p class="text-sm text-zinc-500">共 {{ list.length }} 个板块</p>
-      <button class="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium" @click="openCreate">
-        <Plus class="w-4 h-4" />新建板块
-      </button>
-    </div>
+  <div class="min-h-screen space-y-4">
+    <!-- 页头：海报式标题 + 统计 -->
+    <header class="flex flex-wrap items-end justify-between gap-3 pb-3" style="border-bottom: 1.5px solid var(--ink)">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="ds-sticker ds-sticker--sky">SECTIONS</span>
+          <span class="ds-label">板块编排</span>
+        </div>
+        <h1 class="ds-display ds-display-lg" style="color: var(--ink)">板块管理</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-baseline gap-1.5">
+          <span class="ds-label">共</span>
+          <span class="ds-display ds-display-lg ds-num" style="color: var(--ink)">{{ list.length }}</span>
+          <span class="ds-label">个板块</span>
+        </div>
+        <button type="button" class="ds-btn ds-btn--primary" @click="openCreate">
+          <Plus class="w-4 h-4" />新建板块
+        </button>
+      </div>
+    </header>
 
-    <!-- 列表 -->
-    <div class="bg-white rounded-xl border border-zinc-100 shadow-sm overflow-x-auto">
-      <table class="w-full text-sm">
+    <!-- 列表：纸感表格 -->
+    <section class="ds-card ds-card--flat overflow-x-auto">
+      <table class="w-full text-[13px]">
         <thead>
-          <tr class="text-zinc-500 text-xs bg-zinc-50 border-b border-zinc-100">
-            <th class="text-left px-3 py-2 font-medium">板块</th>
-            <th class="text-left px-3 py-2 font-medium">排序</th>
-            <th class="text-left px-3 py-2 font-medium">发帖审核</th>
-            <th class="text-left px-3 py-2 font-medium">状态</th>
-            <th class="text-right px-3 py-2 font-medium">操作</th>
+          <tr style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">板块</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">排序</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">发帖审核</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">状态</th>
+            <th class="ds-label text-right px-3 py-2.5 font-normal" style="color: var(--ink-soft)">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="s in list" :key="s.id" class="border-b border-zinc-50 hover:bg-zinc-50/50">
-            <td class="px-3 py-2">
-              <div class="flex items-center gap-2">
-                <span v-if="s.icon" class="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-base">{{ s.icon }}</span>
-                <div v-else class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-semibold">{{ s.name?.charAt(0) }}</div>
-                <span class="text-zinc-900">{{ s.name }}</span>
+          <tr
+            v-for="s in list"
+            :key="s.id"
+            class="align-middle hover:bg-[var(--paper)]"
+            style="border-bottom: 1px solid var(--hairline)"
+          >
+            <td class="px-3 py-2.5">
+              <div class="flex items-center gap-2.5">
+                <span
+                  v-if="s.icon"
+                  class="w-8 h-8 flex items-center justify-center text-base shrink-0"
+                  style="border-radius: 9px; border: 1.5px solid var(--ink); background: var(--card)"
+                >{{ s.icon }}</span>
+                <div
+                  v-else
+                  class="w-8 h-8 flex items-center justify-center text-[11px] font-bold shrink-0"
+                  style="border-radius: 9px; border: 1.5px solid var(--ink); background: var(--lime); color: var(--ink)"
+                >{{ s.name?.charAt(0) }}</div>
+                <span class="font-semibold" style="color: var(--ink)">{{ s.name }}</span>
               </div>
             </td>
-            <td class="px-3 py-2 text-zinc-600">{{ s.sort }}</td>
-            <td class="px-3 py-2">
-              <span class="px-2 py-0.5 rounded text-xs font-medium" :class="s.needAudit ? 'bg-amber-100 text-amber-600' : 'bg-zinc-100 text-zinc-500'">
+            <td class="px-3 py-2.5 ds-num" style="color: var(--ink-soft)">{{ s.sort }}</td>
+            <td class="px-3 py-2.5">
+              <span class="ds-tag">
+                <span class="ds-tag-dot" :style="{ background: s.needAudit ? 'var(--coral)' : 'var(--sky)' }"></span>
                 {{ s.needAudit ? '需要审核' : '直接发布' }}
               </span>
             </td>
-            <td class="px-3 py-2">
-              <span class="px-2 py-0.5 rounded text-xs font-medium" :class="s.isActive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'">
+            <td class="px-3 py-2.5">
+              <span class="ds-tag">
+                <span class="ds-tag-dot" :style="{ background: s.isActive ? 'var(--lime)' : 'var(--coral)' }"></span>
                 {{ s.isActive ? '启用中' : '已停用' }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100" @click="openEdit(s)">
+                <button type="button" class="ds-btn ds-btn--sm" @click="openEdit(s)">
                   <Pencil class="w-3 h-3" />编辑
                 </button>
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100" @click="deleteTarget = s">
+                <button type="button" class="ds-btn ds-btn--sm ds-btn--danger" @click="deleteTarget = s">
                   <Trash2 class="w-3 h-3" />删除
                 </button>
               </div>
@@ -139,53 +167,57 @@ onMounted(load)
         </tbody>
       </table>
       <EmptyState v-if="!loading && !list.length" text="暂无板块，点击右上角新建" />
-      <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>
-    </div>
+      <div v-if="loading" class="py-10 text-center ds-sub">加载中...</div>
+    </section>
 
     <!-- 新建/编辑弹窗 -->
     <Teleport to="body">
       <div v-if="formModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="formModal.visible = false">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-4">{{ formModal.id ? '编辑板块' : '新建板块' }}</h3>
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker ds-sticker--sky">{{ formModal.id ? 'EDIT' : 'NEW' }}</span>
+            <span class="ds-label">板块编排</span>
+          </div>
+          <h3 class="ds-title mb-4" style="color: var(--ink)">{{ formModal.id ? '编辑板块' : '新建板块' }}</h3>
           <div class="mb-3">
-            <label class="block text-sm text-zinc-600 mb-1">名称<span class="text-red-500">*</span></label>
+            <label class="ds-label block mb-1.5">名称<span style="color: var(--coral)">*</span></label>
             <input
               v-model="formModal.name"
               placeholder="板块名称"
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+              class="ds-input"
             />
           </div>
           <div class="mb-3 flex gap-3">
             <div class="w-24">
-              <label class="block text-sm text-zinc-600 mb-1">图标</label>
+              <label class="ds-label block mb-1.5">图标</label>
               <input
                 v-model="formModal.icon"
                 placeholder="emoji"
                 maxlength="4"
-                class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+                class="ds-input"
               />
             </div>
             <div class="w-24">
-              <label class="block text-sm text-zinc-600 mb-1">排序</label>
+              <label class="ds-label block mb-1.5">排序</label>
               <input
                 v-model.number="formModal.sort"
                 type="number"
-                class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+                class="ds-input"
               />
             </div>
           </div>
           <label class="flex items-center gap-2 mb-2 cursor-pointer">
-            <input v-model="formModal.needAudit" type="checkbox" class="accent-brand-500" />
-            <span class="text-sm text-zinc-600">发帖需要审核</span>
+            <input v-model="formModal.needAudit" type="checkbox" style="accent-color: var(--ink)" />
+            <span class="text-[13px]" style="color: var(--ink-soft)">发帖需要审核</span>
           </label>
           <label class="flex items-center gap-2 mb-4 cursor-pointer">
-            <input v-model="formModal.isActive" type="checkbox" class="accent-brand-500" />
-            <span class="text-sm text-zinc-600">启用该板块（停用后前台不可见）</span>
+            <input v-model="formModal.isActive" type="checkbox" style="accent-color: var(--ink)" />
+            <span class="text-[13px]" style="color: var(--ink-soft)">启用该板块（停用后前台不可见）</span>
           </label>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="formModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="submitForm">保存</button>
+            <button type="button" class="ds-btn flex-1" @click="formModal.visible = false">取消</button>
+            <button type="button" class="ds-btn ds-btn--primary flex-1" @click="submitForm">保存</button>
           </div>
         </div>
       </div>
@@ -194,15 +226,19 @@ onMounted(load)
     <!-- 删除确认弹窗 -->
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="deleteTarget = null">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-3">删除板块</h3>
-          <p class="text-sm text-zinc-500 mb-4">
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker ds-sticker--coral">DELETE</span>
+            <span class="ds-label">危险操作</span>
+          </div>
+          <h3 class="ds-title mb-2" style="color: var(--ink)">删除板块</h3>
+          <p class="text-[13px] mb-4 leading-relaxed" style="color: var(--ink-soft)">
             确定删除「{{ deleteTarget.name }}」？板块下还有帖子时将无法删除（可改为停用）。
           </p>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="deleteTarget = null">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm" @click="submitDelete">确认删除</button>
+            <button type="button" class="ds-btn flex-1" @click="deleteTarget = null">取消</button>
+            <button type="button" class="ds-btn ds-btn--danger flex-1" @click="submitDelete">确认删除</button>
           </div>
         </div>
       </div>

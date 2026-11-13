@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 管理后台布局：左侧导航 + 顶部当前管理员标识 + 退出/返回前台
+ * V4：墨色侧栏 + 荧光选中态，纸底内容区（控制台也要有海报体系的骨架感）
  */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -45,31 +46,42 @@ function onLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
-    <!-- 桌面侧边栏 -->
-    <aside class="hidden md:flex flex-col w-[200px] fixed inset-y-0 left-0 bg-white border-r border-zinc-100 z-20">
-      <div class="h-14 flex items-center px-4 border-b border-zinc-100">
-        <Shield class="w-5 h-5 text-brand-500 mr-2" />
-        <span class="font-semibold text-zinc-900 text-sm">校园墙后台</span>
+  <div class="min-h-screen" style="background: var(--paper)">
+    <!-- 桌面侧边栏：墨色画布 -->
+    <aside class="hidden md:flex flex-col w-[208px] fixed inset-y-0 left-0 z-20" style="background: var(--ink)">
+      <div class="h-14 flex items-center px-4" style="border-bottom: 1px solid rgb(255 255 255 / 0.1)">
+        <span class="w-6 h-6 rounded-[7px] flex items-center justify-center shrink-0" style="background: var(--lime)">
+          <Shield class="w-3.5 h-3.5" style="color: var(--ink)" />
+        </span>
+        <span class="ds-display text-[15px] ml-2 text-white whitespace-nowrap">校园墙<span style="color: var(--lime)">后台</span></span>
       </div>
-      <nav class="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
+      <nav class="flex-1 py-3 px-2.5 space-y-1 overflow-y-auto">
         <router-link
           v-for="item in visibleNav"
           :key="item.path"
           :to="item.path"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition"
-          :class="isActive(item.path) ? 'bg-brand-50 text-brand-600 font-medium' : 'text-zinc-600 hover:bg-zinc-50'"
+          class="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] transition"
+          :class="isActive(item.path) ? 'font-extrabold' : 'font-semibold'"
+          :style="isActive(item.path)
+            ? 'background: var(--lime); color: var(--ink)'
+            : 'color: rgb(247 242 232 / 0.62)'"
         >
-          <component :is="item.icon" class="w-4 h-4" />
+          <component :is="item.icon" class="w-4 h-4 shrink-0" />
           {{ item.name }}
         </router-link>
       </nav>
-      <div class="p-2 border-t border-zinc-100 space-y-0.5">
-        <router-link to="/" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-600 hover:bg-zinc-50">
+      <div class="p-2.5 space-y-1" style="border-top: 1px solid rgb(255 255 255 / 0.1)">
+        <router-link
+          to="/"
+          class="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-semibold transition"
+          style="color: rgb(247 242 232 / 0.62)"
+        >
           <Home class="w-4 h-4" /> 返回前台
         </router-link>
         <button
-          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-600 hover:bg-red-50 hover:text-red-500"
+          type="button"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] font-semibold transition"
+          style="color: var(--coral)"
           @click="onLogout"
         >
           <LogOut class="w-4 h-4" /> 退出登录
@@ -77,51 +89,58 @@ function onLogout() {
       </div>
     </aside>
 
-    <div class="md:ml-[200px] min-h-screen flex flex-col">
-      <!-- 顶部栏 -->
-      <header class="h-14 bg-white border-b border-zinc-100 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10">
-        <h1 class="font-medium text-zinc-900">{{ currentTitle }}</h1>
+    <div class="md:ml-[208px] min-h-screen flex flex-col">
+      <!-- 顶部栏：纸底 + 墨线 -->
+      <header class="h-14 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
+        <h1 class="ds-display text-[18px]" style="color: var(--ink)">{{ currentTitle }}</h1>
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2">
             <img
               v-if="userStore.user?.avatar"
               :src="userStore.user.avatar"
-              class="w-7 h-7 rounded-full object-cover"
+              class="w-7 h-7 object-cover"
+              style="border: 1.5px solid var(--ink); border-radius: 9px"
               alt=""
             />
             <div
               v-else
-              class="w-7 h-7 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-semibold"
+              class="w-7 h-7 flex items-center justify-center text-[12px] font-black"
+              style="background: var(--lime); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 9px"
             >
               {{ (userStore.user?.nickname || '管')[0] }}
             </div>
-            <span class="text-sm text-zinc-700 hidden sm:inline">{{ userStore.user?.nickname }}</span>
+            <span class="text-sm font-semibold hidden sm:inline" style="color: var(--ink)">{{ userStore.user?.nickname }}</span>
             <!-- 昵称恰好等于角色名时（如超管默认昵称「超级管理员」）不再重复展示角色标签 -->
             <span
               v-if="userStore.user?.nickname !== roleLabel"
-              class="px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 text-xs whitespace-nowrap"
+              class="px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap"
+              style="border: 1px solid var(--line); border-radius: 6px; color: var(--ink-soft)"
             >{{ roleLabel }}</span>
           </div>
-          <router-link to="/" class="text-sm text-zinc-500 hover:text-brand-600 hidden sm:inline">返回前台</router-link>
-          <button class="flex items-center gap-1 text-sm text-zinc-500 hover:text-red-500" @click="onLogout">
-            <LogOut class="w-4 h-4" /> 退出
+          <router-link to="/" class="text-[12.5px] font-bold underline underline-offset-2 hidden sm:inline" style="color: var(--ink-mute)">返回前台</router-link>
+          <button
+            type="button"
+            class="ds-btn ds-btn--sm ds-btn--danger"
+            @click="onLogout"
+          >
+            <LogOut class="w-3.5 h-3.5" /> 退出
           </button>
         </div>
       </header>
 
-      <!-- 移动端导航 -->
-      <div class="md:hidden bg-white border-b border-zinc-100 sticky top-14 z-10">
-        <div class="flex items-center gap-1 px-2 h-11 overflow-x-auto scrollbar-hide">
+      <!-- 移动端导航：横向滚动 chips -->
+      <div class="md:hidden sticky top-14 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
+        <div class="flex items-center gap-1.5 px-2.5 h-11 overflow-x-auto scrollbar-hide ds-scroll-x">
           <router-link
             v-for="item in visibleNav"
             :key="item.path"
             :to="item.path"
-            class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs whitespace-nowrap"
-            :class="isActive(item.path) ? 'bg-brand-50 text-brand-600 font-medium' : 'text-zinc-500'"
+            class="ds-chip !py-1 !text-[11.5px] whitespace-nowrap shrink-0"
+            :class="{ 'is-active': isActive(item.path) }"
           >
             <component :is="item.icon" class="w-3.5 h-3.5" /> {{ item.name }}
           </router-link>
-          <router-link to="/" class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs text-zinc-500 whitespace-nowrap">
+          <router-link to="/" class="ds-chip !py-1 !text-[11.5px] whitespace-nowrap shrink-0">
             <Home class="w-3.5 h-3.5" /> 前台
           </router-link>
         </div>

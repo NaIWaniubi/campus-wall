@@ -217,90 +217,113 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="min-h-screen space-y-4">
+    <!-- 页头：海报式标题 + 统计数字 -->
+    <header class="flex flex-wrap items-end justify-between gap-3 pb-3" style="border-bottom: 1.5px solid var(--ink)">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="ds-sticker ds-sticker--coral">USER OPS</span>
+          <span class="ds-label">账号治理</span>
+        </div>
+        <h1 class="ds-display ds-display-lg" style="color: var(--ink)">用户管理</h1>
+      </div>
+      <div class="flex items-baseline gap-2">
+        <span class="ds-display ds-display-lg ds-num" style="color: var(--ink)">{{ total }}</span>
+        <span class="ds-label">USERS</span>
+      </div>
+    </header>
+
     <!-- 搜索栏 -->
-    <div class="bg-white rounded-xl p-3 border border-zinc-100 shadow-sm flex items-center gap-2 flex-wrap">
+    <section class="ds-card p-3 md:p-4 flex items-center gap-2 flex-wrap">
       <div class="relative flex-1 max-w-md min-w-[200px]">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ink-mute)" />
         <input
           v-model="keyword"
           placeholder="搜索学号/昵称"
-          class="w-full pl-9 pr-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+          class="ds-input"
+          style="padding-left: 38px"
           @keyup.enter="onSearch"
         />
       </div>
-      <select v-model="statusFilter" class="px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" @change="onSearch">
+      <select v-model="statusFilter" class="ds-input" style="width: auto; min-width: 108px" @change="onSearch">
         <option value="">全部状态</option>
         <option value="active">正常</option>
         <option value="banned">封禁</option>
       </select>
-      <select v-model="roleFilter" class="px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm" @change="onSearch">
+      <select v-model="roleFilter" class="ds-input" style="width: auto; min-width: 108px" @change="onSearch">
         <option value="">全部角色</option>
         <option value="user">普通用户</option>
         <option value="section_admin">板块管理员</option>
         <option value="super_admin">超级管理员</option>
       </select>
-      <button class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium" @click="onSearch">搜索</button>
-    </div>
+      <button type="button" class="ds-btn ds-btn--primary" @click="onSearch">搜索</button>
+    </section>
 
-    <!-- 列表 -->
-    <div class="bg-white rounded-xl border border-zinc-100 shadow-sm overflow-x-auto">
-      <table class="w-full text-sm">
+    <!-- 列表：纸感表格 -->
+    <section class="ds-card ds-card--flat overflow-x-auto">
+      <table class="w-full text-[13px]">
         <thead>
-          <tr class="text-zinc-500 text-xs bg-zinc-50 border-b border-zinc-100">
-            <th class="text-left px-3 py-2 font-medium">学号</th>
-            <th class="text-left px-3 py-2 font-medium">昵称</th>
-            <th class="text-left px-3 py-2 font-medium">学院</th>
-            <th class="text-left px-3 py-2 font-medium">信誉分</th>
-            <th class="text-left px-3 py-2 font-medium">角色</th>
-            <th class="text-left px-3 py-2 font-medium">状态</th>
-            <th class="text-left px-3 py-2 font-medium">注册时间</th>
-            <th class="text-left px-3 py-2 font-medium">操作</th>
+          <tr style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">学号</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">昵称</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">学院</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">信誉分</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">角色</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">状态</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">注册时间</th>
+            <th class="ds-label text-left px-3 py-2.5 font-normal" style="color: var(--ink-soft)">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="u in list" :key="u.id" class="border-b border-zinc-50 hover:bg-zinc-50/50">
-            <td class="px-3 py-2 text-zinc-600 whitespace-nowrap">{{ u.student_id }}</td>
-            <td class="px-3 py-2">
+          <tr
+            v-for="u in list"
+            :key="u.id"
+            class="align-top hover:bg-[var(--paper)]"
+            style="border-bottom: 1px solid var(--hairline)"
+          >
+            <td class="px-3 py-2.5 whitespace-nowrap ds-num" style="color: var(--ink-soft)">{{ u.student_id }}</td>
+            <td class="px-3 py-2.5">
               <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+                <div
+                  class="w-7 h-7 flex items-center justify-center text-[11px] font-bold overflow-hidden shrink-0"
+                  style="border-radius: 8px; border: 1.5px solid var(--ink); background: var(--lime); color: var(--ink)"
+                >
                   <img v-if="u.avatar" :src="u.avatar" class="w-full h-full object-cover" alt="" />
                   <span v-else>{{ u.nickname?.charAt(0) }}</span>
                 </div>
-                <span class="text-zinc-900">{{ u.nickname }}</span>
+                <span class="font-semibold" style="color: var(--ink)">{{ u.nickname }}</span>
               </div>
             </td>
-            <td class="px-3 py-2 text-zinc-600">{{ u.college || '-' }}</td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5" style="color: var(--ink-mute)">{{ u.college || '-' }}</td>
+            <td class="px-3 py-2.5">
               <div class="flex items-center gap-1.5">
-                <span class="font-medium text-zinc-900">{{ u.credit_score }}</span>
+                <span class="font-bold ds-num" style="color: var(--ink)">{{ u.credit_score }}</span>
                 <CreditBadge :score="u.credit_score" size="sm" />
               </div>
             </td>
-            <td class="px-3 py-2 text-zinc-600 whitespace-nowrap">{{ ROLE_LABELS[u.role] || u.role }}</td>
-            <td class="px-3 py-2 whitespace-nowrap">
-              <span
-                class="px-2 py-0.5 rounded text-xs font-medium"
-                :class="u.status === 'banned' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'"
-              >
+            <td class="px-3 py-2.5 whitespace-nowrap" style="color: var(--ink-soft)">{{ ROLE_LABELS[u.role] || u.role }}</td>
+            <td class="px-3 py-2.5 whitespace-nowrap">
+              <span class="ds-tag">
+                <span class="ds-tag-dot" :style="{ background: u.status === 'banned' ? 'var(--coral)' : 'var(--lime)' }"></span>
                 {{ u.status === 'banned' ? '封禁' : '正常' }}
               </span>
-              <p v-if="u.status === 'banned' && u.ban_reason" class="text-xs text-zinc-400 mt-0.5">{{ u.ban_reason }}</p>
+              <p v-if="u.status === 'banned' && u.ban_reason" class="text-[11px] mt-1 max-w-[180px]" style="color: var(--ink-mute)">{{ u.ban_reason }}</p>
             </td>
-            <td class="px-3 py-2 text-zinc-400 whitespace-nowrap">{{ formatTime(u.createdAt) }}</td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5 whitespace-nowrap ds-num text-[12px]" style="color: var(--ink-mute)">{{ formatTime(u.createdAt) }}</td>
+            <td class="px-3 py-2.5">
               <div class="flex items-center gap-1.5 whitespace-nowrap">
                 <button
-                  class="flex items-center gap-1 px-2 py-1 rounded text-xs"
-                  :class="u.status === 'banned' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'"
+                  type="button"
+                  class="ds-btn ds-btn--sm"
+                  :class="u.status === 'banned' ? '' : 'ds-btn--danger'"
                   @click="openConfirm(u.status === 'banned' ? 'unban' : 'ban', u, `${u.status === 'banned' ? '解封' : '封禁'}后该用户${u.status === 'banned' ? '将恢复' : '将无法'}登录`, undefined, { reason: u.ban_reason || '', duration: '7' })"
                 >
                   <Ban class="w-3 h-3" />{{ u.status === 'banned' ? '解封' : '封禁' }}
                 </button>
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100" @click="openConfirm('resetPassword', u, `将生成新的 8 位一次性密码并立即生效`);">
+                <button type="button" class="ds-btn ds-btn--sm" @click="openConfirm('resetPassword', u, `将生成新的 8 位一次性密码并立即生效`);">
                   <KeyRound class="w-3 h-3" />重置密码
                 </button>
-                <button class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-600 hover:bg-amber-100" @click="openConfirm('adjustCredit', u, '可在下一步弹窗中输入分值与理由')">
+                <button type="button" class="ds-btn ds-btn--sm" @click="openConfirm('adjustCredit', u, '可在下一步弹窗中输入分值与理由')">
                   <Star class="w-3 h-3" />信誉
                 </button>
               </div>
@@ -309,17 +332,17 @@ onMounted(load)
         </tbody>
       </table>
       <EmptyState v-if="!loading && !list.length" text="暂无用户数据" />
-      <div v-if="loading" class="py-10 text-center text-sm text-zinc-400">加载中...</div>
-    </div>
+      <div v-if="loading" class="py-10 text-center ds-sub">加载中...</div>
+    </section>
 
     <!-- 分页 -->
-    <div class="flex items-center justify-between text-sm text-zinc-500">
-      <span>共 {{ total }} 条，第 {{ page }} 页 / 共 {{ totalPages() }} 页</span>
+    <div class="flex items-center justify-between text-[13px]" style="color: var(--ink-mute)">
+      <span class="ds-num">共 {{ total }} 条，第 {{ page }} 页 / 共 {{ totalPages() }} 页</span>
       <div class="flex gap-2">
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page <= 1" @click="prevPage">
+        <button type="button" class="ds-btn ds-btn--sm" aria-label="上一页" :disabled="page <= 1" @click="prevPage">
           <ChevronLeft class="w-4 h-4" />
         </button>
-        <button class="px-3 py-1.5 rounded-lg border border-zinc-200 disabled:opacity-40 hover:bg-zinc-50" :disabled="page * pageSize >= total" @click="nextPage">
+        <button type="button" class="ds-btn ds-btn--sm" aria-label="下一页" :disabled="page * pageSize >= total" @click="nextPage">
           <ChevronRight class="w-4 h-4" />
         </button>
       </div>
@@ -328,40 +351,48 @@ onMounted(load)
     <!-- 二次确认弹窗（封禁/解封/重置密码/调整信誉） -->
     <Teleport to="body">
       <div v-if="confirmDialog.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeConfirm">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-3">{{ confirmDialog.title }}</h3>
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker ds-sticker--coral">CONFIRM</span>
+            <span class="ds-label">二次确认</span>
+          </div>
+          <h3 class="ds-title mb-3" style="color: var(--ink)">{{ confirmDialog.title }}</h3>
           <!-- 目标用户信息 -->
-          <div v-if="confirmDialog.target" class="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl mb-3">
-            <div class="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-xs font-medium overflow-hidden shrink-0">
+          <div v-if="confirmDialog.target" class="flex items-center gap-3 p-3 mb-3" style="background: var(--paper); border-radius: var(--ds-radius-sm); border: 1px solid var(--hairline)">
+            <div
+              class="w-9 h-9 flex items-center justify-center text-[11px] font-bold overflow-hidden shrink-0"
+              style="border-radius: 9px; border: 1.5px solid var(--ink); background: var(--lime); color: var(--ink)"
+            >
               <img v-if="confirmDialog.target.avatar" :src="confirmDialog.target.avatar" class="w-full h-full object-cover" alt="" />
               <span v-else>{{ confirmDialog.target.nickname?.charAt(0) }}</span>
             </div>
             <div class="min-w-0 flex-1">
-              <div class="text-sm font-medium text-zinc-900 truncate">{{ confirmDialog.target.nickname }}</div>
-              <div class="text-xs text-zinc-500 truncate">学号 {{ confirmDialog.target.student_id }} · 当前信誉 {{ confirmDialog.target.credit_score }}</div>
+              <div class="text-[13px] font-bold truncate" style="color: var(--ink)">{{ confirmDialog.target.nickname }}</div>
+              <div class="text-[12px] truncate ds-num" style="color: var(--ink-mute)">学号 {{ confirmDialog.target.student_id }} · 当前信誉 {{ confirmDialog.target.credit_score }}</div>
             </div>
           </div>
           <!-- 动作预览 -->
-          <div class="text-sm text-zinc-600 mb-2">{{ confirmDialog.body }}</div>
-          <ul v-if="confirmDialog.kind === 'ban'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+          <div class="text-[13px] mb-2" style="color: var(--ink-soft)">{{ confirmDialog.body }}</div>
+          <ul v-if="confirmDialog.kind === 'ban'" class="text-[12px] space-y-0.5 mb-4" style="color: var(--ink-mute)">
             <li>· 动作：封禁 7 天</li>
             <li>· 原因：{{ (confirmDialog.meta?.reason as string) || '（下一步填写）' }}</li>
           </ul>
-          <ul v-else-if="confirmDialog.kind === 'resetPassword'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+          <ul v-else-if="confirmDialog.kind === 'resetPassword'" class="text-[12px] space-y-0.5 mb-4" style="color: var(--ink-mute)">
             <li>· 动作：重置密码</li>
             <li>· 新密码：********（下一步生成 8 位一次性密码）</li>
           </ul>
-          <ul v-else-if="confirmDialog.kind === 'adjustCredit'" class="text-xs text-zinc-500 space-y-0.5 mb-4">
+          <ul v-else-if="confirmDialog.kind === 'adjustCredit'" class="text-[12px] space-y-0.5 mb-4" style="color: var(--ink-mute)">
             <li>· 当前：{{ confirmDialog.target?.credit_score }}</li>
             <li>· 新值：在下一步弹窗中输入</li>
           </ul>
           <div v-else class="mb-4"></div>
-          <p class="text-[11px] text-zinc-400 mb-3">本操作将被记录到审计日志，包含操作者、时间与原因。</p>
+          <p class="ds-sub mb-3">本操作将被记录到审计日志，包含操作者、时间与原因。</p>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="closeConfirm">取消</button>
+            <button type="button" class="ds-btn flex-1" @click="closeConfirm">取消</button>
             <button
-              class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm"
+              type="button"
+              class="ds-btn ds-btn--primary flex-1"
               :disabled="confirmDialog.submitting"
               @click="onConfirm"
             >
@@ -375,22 +406,26 @@ onMounted(load)
     <!-- 封禁/解封弹窗 -->
     <Teleport to="body">
       <div v-if="banModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="banModal.visible = false">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-4">{{ banModal.action === 'ban' ? '封禁用户' : '解封用户' }}</h3>
-          <p class="text-sm text-zinc-500 mb-3">{{ banModal.user?.nickname }}（{{ banModal.user?.student_id }}）</p>
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker" :class="banModal.action === 'ban' ? 'ds-sticker--coral' : 'ds-sticker--sky'">{{ banModal.action === 'ban' ? 'BAN' : 'UNBAN' }}</span>
+            <span class="ds-label">{{ banModal.action === 'ban' ? '处罚' : '恢复' }}</span>
+          </div>
+          <h3 class="ds-title mb-2" style="color: var(--ink)">{{ banModal.action === 'ban' ? '封禁用户' : '解封用户' }}</h3>
+          <p class="text-[13px] mb-4 ds-num" style="color: var(--ink-mute)">{{ banModal.user?.nickname }}（{{ banModal.user?.student_id }}）</p>
           <template v-if="banModal.action === 'ban'">
             <div class="mb-3">
-              <label class="block text-sm text-zinc-600 mb-1">封禁原因</label>
+              <label class="ds-label block mb-1.5">封禁原因</label>
               <input
                 v-model="banModal.reason"
                 placeholder="请输入封禁原因"
-                class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm"
+                class="ds-input"
               />
             </div>
             <div class="mb-4">
-              <label class="block text-sm text-zinc-600 mb-1">封禁时长</label>
-              <select v-model="banModal.duration" class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-sm focus:outline-none">
+              <label class="ds-label block mb-1.5">封禁时长</label>
+              <select v-model="banModal.duration" class="ds-input">
                 <option value="1">1天</option>
                 <option value="7">7天</option>
                 <option value="30">30天</option>
@@ -398,10 +433,16 @@ onMounted(load)
               </select>
             </div>
           </template>
-          <p v-else class="text-sm text-zinc-500 mb-4">确定要解封该用户吗？</p>
+          <p v-else class="text-[13px] mb-4" style="color: var(--ink-soft)">确定要解封该用户吗？</p>
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="banModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="banModal.submitting" @click="submitBan">{{ banModal.submitting ? '提交中…' : '确定' }}</button>
+            <button type="button" class="ds-btn flex-1" @click="banModal.visible = false">取消</button>
+            <button
+              type="button"
+              class="ds-btn flex-1"
+              :class="banModal.action === 'ban' ? 'ds-btn--danger' : 'ds-btn--primary'"
+              :disabled="banModal.submitting"
+              @click="submitBan"
+            >{{ banModal.submitting ? '提交中…' : '确定' }}</button>
           </div>
         </div>
       </div>
@@ -410,28 +451,35 @@ onMounted(load)
     <!-- 重置密码弹窗 -->
     <Teleport to="body">
       <div v-if="pwdModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="pwdModal.visible = false">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-4">重置密码</h3>
-          <p class="text-sm text-zinc-500 mb-3">{{ pwdModal.user?.nickname }}（{{ pwdModal.user?.student_id }}）</p>
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker ds-sticker--violet">RESET</span>
+            <span class="ds-label">凭据</span>
+          </div>
+          <h3 class="ds-title mb-2" style="color: var(--ink)">重置密码</h3>
+          <p class="text-[13px] mb-4 ds-num" style="color: var(--ink-mute)">{{ pwdModal.user?.nickname }}（{{ pwdModal.user?.student_id }}）</p>
           <template v-if="!pwdModal.done">
-            <label class="block text-sm text-zinc-600 mb-1">一次性新密码（请妥善转告用户）</label>
+            <label class="ds-label block mb-1.5">一次性新密码（请妥善转告用户）</label>
             <input
               :value="pwdModal.password"
               readonly
-              class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:outline-none text-sm font-mono tracking-wider mb-4 select-all"
+              class="ds-input font-mono tracking-wider mb-4 select-all"
             />
             <div class="flex gap-3">
-              <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="pwdModal.visible = false">取消</button>
-              <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="pwdModal.submitting" @click="submitPwd">{{ pwdModal.submitting ? '提交中…' : '确认重置' }}</button>
+              <button type="button" class="ds-btn flex-1" @click="pwdModal.visible = false">取消</button>
+              <button type="button" class="ds-btn ds-btn--primary flex-1" :disabled="pwdModal.submitting" @click="submitPwd">{{ pwdModal.submitting ? '提交中…' : '确认重置' }}</button>
             </div>
           </template>
           <template v-else>
-            <p class="text-sm text-zinc-600 mb-1">已生效的一次性新密码：</p>
-            <p class="text-base font-mono font-semibold text-brand-600 tracking-wider bg-brand-50 rounded-lg px-3 py-2 mb-4 select-all">{{ pwdModal.password }}</p>
+            <p class="text-[13px] mb-1.5" style="color: var(--ink-soft)">已生效的一次性新密码：</p>
+            <p
+              class="text-[15px] font-mono font-bold tracking-wider px-3 py-2 mb-4 select-all ds-num"
+              style="background: var(--lime); color: var(--ink); border: 1.5px solid var(--ink); border-radius: var(--ds-radius-sm); box-shadow: var(--shadow-hard-sm)"
+            >{{ pwdModal.password }}</p>
             <div class="flex gap-3">
-              <button class="flex-1 py-2 rounded-full border border-brand-200 text-brand-600 text-sm hover:bg-brand-50" @click="copyPwd">复制密码</button>
-              <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="pwdModal.visible = false">我已记录，关闭</button>
+              <button type="button" class="ds-btn flex-1" @click="copyPwd">复制密码</button>
+              <button type="button" class="ds-btn ds-btn--primary flex-1" @click="pwdModal.visible = false">我已记录，关闭</button>
             </div>
           </template>
         </div>
@@ -441,32 +489,42 @@ onMounted(load)
     <!-- 信誉调整弹窗 -->
     <Teleport to="body">
       <div v-if="creditModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="creditModal.visible = false">
-        <div class="absolute inset-0 bg-black/40"></div>
-        <div class="relative bg-white rounded-2xl w-full max-w-sm p-6">
-          <h3 class="text-lg font-semibold mb-4">调整信誉分</h3>
-          <p class="text-sm text-zinc-500 mb-3">
+        <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
+        <div class="relative ds-card w-full max-w-sm p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="ds-sticker">CREDIT</span>
+            <span class="ds-label">信誉</span>
+          </div>
+          <h3 class="ds-title mb-2" style="color: var(--ink)">调整信誉分</h3>
+          <p class="text-[13px] mb-4" style="color: var(--ink-soft)">
             {{ creditModal.user?.nickname }}（当前
-            <span class="font-medium text-zinc-900">{{ creditModal.user?.credit_score }}</span>
+            <span class="font-bold ds-num" style="color: var(--ink)">{{ creditModal.user?.credit_score }}</span>
             ，调整后
-            <span class="font-medium text-brand-600">{{ Math.max(0, Math.min(120, (creditModal.user?.credit_score || 0) + Number(creditModal.score) || 0)) }}</span>
+            <span class="font-bold ds-num" style="color: var(--violet)">{{ Math.max(0, Math.min(120, (creditModal.user?.credit_score || 0) + Number(creditModal.score) || 0)) }}</span>
             ）
           </p>
-          <label class="block text-sm text-zinc-600 mb-1">分值（正数增加，负数减少）</label>
+          <label class="ds-label block mb-1.5">分值（正数增加，负数减少）</label>
           <input
             v-model.number="creditModal.score"
             type="number"
             placeholder="如 10 或 -10"
-            class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm mb-3"
+            class="ds-input mb-3"
           />
-          <label class="block text-sm text-zinc-600 mb-1">理由</label>
+          <label class="ds-label block mb-1.5">理由</label>
           <input
             v-model="creditModal.reason"
             placeholder="调整原因"
-            class="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:outline-none text-sm mb-4"
+            class="ds-input mb-4"
           />
           <div class="flex gap-3">
-            <button class="flex-1 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm" @click="creditModal.visible = false">取消</button>
-            <button class="flex-1 py-2 rounded-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm" :disabled="creditModal.submitting" @click="submitCredit">{{ creditModal.submitting ? '提交中…' : '确定' }}</button>
+            <button type="button" class="ds-btn flex-1" @click="creditModal.visible = false">取消</button>
+            <button
+              type="button"
+              class="ds-btn flex-1"
+              :class="creditModal.score < 0 ? 'ds-btn--danger' : 'ds-btn--primary'"
+              :disabled="creditModal.submitting"
+              @click="submitCredit"
+            >{{ creditModal.submitting ? '提交中…' : '确定' }}</button>
           </div>
         </div>
       </div>

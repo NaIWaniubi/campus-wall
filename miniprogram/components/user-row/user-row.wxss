@@ -53,7 +53,7 @@
 .credit-chip.lv-gold { color: #B8860B; background: rgba(255, 193, 7, 0.15); }
 .credit-chip.lv-good { color: #6D3BF5; background: rgba(109, 59, 245, 0.12); }
 .credit-chip.lv-normal { color: #4A90D9; background: rgba(109, 59, 245, 0.12); }
-.credit-chip.lv-warn { color: #E67E22; background: rgba(230, 126, 34, 0.12); }
+.credit-chip.lv-warn { color: #B45309; background: rgba(180, 83, 9, 0.12); }
 .credit-chip.lv-bad { color: #E74C3C; background: rgba(231, 76, 60, 0.12); }
 
 .signature {

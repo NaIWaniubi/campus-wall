@@ -1,4 +1,9 @@
 <view class="page-publish {{perfLowClass}}">
+  <view class="pub-hero">
+    <text class="pub-hero__sticker">NEW</text>
+    <view class="pub-hero__title">发布新鲜事</view>
+    <view class="pub-hero__sub">选对分类，让全校精准看到</view>
+  </view>
   <view class="publish-form">
     <view class="category-select card">
       <text class="label">选择分类</text>
@@ -33,7 +38,7 @@
           <text class="identity-hint gray-color" wx:elif="{{isAnonymous}}">匿名发布</text>
           <text class="identity-hint gray-color" wx:else>实名发布</text>
         </view>
-        <switch checked="{{isAnonymous}}" disabled="{{forcedAnonymous}}" bindchange="onToggleAnonymous" color="#16A085" />
+        <switch checked="{{isAnonymous}}" disabled="{{forcedAnonymous}}" bindchange="onToggleAnonymous" color="#6D3BF5" />
       </view>
       <text class="anon-note gray-color">信誉分满 90 才可匿名发布，匿名帖子由管理端留存实名溯源</text>
     </view>

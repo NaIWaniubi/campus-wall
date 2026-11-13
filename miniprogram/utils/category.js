@@ -3,7 +3,7 @@ const CATEGORY_CONFIG = {
     id: 'lost',
     name: '失物招领',
     icon: '🔍',
-    color: '#16A085',
+    color: '#06B6D4',
     subTypes: [
       { id: 'campus_card', name: '校园卡' },
       { id: 'keys', name: '钥匙' },
@@ -17,7 +17,7 @@ const CATEGORY_CONFIG = {
     id: 'confession',
     name: '表白墙',
     icon: '💕',
-    color: '#FF6B6B',
+    color: '#F43F5E',
     subTypes: [
       { id: 'confession', name: '匿名表白' },
       { id: 'mention', name: '@同学' },
@@ -30,7 +30,7 @@ const CATEGORY_CONFIG = {
     id: 'help',
     name: '校园求助',
     icon: '🆘',
-    color: '#FECA57',
+    color: '#4F46E5',
     subTypes: [
       { id: 'study', name: '学习求助' },
       { id: 'life', name: '生活求助' },
@@ -41,7 +41,7 @@ const CATEGORY_CONFIG = {
     id: 'trade',
     name: '二手闲置',
     icon: '📦',
-    color: '#00D2D3',
+    color: '#F59E0B',
     subTypes: [
       { id: 'textbook', name: '课本教材' },
       { id: 'digital', name: '电子数码' },
@@ -55,7 +55,7 @@ const CATEGORY_CONFIG = {
     id: 'carshare',
     name: '拼车/拼单',
     icon: '🚗',
-    color: '#3498DB',
+    color: '#C026D3',
     subTypes: [
       { id: 'campus_commute', name: '校区通勤' },
       { id: 'station', name: '高铁站/机场' },
@@ -69,7 +69,7 @@ const CATEGORY_CONFIG = {
     id: 'team',
     name: '社团/组队',
     icon: '👥',
-    color: '#1ABC9C',
+    color: '#EC4899',
     subTypes: [
       { id: 'club', name: '社团招新' },
       { id: 'competition', name: '比赛组队' },
@@ -81,7 +81,7 @@ const CATEGORY_CONFIG = {
     id: 'daily',
     name: '校园日常',
     icon: '🌟',
-    color: '#E67E22',
+    color: '#8B5CF6',
     subTypes: [
       { id: 'share', name: '生活分享' },
       { id: 'positive', name: '正能量' },
@@ -93,7 +93,7 @@ const CATEGORY_CONFIG = {
     id: 'activity',
     name: '校园活动',
     icon: '🎉',
-    color: '#9B59B6',
+    color: '#3B82F6',
     subTypes: [
       { id: 'show', name: '文体演出' },
       { id: 'lecture', name: '讲座论坛' },

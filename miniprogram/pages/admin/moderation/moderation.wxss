@@ -58,7 +58,7 @@
 }
 
 .stat-card.accent .stat-value {
-  color: #E67E22;
+  color: #B45309;
 }
 
 .stat-value {
@@ -185,7 +185,7 @@
 }
 
 .meta .count {
-  color: #E67E22;
+  color: #B45309;
   font-weight: 700;
 }
 
@@ -223,7 +223,7 @@
 }
 
 .badge.s-pending_review {
-  background: rgba(230, 126, 34, 0.12);
+  background: rgba(180, 83, 9, 0.12);
   color: #CA6F1E;
 }
 
@@ -243,7 +243,7 @@
 }
 
 .badge.pending-badge {
-  background: rgba(230, 126, 34, 0.12);
+  background: rgba(180, 83, 9, 0.12);
   color: #CA6F1E;
 }
 
@@ -301,7 +301,7 @@
 }
 
 .btn-warn {
-  background: rgba(230, 126, 34, 0.12);
+  background: rgba(180, 83, 9, 0.12);
   color: #CA6F1E;
 }
 

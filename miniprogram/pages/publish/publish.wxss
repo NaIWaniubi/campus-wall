@@ -401,3 +401,40 @@
   color: #C9CDD4;
   line-height: 1;
 }
+
+/* ── V4 结构升级：海报小标头 + 分区柠条 ── */
+.pub-hero {
+  background: #14110F;
+  padding: 34rpx 32rpx 40rpx;
+  position: relative;
+}
+.pub-hero__sticker {
+  position: absolute;
+  right: 40rpx;
+  top: 22rpx;
+  transform: rotate(6deg);
+  background: #C8F04A;
+  color: #14110F;
+  border: 3rpx solid #F7F2E8;
+  border-radius: 12rpx;
+  box-shadow: 4rpx 4rpx 0 #FF4D2E;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+  padding: 4rpx 14rpx;
+}
+.pub-hero__title {
+  color: #F7F2E8;
+  font-size: 44rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+}
+.pub-hero__sub {
+  margin-top: 8rpx;
+  color: rgba(247, 242, 232, 0.6);
+  font-size: 24rpx;
+}
+.publish-form .label {
+  border-left: 8rpx solid #C8F04A;
+  padding-left: 12rpx;
+}

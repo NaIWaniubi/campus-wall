@@ -1,6 +1,6 @@
 // 本地占位资源：内联 SVG（data URI），去除 Picsum 外链依赖
 function avatarPlaceholder(seed) {
-  const palette = ['#16A085', '#20C4A4', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#10B981']
+  const palette = ['#6D3BF5', '#38D6F5', '#0E7C86', '#F59E0B', '#FF4D2E', '#8B5CF6', '#EC4899', '#B45309']
   let h = 0
   for (const ch of String(seed || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   const c1 = palette[h % palette.length]
@@ -10,7 +10,7 @@ function avatarPlaceholder(seed) {
 }
 
 function photoPlaceholder(seed) {
-  const palette = ['#16A085', '#20C4A4', '#3B82F6', '#F59E0B', '#8B5CF6', '#10B981', '#0EA5E9', '#F472B6']
+  const palette = ['#6D3BF5', '#38D6F5', '#0E7C86', '#F59E0B', '#8B5CF6', '#C8F04A', '#C026D3', '#F472B6']
   let hash = 0
   for (const ch of String(seed || '')) hash = (hash * 33 + ch.charCodeAt(0)) >>> 0
   const c1 = palette[hash % palette.length]

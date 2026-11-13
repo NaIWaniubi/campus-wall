@@ -17,10 +17,13 @@
 - **分享海报**：详情页一键生成 750×1000@2 纯 canvas 海报（恒暗品牌头 + 板块色胶囊 + 空间不足先舍图再舍摘要行），下载/复制/系统分享
 - **无障碍**：三个 Teleport 模态接入 inert 焦点陷阱（背景退出 Tab 序列与无障碍树）；skip-link / aria / 对比度回归锁
 - **PWA 一键安装**：`beforeinstallprompt` 捕获单例 + 设置页「安装校园墙」（已安装/可安装/手动指引三分支）
+- **全局实时通知**：任意页面收到 WS 推送即刷新未读徽标 + toast 摘要（消息页内不打扰）；修 `main.ts` 仅在已登录时 start 导致游客→登录不装 WS token-watch 的根因（改无条件 start，内部按 token 决策）
+- **SEO 静态面**：`robots.txt`（屏蔽 /admin /api + 绝对 Sitemap 指向）与动态 `sitemap.xml`（published 帖 + 全板块入图，缓存 10min），注册在 SPA 通配回退之前
+- **全局错误兜底**：`router.onError` 识别旧 chunk 404 自动硬刷新一次（sessionStorage 防死循环、storage 不可用则保守不刷）；`app.config.errorHandler` 把未捕获 Vue 错误降级为提示而非白屏；`errorGuard` 纯函数抽出 + 单测锁死
 - **小程序 V4 结构级同源**：全部 wxss 去渐变/玻璃拟态/蓝灰柔影 → 纸白实底 + 墨线硬影；私信 CTA 墨底柠字；全局分区标题柠色标记条；发布页海报小标头 + NEW 贴纸；8 分类色与 mock 调色板对齐 web 板块色；3 条风格回潮回归锁
 - **细节**：路由顶部进度条、首页回到顶部、toast/信誉色彻底退绿（紫/深青/深琥珀/红）、PWA 图标重绘为 V4 墨底荧光砖、`:focus-visible` 焦点环、`prefers-reduced-motion` 降级
 - **管理后台 V4 全量重构**：外壳 + 看板 + 帖子/评论/举报/用户/板块/反馈/公告/AI 设置共 11 页；图表跟随主题
-- 测试 223 条全过（SEO 15 / 评论直达 3 / 风格回潮锁 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA E2E 0 控制台报错
+- 测试 233 条全过（SEO 15+5 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
 
 ### V4 · 纸感海报设计系统（2026-11-12）
 - 全站换肤：暖纸底 + 1.5px 墨线 + 硬投影 + 大字排版 + 荧光四色（lime/coral/sky/violet）

@@ -136,7 +136,7 @@ onMounted(load)
     <!-- 二次确认：标记已处理 -->
     <Teleport to="body">
       <div v-if="closeConfirm.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="cancelCloseConfirm">
-        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="ds-scrim absolute inset-0"></div>
         <div class="relative ds-card w-full max-w-sm p-6">
           <span class="ds-sticker ds-sticker--sky">CLOSE</span>
           <h3 class="ds-title mt-2 mb-3" style="color: var(--ink)">标记为已处理？</h3>

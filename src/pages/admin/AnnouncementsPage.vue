@@ -125,7 +125,7 @@ onMounted(load)
     <!-- 发布公告弹窗 -->
     <Teleport to="body">
       <div v-if="createModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="createModal.visible = false">
-        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="ds-scrim absolute inset-0"></div>
         <div class="relative ds-card w-full max-w-md p-6">
           <span class="ds-sticker ds-sticker--coral">NOTICE</span>
           <h3 class="ds-title mt-2 mb-4" style="color: var(--ink)">发布公告</h3>
@@ -182,7 +182,7 @@ onMounted(load)
     <!-- 下线确认弹窗 -->
     <Teleport to="body">
       <div v-if="offlineTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="offlineTarget = null">
-        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.55"></div>
+        <div class="ds-scrim absolute inset-0"></div>
         <div class="relative ds-card w-full max-w-sm p-6">
           <h3 class="ds-title mb-3" style="color: var(--ink)">下线公告</h3>
           <p class="text-[13px] leading-relaxed mb-4" style="color: var(--ink-soft)">确定下线「{{ offlineTarget.title }}」？下线后用户端不再展示。</p>

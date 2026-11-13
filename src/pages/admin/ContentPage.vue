@@ -380,7 +380,7 @@ onMounted(() => {
     <!-- 驳回弹窗（原因必填） -->
     <Teleport to="body">
       <div v-if="rejectModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="rejectModal.visible = false">
-        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.5"></div>
+        <div class="ds-scrim absolute inset-0"></div>
         <div class="relative ds-card w-full max-w-sm p-5">
           <h3 class="ds-title">驳回帖子</h3>
           <p class="ds-sub mt-1.5 mb-3 truncate">{{ rejectModal.post?.title }}</p>
@@ -408,7 +408,7 @@ onMounted(() => {
     <!-- 置顶二选一弹窗 -->
     <Teleport to="body">
       <div v-if="topModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="topModal.visible = false">
-        <div class="absolute inset-0" style="background: var(--ink); opacity: 0.5"></div>
+        <div class="ds-scrim absolute inset-0"></div>
         <div class="relative ds-card w-full max-w-sm p-5">
           <h3 class="ds-title">设置置顶</h3>
           <p class="ds-sub mt-1.5 mb-4 truncate">{{ topModal.post?.title }}</p>

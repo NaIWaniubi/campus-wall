@@ -546,9 +546,9 @@ const TIME_TAIL_RE = /^\s*的?(上午|下午|中午|晚上|傍晚|凌晨|早上)
 function extractOfflineTime(raw: string): string | null {
   const m = raw.match(OFFLINE_TIME_HEAD);
   if (!m || m.index == null) return null;
-  let val = m[1].trim();
+  let val = (m[1] ?? '').trim();
   const tail = raw.slice(m.index + m[0].length).match(TIME_TAIL_RE);
-  if (tail) val += tail[1];
+  if (tail) val += tail[1] ?? '';
   return val;
 }
 const OFFLINE_CONTACT_RE =

@@ -2,9 +2,10 @@
 /**
  * 板块详情页：展示单个板块下的帖子列表
  */
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Plus, RefreshCw, Bell, BellRing } from '@lucide/vue'
+import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, subscriptionApi } from '@/utils/api'
@@ -27,6 +28,28 @@ const hasMore = ref(true)
 const loading = ref(false)
 const loadingMore = ref(false)
 const refreshing = ref(false)
+
+// A-T3 窗口虚拟化（与首页同源）：单板块帖量可能上千，DOM 节点不随 list 无限增长
+const listRef = ref<HTMLElement | null>(null)
+const scrollMargin = ref(0)
+const virtualizer = useWindowVirtualizer(
+  computed(() => ({
+    count: list.value.length,
+    estimateSize: () => 320,
+    overscan: 6,
+    scrollMargin: scrollMargin.value,
+  })),
+)
+const virtualItems = computed(() => virtualizer.value.getVirtualItems())
+const totalSize = computed(() => virtualizer.value.getTotalSize())
+function measureRow(el: any) {
+  if (el) virtualizer.value.measureElement(el)
+}
+function updateScrollMargin() {
+  scrollMargin.value = listRef.value
+    ? listRef.value.getBoundingClientRect().top + window.scrollY
+    : 0
+}
 
 const sortOptions = [
   { key: 'new', label: '最新' },
@@ -107,6 +130,8 @@ async function loadList(reset = false) {
   } finally {
     loading.value = false
     loadingMore.value = false
+    // 列表容器从骨架换成虚拟化容器后，顶部偏移会变，需重算 scrollMargin
+    nextTick(updateScrollMargin)
   }
 }
 
@@ -173,6 +198,8 @@ async function toggleSubscribe() {
 
 onMounted(() => {
   window.addEventListener('scroll', onScroll)
+  window.addEventListener('resize', updateScrollMargin)
+  nextTick(updateScrollMargin)
   loadSubscribed()
   if (!appStore.sections.length) {
     // 板块元数据失败不能把列表一起拖死：列表接口本身不依赖它
@@ -183,9 +210,14 @@ onMounted(() => {
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', updateScrollMargin)
 })
 
 watch(sectionId, () => {
+  // 换板块：回顶并归零，虚拟化窗口从列表头重新渲染
+  window.scrollTo({ top: 0 })
+  list.value = []
+  nextTick(updateScrollMargin)
   loadList(true)
   loadSubscribed()
 })
@@ -300,7 +332,23 @@ watch(sectionId, () => {
       <PostSkeleton v-if="loading" :count="4" />
 
       <template v-else>
-        <PostCard v-for="post in list" :key="post.id" :post="post" />
+        <div ref="listRef" class="relative" :style="{ height: totalSize + 'px' }">
+          <div
+            v-for="v in virtualItems"
+            :key="v.index"
+            :ref="measureRow"
+            class="pb-3"
+            :style="{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${v.start - scrollMargin}px)`,
+            }"
+          >
+            <PostCard :post="list[v.index]" />
+          </div>
+        </div>
         <div v-if="loadingMore" class="py-4 flex items-center justify-center gap-2 ds-label">
           <RefreshCw class="w-4 h-4 animate-spin" /> 加载中…
         </div>

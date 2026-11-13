@@ -122,7 +122,7 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
   // 通知作者（去重）
   if (post.user_id !== req.currentUser!.id) {
     upsertNotification(
-      post.user_id, 'comment', `${req.currentUser!.nickname} 评论了你的帖子「${post.title}」`, postId
+      post.user_id, 'comment', `${req.currentUser!.nickname} 评论了你的帖子「${post.title}」`, postId, Number(commentId)
     );
   }
 
@@ -166,8 +166,9 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
 
   // 通知被回复者（去重）
   if (parent.user_id !== req.currentUser!.id) {
+    // 直达锚点用顶层父评论：回复嵌在楼中楼里，滚到父评论才能看见整条对话
     upsertNotification(
-      parent.user_id, 'comment', `${req.currentUser!.nickname} 回复了你的评论`, parent.post_id
+      parent.user_id, 'comment', `${req.currentUser!.nickname} 回复了你的评论`, parent.post_id, commentId
     );
   }
 

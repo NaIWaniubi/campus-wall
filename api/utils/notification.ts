@@ -14,36 +14,37 @@ const DEDUP_WINDOW_DAYS = 7;
 
 /**
  * 写入一条通知（带去重）。
- * 同一 (user_id, type, related_id) 在 DEDUP_WINDOW_DAYS 天内已存在时，
+ * 同一 (user_id, type, related_id, related_sub_id) 在 DEDUP_WINDOW_DAYS 天内已存在时，
  * 更新原记录而非新增；否则插入新记录。
  */
 export function upsertNotification(
   user_id: number,
   type: string,
   content: string,
-  related_id?: number | null
+  related_id?: number | null,
+  related_sub_id?: number | null
 ): void {
   let notificationId = 0;
 
   const existing = db.prepare(`
     SELECT id FROM messages
-    WHERE user_id = ? AND type = ? AND related_id IS ?
+    WHERE user_id = ? AND type = ? AND related_id IS ? AND related_sub_id IS ?
       AND created_at >= datetime('now', '-' || ? || ' days')
     ORDER BY created_at DESC LIMIT 1
-  `).get(user_id, type, related_id ?? null, DEDUP_WINDOW_DAYS) as any;
+  `).get(user_id, type, related_id ?? null, related_sub_id ?? null, DEDUP_WINDOW_DAYS) as any;
 
   if (existing) {
     db.prepare(`
       UPDATE messages
-      SET content = ?, is_read = 0, created_at = CURRENT_TIMESTAMP
+      SET content = ?, related_sub_id = ?, is_read = 0, created_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(content, existing.id);
+    `).run(content, related_sub_id ?? null, existing.id);
     notificationId = existing.id;
   } else {
     const r = db.prepare(`
-      INSERT INTO messages (user_id, type, content, related_id)
-      VALUES (?, ?, ?, ?)
-    `).run(user_id, type, content, related_id ?? null);
+      INSERT INTO messages (user_id, type, content, related_id, related_sub_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(user_id, type, content, related_id ?? null, related_sub_id ?? null);
     notificationId = Number(r.lastInsertRowid);
   }
 

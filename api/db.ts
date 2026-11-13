@@ -492,6 +492,13 @@ const feedbackHasStatus = (db.prepare('PRAGMA table_info(feedback)').all() as { 
 if (!feedbackHasStatus) {
   db.exec(`ALTER TABLE feedback ADD COLUMN status TEXT DEFAULT 'open'`);
 }
+// 老库升级：评论/回复通知直达具体评论（related_id=帖子，related_sub_id=顶层评论）
+const msgHasSub = (db.prepare('PRAGMA table_info(messages)').all() as { name: string }[])
+  .some((c) => c.name === 'related_sub_id');
+if (!msgHasSub) {
+  db.exec(`ALTER TABLE messages ADD COLUMN related_sub_id INTEGER`);
+}
+
 // 管理端反馈列表按时间倒序分页
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);

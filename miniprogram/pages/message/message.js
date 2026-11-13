@@ -107,7 +107,7 @@ Page({
   },
 
   async onTapNotification(e) {
-    const { id, postid } = e.currentTarget.dataset
+    const { id, postid, commentid } = e.currentTarget.dataset
     if (!app.checkLogin()) return
     // 本地立即置灰 + 后端持久化已读（PUT /messages/read/:id），失败不阻塞跳转
     this.setData({
@@ -116,7 +116,9 @@ Page({
     })
     put('/messages/read/' + id, {}, false).catch(() => {})
     if (postid) {
-      wx.navigateTo({ url: `/pages/detail/detail?id=${postid}` })
+      // 评论/回复通知直达具体楼层（detail 页 scroll-into-view cmt-{id}）
+      const sub = commentid ? `&comment=${commentid}` : ''
+      wx.navigateTo({ url: `/pages/detail/detail?id=${postid}${sub}` })
     }
   },
 

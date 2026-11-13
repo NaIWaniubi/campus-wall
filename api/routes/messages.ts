@@ -40,6 +40,7 @@ router.get('/', authRequired, (req, res) => {
     type: m.type,
     content: m.content,
     postId: m.related_id,
+    relatedSubId: m.related_sub_id ?? null,
     isRead: !!m.is_read,
     createdAt: m.created_at ? new Date(m.created_at).toISOString() : m.created_at,
   }));

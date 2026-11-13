@@ -245,7 +245,7 @@
       </view>
 
       <view class="comment-list" wx:if="{{comments.length > 0}}">
-        <comment-item wx:for="{{comments}}" wx:key="id" comment="{{item}}" 
+        <comment-item wx:for="{{comments}}" wx:key="id" id="cmt-{{item.id}}" comment="{{item}}" 
           bind:likecomment="onLikeComment" 
           bind:reply="onReplyComment"
           bind:likereply="onLikeReply"

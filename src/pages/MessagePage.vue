@@ -84,7 +84,8 @@ async function onItemClick(msg: any) {
   // digest：不跳转，展开/收起全文
   if (msg.type === 'digest') return toggleDigest(msg.id)
   if ((msg.type === 'comment' || msg.type === 'like') && msg.postId) {
-    return router.push(`/post/${msg.postId}`)
+    // 评论/回复通知带 relatedSubId → 直达那一条并高亮
+    return router.push(msg.relatedSubId ? `/post/${msg.postId}?comment=${msg.relatedSubId}` : `/post/${msg.postId}`)
   }
   // match：related_id 即对方帖子 id，带 showMatches 让详情页定位并展开匹配卡片
   if (msg.type === 'match' && msg.postId) {

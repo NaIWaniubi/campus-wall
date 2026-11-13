@@ -284,10 +284,22 @@ async function fetchPost() {
   }
 }
 
+// 评论通知直达：?comment= 命中时滚到该楼并荧光闪一下（同 showMatches 的定位语言）
+const flashCommentId = ref<number | null>(null)
+function flashComment(cid: number) {
+  flashCommentId.value = cid
+  nextTick(() => {
+    document.getElementById(`cmt-${cid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { if (flashCommentId.value === cid) flashCommentId.value = null }, 2600)
+  })
+}
+
 async function fetchComments() {
   try {
     const res: any = await commentApi.list(postId.value)
     comments.value = res.data || []
+    const qc = Number(route.query.comment)
+    if (qc && comments.value.some((c: any) => c.id === qc)) flashComment(qc)
   } catch {
     comments.value = []
   }
@@ -1030,7 +1042,7 @@ function closeMoreMenu(e: MouseEvent) {
           <span class="ds-section-head__line"></span>
         </div>
         <div v-if="!comments.length" class="text-center text-[13px] py-6" style="color: var(--ink-mute)">暂无评论，快来抢沙发</div>
-        <div v-for="c in comments" :key="c.id" class="cmt py-3.5">
+        <div v-for="c in comments" :id="`cmt-${c.id}`" :key="c.id" class="cmt py-3.5" :class="{ 'cmt-flash': flashCommentId === c.id }">
           <div class="flex items-start gap-2.5">
             <div class="w-9 h-9 rounded-[10px] overflow-hidden flex items-center justify-center shrink-0"
               style="background: var(--sky); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm)">
@@ -1253,6 +1265,14 @@ function closeMoreMenu(e: MouseEvent) {
 .detail-body { font-size: 15.5px; line-height: 1.85; color: var(--ink-soft); }
 .cmt-body { font-size: 14px; line-height: 1.7; color: var(--ink-soft); }
 .cmt + .cmt { border-top: 1.5px solid var(--ink); }
+.cmt-flash {
+  border-radius: 14px;
+  animation: cmt-flash 2.6s ease forwards;
+}
+@keyframes cmt-flash {
+  0%, 60% { box-shadow: 0 0 0 3px var(--lime); background: color-mix(in srgb, var(--lime) 14%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; background: transparent; }
+}
 .row-link { border-bottom: 1px solid var(--hairline); }
 .row-link:last-child { border-bottom: 0; }
 .row-link:hover,

@@ -49,6 +49,12 @@ Page({
         })
       }, 500)
     }
+    // 评论通知直达：滚到具体楼层（id 在 comment-item 上）
+    if (options.comment) {
+      setTimeout(() => {
+        this.setData({ scrollIntoView: 'cmt-' + options.comment })
+      }, 650)
+    }
   },
 
   /** 空操作：用于 catchtap 阻断冒泡（微信要求 handler 必须是真实方法，写 "true" 会报错） */

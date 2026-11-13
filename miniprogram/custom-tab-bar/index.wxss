@@ -14,7 +14,7 @@
   padding: 10rpx 14rpx 12rpx;
   background: #FFFFFF;
   border-top: 1rpx solid #E8ECEF;
-  box-shadow: 0 -2rpx 12rpx rgba(17, 24, 39, 0.05);
+  box-shadow: 0 -2rpx 12rpx rgba(20, 17, 15, 0.05);
   box-sizing: content-box;
   padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
 }
@@ -50,7 +50,7 @@
 
 /* 选中态统一为品牌绿 #6D3BF5，不再按 Tab 位次变色 */
 .is-active { color: #6D3BF5; font-weight: 700; }
-.is-active .tab-icon-wrap { background: rgba(22, 160, 133, 0.10); }
+.is-active .tab-icon-wrap { background: rgba(109, 59, 245, 0.10); }
 
 /* 中间发布键：品牌绿实心圆，去掉呼吸浮动动画 */
 .tab-publish { transform: translateY(-16rpx); }
@@ -59,7 +59,7 @@
   height: 84rpx;
   border-radius: 50%;
   background: #6D3BF5;
-  box-shadow: 0 8rpx 20rpx rgba(22, 160, 133, 0.28);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
 }
 .tab-publish .tab-icon { width: 42rpx; height: 42rpx; }
 .tab-publish .tab-label { margin-top: 6rpx; color: #6B7280; }

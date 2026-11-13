@@ -21,7 +21,7 @@
 .loading-spinner {
   width: 32rpx;
   height: 32rpx;
-  border: 4rpx solid rgba(22, 160, 133, 0.1);
+  border: 4rpx solid rgba(109, 59, 245, 0.1);
   border-top-color: #6D3BF5;
   border-radius: 50%;
   animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;

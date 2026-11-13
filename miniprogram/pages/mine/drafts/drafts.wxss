@@ -18,7 +18,7 @@
 .draft-section {
   font-size: 22rpx;
   color: var(--color-brand, #6D3BF5);
-  background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
+  background: var(--color-brand-tint, rgba(109, 59, 245, 0.1));
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
 }

@@ -13,16 +13,16 @@
 .follow-tab {
   padding: 12rpx 36rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(15, 23, 42, 0.08);
+  background: #FFFFFF;
+  border: 1rpx solid rgba(20, 17, 15, 0.08);
   color: #6E6659;
   font-size: 27rpx;
   font-weight: 700;
 }
 
 .follow-tab.active {
-  background: rgba(22, 160, 133, 0.12);
-  border-color: rgba(22, 160, 133, 0.35);
+  background: rgba(109, 59, 245, 0.12);
+  border-color: rgba(109, 59, 245, 0.35);
   color: #542BC4;
 }
 
@@ -38,10 +38,10 @@
   align-items: center;
   padding: 24rpx;
   margin-bottom: 16rpx;
-  background: rgba(255, 255, 255, 0.96);
+  background: #FFFFFF;
   border-radius: 28rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
-  box-shadow: 0 16rpx 42rpx rgba(15, 23, 42, 0.06);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
+  box-shadow: 6rpx 6rpx 0 rgba(20, 17, 15, 0.14);
 }
 
 .avatar {

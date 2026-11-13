@@ -4,10 +4,10 @@
   align-items: center;
   padding: 26rpx;
   margin-bottom: 18rpx;
-  background: rgba(255, 255, 255, 0.96);
+  background: #FFFFFF;
   border-radius: 28rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
-  box-shadow: 0 16rpx 42rpx rgba(15, 23, 42, 0.06);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
+  box-shadow: 6rpx 6rpx 0 rgba(20, 17, 15, 0.14);
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -60,10 +60,10 @@
   height: 32rpx;
   padding: 0 8rpx;
   border-radius: 16rpx;
-  background: linear-gradient(135deg, #FF4D2E, #EF4444);
+  background: #FF4D2E;
   color: #FFFFFF;
   font-size: 20rpx;
   line-height: 32rpx;
   text-align: center;
-  box-shadow: 0 6rpx 14rpx rgba(239, 68, 68, 0.24);
+  box-shadow: 3rpx 3rpx 0 #14110F;
 }

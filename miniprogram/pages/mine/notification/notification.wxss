@@ -9,7 +9,7 @@
   border-radius: 22rpx;
   padding: 10rpx;
   margin-bottom: 20rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
 }
 
 .notification-tabs .tab-item {
@@ -22,7 +22,7 @@
 }
 
 .notification-tabs .tab-item.active {
-  background: rgba(22, 160, 133, 0.1);
+  background: rgba(109, 59, 245, 0.1);
   color: #542BC4;
   font-weight: 800;
 }
@@ -36,15 +36,15 @@
 }
 
 .notification-item.unread {
-  background: rgba(22, 160, 133, 0.08);
-  border-color: rgba(22, 160, 133, 0.14);
+  background: rgba(109, 59, 245, 0.08);
+  border-color: rgba(109, 59, 245, 0.14);
 }
 
 .notification-icon-wrap {
   width: 76rpx;
   height: 76rpx;
   border-radius: 50%;
-  background: rgba(22, 160, 133, 0.1);
+  background: rgba(109, 59, 245, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;

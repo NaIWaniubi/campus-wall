@@ -76,17 +76,17 @@
   color: #14110F;
   font-size: 28rpx;
   line-height: 1.6;
-  box-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.05);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
   animation: fadeInUp 0.28s ease;
   word-break: break-all;
 }
 
 .bubble.mine {
   margin-left: auto;
-  background: linear-gradient(135deg, #6D3BF5, #8B5CF6);
+  background: #6D3BF5;
   color: #FFFFFF;
   border-radius: 28rpx 28rpx 8rpx 28rpx;
-  box-shadow: 0 14rpx 30rpx rgba(22, 160, 133, 0.18);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
 }
 
 .bubble.pending {
@@ -106,12 +106,10 @@
   display: flex;
   gap: 16rpx;
   padding: 18rpx;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(26rpx);
-  -webkit-backdrop-filter: blur(26rpx);
+  background: #FFFFFF;
   border-radius: 34rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 18rpx 48rpx rgba(15, 23, 42, 0.12);
+  border: 1rpx solid rgba(20, 17, 15, 0.06);
+  box-shadow: 6rpx 6rpx 0 rgba(20, 17, 15, 0.14);
 }
 
 .chat-input {
@@ -128,7 +126,7 @@
   height: 76rpx;
   margin: 0;
   border-radius: 999rpx;
-  background: linear-gradient(135deg, #6D3BF5, #8B5CF6);
+  background: #6D3BF5;
   color: #FFFFFF;
   font-size: 28rpx;
   font-weight: 800;

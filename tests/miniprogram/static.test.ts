@@ -355,3 +355,42 @@ describe('wxml 事件绑定与 js 方法一致性', () => {
     expect(wxml).not.toMatch(/catchtap\s*=\s*"true"/);
   });
 });
+
+describe('V4 纸感风格不回潮（结构级换肤回归锁）', () => {
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(path.join(dir, e.name)) : e.name.endsWith('.wxss') ? [path.join(dir, e.name)] : []
+    );
+  const wxss = walk(MINI).filter((f) => !f.endsWith('tokens.wxss'));
+
+  it('禁止渐变按钮 / 玻璃拟态 / 旧色相家族回潮', () => {
+    const bad: string[] = [];
+    for (const f of wxss) {
+      const s = fs.readFileSync(f, 'utf-8');
+      const rel = path.relative(MINI, f).replace(/\\/g, '/');
+      // 唯一允许的渐变：海报头墨色渐变（mine.wxss hero）
+      const stripped = s.replace(/linear-gradient\(135deg, #14110F, #241E19\)/g, '');
+      if (/linear-gradient\(135deg/.test(stripped)) bad.push(`${rel}: 135 渐变`);
+      if (/backdrop-filter:\s*blur/.test(s)) bad.push(`${rel}: 玻璃拟态 blur`);
+      for (const hue of ['15, 23, 42', '22, 160, 133', '16, 185, 129', '31, 41, 51', '17, 24, 39', '255, 107, 107', '74, 144, 217', '37, 99, 235', '44, 201, 221']) {
+        if (s.includes(`rgba(${hue}`)) bad.push(`${rel}: 旧色相 rgba(${hue}`);
+      }
+    }
+    expect(bad, `旧风格回潮：\n${bad.join('\n')}`).toEqual([]);
+  });
+
+  it('阴影一律 0 扩散硬阴影（禁纵向柔影）', () => {
+    const bad: string[] = [];
+    for (const f of wxss) {
+      const s = fs.readFileSync(f, 'utf-8');
+      const rel = path.relative(MINI, f).replace(/\\/g, '/');
+      // box-shadow: 0 <y>rpx <blur>rpx —— 旧柔影形态（保留 0 0 0 描边环与 inset）
+      if (/box-shadow:\s*0\s+\d+rpx\s+\d+rpx\s+rgba/.test(s)) bad.push(rel);
+    }
+    expect(bad, `柔阴影回潮：\n${bad.join('\n')}`).toEqual([]);
+  });
+
+  it('全局分区标题带柠色标记条（V4 海报头语汇）', () => {
+    expect(read('app.wxss')).toMatch(/\.section-title\s*\{[^}]*border-left:\s*8rpx solid #C8F04A/s);
+  });
+});

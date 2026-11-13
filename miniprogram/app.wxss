@@ -107,7 +107,7 @@ view, text, image, scroll-view, swiper {
   font-weight: var(--font-weight-bold, 700);
   text-align: center;
   letter-spacing: 0;
-  box-shadow: 0 16rpx 34rpx rgba(22, 160, 133, 0.22);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
   transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
 }
 
@@ -116,9 +116,9 @@ view, text, image, scroll-view, swiper {
 }
 
 .btn-outline {
-  background-color: var(--color-brand-tint, rgba(22, 160, 133, 0.06));
+  background-color: var(--color-brand-tint, rgba(109, 59, 245, 0.06));
   color: var(--color-brand, #6D3BF5);
-  border: 1rpx solid rgba(22, 160, 133, 0.18);
+  border: 1rpx solid rgba(109, 59, 245, 0.18);
   border-radius: var(--radius-xl, 24rpx);
   padding: 18rpx 38rpx;
   font-size: var(--font-size-body-l, 30rpx);
@@ -144,7 +144,7 @@ view, text, image, scroll-view, swiper {
 }
 
 .tag-primary {
-  background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
+  background: var(--color-brand-tint, rgba(109, 59, 245, 0.1));
   color: var(--color-brand-strong, #542BC4);
 }
 
@@ -159,13 +159,13 @@ view, text, image, scroll-view, swiper {
 }
 
 .tag-success {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(109, 59, 245, 0.1);
   color: #047857;
 }
 
 .divider {
   height: 1rpx;
-  background: rgba(15, 23, 42, 0.08);
+  background: rgba(20, 17, 15, 0.08);
   margin: 24rpx 0;
 }
 
@@ -192,16 +192,16 @@ view, text, image, scroll-view, swiper {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #EEF3F2, #DDE7E4);
+  background: #EDE6D8;
   border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 8rpx 20rpx rgba(15, 23, 42, 0.08);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
 }
 
 .avatar-small {
   width: 60rpx;
   height: 60rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #EEF3F2, #DDE7E4);
+  background: #EDE6D8;
   border: 2rpx solid rgba(255, 255, 255, 0.95);
 }
 
@@ -211,6 +211,8 @@ view, text, image, scroll-view, swiper {
   color: #14110F;
   margin-bottom: 20rpx;
   letter-spacing: 0;
+  border-left: 8rpx solid #C8F04A;
+  padding-left: 14rpx;
 }
 
 .safe-bottom {
@@ -251,19 +253,17 @@ view, text, image, scroll-view, swiper {
 .tag:active {
   transform: scale(0.985);
   opacity: 0.92;
-  box-shadow: var(--shadow-sm, 0 2rpx 8rpx rgba(15, 23, 42, 0.04));
+  box-shadow: var(--shadow-sm, 0 2rpx 8rpx rgba(20, 17, 15, 0.04));
 }
 
 .btn-primary:active {
   opacity: 0.94;
-  box-shadow: 0 8rpx 18rpx rgba(22, 160, 133, 0.18);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
 }
 
 .surface-blur {
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(24rpx);
-  -webkit-backdrop-filter: blur(24rpx);
-  border: 1rpx solid rgba(15, 23, 42, 0.06);
+  background: #FFFFFF;
+  border: 1rpx solid rgba(20, 17, 15, 0.06);
 }
 
 /* 低端机性能降级：在 Page 根容器加 .perf-low 后，关闭动画/过渡/模糊，减少合成层 */

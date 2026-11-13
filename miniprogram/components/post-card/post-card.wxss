@@ -8,13 +8,13 @@
   border-radius: var(--radius-xl, 22rpx);
   overflow: hidden;
   margin: var(--space-3, 16rpx) var(--space-4, 18rpx);
-  box-shadow: var(--shadow-sm, 0 4rpx 20rpx rgba(15, 23, 42, 0.05));
+  box-shadow: var(--shadow-sm, 0 4rpx 20rpx rgba(20, 17, 15, 0.05));
   transition: transform var(--duration-fast, 0.15s) var(--ease-standard, ease-out),
               box-shadow var(--duration-fast, 0.15s) var(--ease-standard, ease-out);
 }
 .post-card:active {
   transform: scale(0.98);
-  box-shadow: var(--shadow-md, 0 12rpx 30rpx rgba(15, 23, 42, 0.09));
+  box-shadow: var(--shadow-md, 0 12rpx 30rpx rgba(20, 17, 15, 0.09));
 }
 .post-card--perf-low {
   transition: none !important;

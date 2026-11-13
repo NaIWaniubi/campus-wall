@@ -8,10 +8,8 @@
   align-items: center;
   padding: 20rpx 28rpx;
   background: rgba(245, 246, 248, 0.96);
-  backdrop-filter: blur(24rpx);
-  -webkit-backdrop-filter: blur(24rpx);
   gap: 16rpx;
-  border-bottom: 1rpx solid rgba(15, 23, 42, 0.05);
+  border-bottom: 1rpx solid rgba(20, 17, 15, 0.05);
 }
 
 .search-input-wrap {
@@ -20,8 +18,8 @@
   background: #FFFFFF;
   border-radius: 999rpx;
   padding: 14rpx 28rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 10rpx 28rpx rgba(15, 23, 42, 0.04);
+  border: 1rpx solid rgba(20, 17, 15, 0.06);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
 }
 
 .search-icon {
@@ -65,6 +63,8 @@
   font-weight: 900;
   color: #14110F;
   letter-spacing: 0;
+  border-left: 8rpx solid #C8F04A;
+  padding-left: 14rpx;
 }
 
 .clear-history {
@@ -74,17 +74,17 @@
 }
 
 .hot-list {
-  background: rgba(255, 255, 255, 0.96);
+  background: #FFFFFF;
   border-radius: 30rpx;
   padding: 0 28rpx;
   margin-bottom: 36rpx;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
-  box-shadow: 0 18rpx 48rpx rgba(15, 23, 42, 0.06);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
+  box-shadow: 6rpx 6rpx 0 rgba(20, 17, 15, 0.14);
 }
 
 .hot-item {
   padding: 24rpx 0;
-  border-bottom: 1rpx solid rgba(15, 23, 42, 0.05);
+  border-bottom: 1rpx solid rgba(20, 17, 15, 0.05);
   align-items: center;
 }
 
@@ -128,8 +128,8 @@
   border-radius: 999rpx;
   font-size: 26rpx;
   color: #4A443C;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.035);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
+  box-shadow: 4rpx 4rpx 0 rgba(20, 17, 15, 0.12);
   letter-spacing: 0;
 }
 
@@ -140,12 +140,10 @@
 .filter-tabs {
   padding: 20rpx 28rpx;
   background: rgba(245, 246, 248, 0.96);
-  backdrop-filter: blur(24rpx);
-  -webkit-backdrop-filter: blur(24rpx);
   gap: 10rpx;
   overflow-x: auto;
   white-space: nowrap;
-  border-bottom: 1rpx solid rgba(15, 23, 42, 0.05);
+  border-bottom: 1rpx solid rgba(20, 17, 15, 0.05);
 }
 
 .filter-tab {
@@ -155,15 +153,15 @@
   color: #636E72;
   background: #FFFFFF;
   flex-shrink: 0;
-  border: 1rpx solid rgba(15, 23, 42, 0.05);
+  border: 1rpx solid rgba(20, 17, 15, 0.05);
   letter-spacing: 0;
   font-weight: 700;
 }
 
 .filter-tab.active {
-  background: rgba(22, 160, 133, 0.1);
+  background: rgba(109, 59, 245, 0.1);
   color: #542BC4;
-  border-color: rgba(22, 160, 133, 0.16);
+  border-color: rgba(109, 59, 245, 0.16);
   font-weight: 900;
 }
 

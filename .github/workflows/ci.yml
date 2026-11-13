@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]  # node:sqlite 需 ≥22.5；与本地开发环境(24)对齐
 
     steps:
       - uses: actions/checkout@v4

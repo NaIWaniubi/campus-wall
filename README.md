@@ -4,8 +4,10 @@
 
 # 校园墙 Campus Wall
 
+[![CI](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml?query=branch:master)
+
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
-> **V3 · AI 原生版**：紫粉多巴胺视觉（不再是绿白校园墙）+ AI 参与「发帖 → 读帖 → 看今天」主链路。
+> **V5 · 纸感海报**：墨线硬影设计语言 + AI 主链路（成稿/划重点/简报，全部带离线套版兜底）+ Web Push 离线推送 + 传播面全装（OG/JSON-LD/sitemap/RSS）+ CI 五道门常绿。
 
 校园墙按场景分类提供**二手交易、失物招领、表白墙、吐槽树洞、互助问答、校园活动、拼车、组队**八大垂直板块，支持 **Web 网页端 + 微信小程序**双端访问，解决校园信息碎片化、传播效率低、匿名表达需求强等痛点。
 

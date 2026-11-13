@@ -11,6 +11,7 @@ import { postApi, uploadApi, draftApi, aiApi } from '@/utils/api'
 import { assessRisk } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import PostCard from '@/components/PostCard.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -374,6 +375,35 @@ function onPaste(e: ClipboardEvent) {
 
 function removeImage(idx: number) {
   form.images.splice(idx, 1)
+}
+
+// ── 发布前预览：复用 PostCard 所见即所得；捕获阶段 stop 冒泡避免预览里的点击真的触发点赞/跳转 ──
+const showPreview = ref(false)
+const previewPost = computed(() => ({
+  id: 0,
+  title: form.title || '（标题还没写）',
+  content: form.content || '（正文还没写）',
+  images: form.images,
+  thumbImages: form.images.slice(0, 4),
+  section: selectedSection.value || {},
+  author: {
+    nickname: form.isAnonymous ? '匿名同学' : (userStore.user?.nickname || '我'),
+    avatar: form.isAnonymous ? '' : (userStore.user?.avatar || ''),
+  },
+  isAnonymous: form.isAnonymous,
+  extraFields: { ...form.extraFields },
+  likeCount: 0,
+  commentCount: 0,
+  favoriteCount: 0,
+  viewCount: 0,
+  createdAt: new Date().toISOString(),
+}))
+function openPreview() {
+  if (!form.title.trim() && !form.content.trim()) {
+    toast.error('先写点内容再预览')
+    return
+  }
+  showPreview.value = true
 }
 
 function onAnonymousChange(v: boolean) {
@@ -776,6 +806,13 @@ async function handleSubmit() {
         <button
           v-if="!editId"
           class="pub-draft ds-btn shrink-0"
+          @click="openPreview"
+        >
+          预览
+        </button>
+        <button
+          v-if="!editId"
+          class="pub-draft ds-btn shrink-0"
           @click="saveDraft"
         >
           存草稿
@@ -792,6 +829,25 @@ async function handleSubmit() {
     </main>
 
     <!-- 切换板块确认：避免静默清空已填的差异化字段 -->
+    <!-- 发布前预览弹窗 -->
+    <Teleport to="body">
+      <div v-if="showPreview" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-3 animate-fade-in" role="dialog" aria-modal="true" aria-label="发布预览" @click.self="showPreview = false">
+        <div class="absolute inset-0 ds-scrim"></div>
+        <div class="relative w-full max-w-[540px] flex flex-col" style="max-height: 82vh">
+          <div class="flex items-center gap-2 px-1 pb-2">
+            <span class="ds-sticker ds-sticker--sky">PREVIEW</span>
+            <span class="ds-label" style="color: rgb(247 242 232 / 0.72)">这就是发布后的样子（预览中不可互动）</span>
+            <button type="button" class="ds-icon-btn !w-8 !h-8 ml-auto" style="background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.34); color: #fff; box-shadow: none" aria-label="关闭预览" @click="showPreview = false">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <div class="overflow-y-auto overscroll-contain px-1 pb-1" @click.capture.stop @touchstart.stop.capture>
+            <PostCard :post="previewPost" />
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <ConfirmDialog
       :visible="showSwitchConfirm"
       title="切换板块"

@@ -19,6 +19,7 @@
     "e2e:ui": "playwright test --ui",
     "pretest": "node scripts/ensure-vitest-shim.mjs",
     "check": "vue-tsc -b",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "docs:dev": "vitepress dev docs",

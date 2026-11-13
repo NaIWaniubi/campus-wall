@@ -49,6 +49,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 体积预算门：防止重依赖被随手带进首屏（阈值见 scripts/check-bundle-budget.mjs）
+      - name: Bundle budget
+        run: npm run check:bundle
+
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:

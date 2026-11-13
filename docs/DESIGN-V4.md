@@ -131,4 +131,5 @@
 - **小程序 V4 同源**：纸白实底 + 墨线 + 硬投影取代渐变/玻璃拟态/柔影（`static.test.ts` 三条回潮锁：135 渐变仅允许 mine 海报头、禁 `backdrop-filter: blur`、禁旧色相 rgba 家族）；全局 `.section-title` 柠色标记条；发布页 `.pub-hero` 海报小标头 + NEW 贴纸；8 分类色与 mock 调色板对齐 `src/utils/sections.ts` 板块色。
 - **全局实时通知**：`useNotifyFeed`（App.vue 挂一次）消费 `notification:push` / `message:incoming` → `appStore.refreshUnread()` + 非消息页才 toast。`main.ts` 无条件 `useWebSocket().start()`（内部仅 token 存在才真连，并 `$subscribe` 跟随登录/换号/登出）——这是游客登录后能收到推送的前提。
 - **SEO 静态面**：`registerCrawlEndpoints`（在 SPA 通配回退**之前**注册）出 `robots.txt`（绝对 Sitemap、屏蔽 /admin /api）与 `sitemap.xml`（published 帖 + 板块，缓存 10min）；`buildSitemapXml` 纯函数、loc 转义防 XML 注入。
+- **离线智能成稿**：`ruleDraft` 无 AI 时按板块套版——`offlineFields` 只抽原文实有字段（物品/成色/价格/时间/地点/联系方式/捡到or丢失），正文=原话+📌 清单；表白/吐槽情绪板块不套版；标签以干净字段为种子，滑窗碎片仅在零标签时兜底。
 - **全局错误兜底**：`errorGuard.isChunkLoadError/shouldReloadOnChunkError`（纯函数 + 单测）驱动 `router.onError`——旧 chunk 404 硬刷新一次防白屏，sessionStorage/storage 异常均有防死循环；`app.config.errorHandler` 兜未捕获 Vue 错误为 toast 而非白屏。

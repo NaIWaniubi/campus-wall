@@ -113,4 +113,44 @@ describe('AI V3 · 宽容 JSON 解析 / 规则成稿', () => {
     expect(d.content).toContain('出自行车');
     expect(d.content).toContain('还想补充');
   });
+
+  it('失物招领套版：抽出物品/地点/联系方式并标注捡到状态', () => {
+    const d = ruleDraft('三号楼捡到一张校园卡，名字王明，放在宿管阿姨那，联系 13800001111', 2);
+    expect(d.sectionName).toBe('失物招领');
+    const map = Object.fromEntries(d.fields);
+    expect(map['物品']).toBe('校园卡');
+    expect(map['状态']).toBe('捡到待认领');
+    expect(map['联系方式']).toContain('13800001111');
+    // 标题带板块前缀且 ≤24
+    expect(d.title.startsWith('【失物招领】')).toBe(true);
+    expect(d.title.length).toBeLessThanOrEqual(25);
+    expect(d.content).toContain('📌');
+    // 标签必须是干净词：物品/地点优先，禁止滑窗半截词
+    expect(d.tags).toContain('校园卡');
+    expect(d.tags).toContain('三号楼');
+    expect(d.tags.some((t) => /到一张|园卡名|字王明/.test(t))).toBe(false);
+    // 原文不能被丢掉
+    expect(d.content).toContain('名字王明');
+  });
+
+  it('二手交易套版：价格提前、成色识别，读起来像正文', () => {
+    const d = ruleDraft('出九成新 iPad Air 4000 元 东门自提', 1);
+    const map = Object.fromEntries(d.fields);
+    expect(map['价格']).toBe('¥4000');
+    expect(map['成色']).toContain('九成新');
+    expect(d.fields.findIndex((f) => f[0] === '价格')).toBeLessThan(d.fields.findIndex((f) => f[0] === '地点'));
+  });
+
+  it('信息太少不硬凑套版（fields 为空 → 无 📌 块）', () => {
+    const d = ruleDraft('随便水一条动态看看');
+    expect(d.fields.length).toBe(0);
+    expect(d.content).not.toContain('📌');
+  });
+
+  it('情绪板块（表白/吐槽）不套结构化清单', () => {
+    const d = ruleDraft('想认识图书馆三楼穿白衣服的男生，每天下午都在', 3);
+    expect(d.sectionName).toBe('表白墙');
+    expect(d.fields.length).toBe(0);
+    expect(d.content).not.toContain('📌');
+  });
 });

@@ -447,8 +447,8 @@ export function extractTags(raw: string, limit = 4): string[] {
   const price = extractPrice(raw);
   if (price) push(`¥${price}`);
 
-  // 4) 兜底：中文 3~4 字块，跳过含虚词的窗口
-  if (tags.length < limit) {
+  // 4) 兜底：中文 3~4 字块滑窗——仅在前面一个标签都没抽到时才用（宁可少标签，不出「到一张校」式半截词）
+  if (tags.length === 0) {
     const cjk = raw.replace(/[^\u4e00-\u9fa5]/g, '');
     for (const m of cjk.match(/[\u4e00-\u9fa5]{3,4}/g) ?? []) {
       if (/[了的 是在我你他也就都很多吗呢把被给和与]/.test(m)) continue;
@@ -522,19 +522,109 @@ export function parseJsonLoose(text: string): any | null {
   }
 }
 
+/** 结构化字段抽取（离线套版用）：只抽取原文里确实出现的，绝不编造 */
+const OFFLINE_LOC_RE =
+  /([\u4e00-\u9fa5A-Za-z0-9]{1,10}(?:楼|栋|馆|舍|室|门|驿站|超市|浴室|食堂|操场|体育馆|教学楼|实验楼|行政楼|图书馆|广场|车站|地铁站|机场|自习区|研讨室))/;
+const OFFLINE_TIME_RE =
+  /(今天|明天|后天|周[一二三四五六日天]|星期[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]?|[上下]午\s*\d{1,2}(?:[:：]\d{2})?|\d{1,2}[:：]\d{2}|\d{1,2}\s*点(?:半|[零一二三四五六七八九十\d]{1,2}分)?)/;
+const OFFLINE_CONTACT_RE =
+  /(1[3-9]\d{9}|\d{7,11}|(?:微信|weixin|wx|QQ|q群|扣扣)\s*[:：]?\s*[A-Za-z0-9_-]{4,15}|[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,})/i;
+const OFFLINE_ITEM_LEXICON = [
+  '校园卡', '一卡通', '饭卡', '身份证', '学生证', '钥匙', '钱包', '蓝牙耳机', '耳机', '手机', '平板',
+  '电脑', '笔记本', '显示器', '水杯', '保温杯', '雨伞', '自行车', '电动车', '充电宝', '背包', '帽子',
+  '外套', '课本', '资料', '宠物', '猫', '狗',
+];
+const OFFLINE_COND_RE = /(全新|九五成新|九成新|八成新|七成新|成新)/;
+
+function extractOfflineItem(raw: string): string | null {
+  const lower = raw.toLowerCase();
+  for (const it of OFFLINE_ITEM_LEXICON) {
+    if (lower.includes(it.toLowerCase())) return it;
+  }
+  return null;
+}
+
+/**
+ * 组装离线结构化字段（按板块挑选相关项，顺序即展示顺序）。
+ * 返回 [标签, 值] 列表；空数组表示原文信息太少，不值得套版。
+ */
+function offlineFields(sectionId: number | null, raw: string, price: number | null): Array<[string, string]> {
+  const loc = raw.match(OFFLINE_LOC_RE)?.[1] ?? null;
+  const time = raw.match(OFFLINE_TIME_RE)?.[1]?.trim() ?? null;
+  const contact = raw.match(OFFLINE_CONTACT_RE)?.[1]?.trim() ?? null;
+  const item = extractOfflineItem(raw);
+  const cond = raw.match(OFFLINE_COND_RE)?.[1] ?? null;
+  const pairs = new Map<string, string>();
+  if (item) pairs.set('物品', item);
+  if (price != null) pairs.set('价格', `¥${price}`);
+  if (cond) pairs.set('成色', cond);
+  if (time) pairs.set('时间', time);
+  if (loc) pairs.set('地点', loc);
+  if (contact) pairs.set('联系方式', contact);
+  // 失物招领额外标注意向（捡到 or 丢失），其余板块按通用字段
+  const rows: Array<[string, string]> = [];
+  if (sectionId === 2) {
+    if (/捡|拾|拾到|发现|找到/.test(raw)) rows.push(['状态', '捡到待认领']);
+    else if (/丢|丢失|不见|忘在|落在/.test(raw)) rows.push(['状态', '丢失寻找']);
+  }
+  // 交易/拼车把价格提前，读起来更像正文
+  const order = sectionId === 1 || sectionId === 7
+    ? ['物品', '价格', '成色', '时间', '地点', '联系方式']
+    : sectionId === 2
+      ? ['物品', '时间', '地点', '联系方式']
+      : ['时间', '地点', '物品', '价格', '成色', '联系方式'];
+  for (const key of order) {
+    const v = pairs.get(key);
+    if (v) rows.push([key, v]);
+  }
+  return rows;
+}
+
+/** 标题：板块前缀 + 核心（物品/成色/价格），整体 ≤24，超了就退回首行截断 */
+function offlineTitle(sectionName: string | null, fields: Array<[string, string]>, firstLine: string): string {
+  const item = fields.find((f) => f[0] === '物品')?.[1];
+  const price = fields.find((f) => f[0] === '价格')?.[1];
+  const cond = fields.find((f) => f[0] === '成色')?.[1];
+  const prefix = sectionName ? `【${sectionName}】` : '';
+  let core = item ? `${cond ? cond + ' ' : ''}${item}${price ? ' ' + price : ''}` : firstLine.slice(0, 16);
+  if (!core.trim()) core = firstLine.slice(0, 16);
+  const full = prefix + core;
+  if (full.length <= 24) return full;
+  return (prefix + core).slice(0, 23) + '…';
+}
+
+/** 情绪板块（表白/吐槽）不套结构化清单，避免把有感情的话削成表格 */
+function isEmotionalSection(id: number | null): boolean {
+  return id === 3 || id === 4;
+}
+
 /** 规则版成稿：首行截断做标题 + 抽标签 + 猜板块 + 抽价格 */
 export function ruleDraft(raw: string, sectionId?: number | null) {
   const text = raw.replace(/\s+/g, ' ').trim();
   const firstLine = (raw.split(/\n/)[0] || text).trim();
-  const title = (firstLine.length > 24 ? firstLine.slice(0, 24) + '…' : firstLine) || '新动态';
   const sid = guessSectionId(text, sectionId);
   const sectionName = SECTION_HINTS.find((s) => s.id === sid)?.name ?? null;
   const price = extractPrice(text);
-  const content =
-    text.length < 12
-      ? text + '\n\n（还想补充：物品成色 / 期望价格 / 见面地点 / 联系方式）'
-      : text;
-  return { title, content, tags: extractTags(text), sectionId: sid, sectionName, price };
+  const fields = isEmotionalSection(sid) ? [] : offlineFields(sid, text, price);
+
+  const title = offlineTitle(sectionName, fields, firstLine) || '新动态';
+  // 正文：保留用户原话，再附「📌 结构化信息」（≥1 个字段才加），短内容仍给补充提示
+  let content = text;
+  if (fields.length >= 1) {
+    const block = fields.map((f) => `📌 ${f[0]}：${f[1]}`).join('\n');
+    content = `${text}\n\n${block}`;
+  }
+  if (text.length < 12) {
+    content += '\n\n（还想补充：物品成色 / 期望价格 / 见面地点 / 联系方式）';
+  }
+  // 标签：结构化字段里的干净词（物品/地点）优先，其余交给词表/价格/ASCII 抽取
+  const seeds: string[] = [];
+  for (const key of ['物品', '地点']) {
+    const v = fields.find((f) => f[0] === key)?.[1];
+    if (v && v.length >= 2) seeds.push(v);
+  }
+  const tags = Array.from(new Set([...seeds, ...extractTags(text)])).slice(0, 4);
+  return { title, content, tags, sectionId: sid, sectionName, price, fields };
 }
 
 // ---------- 1. 发布助手：一句话 → 完整草稿 ----------

@@ -17,6 +17,12 @@ foreach ($d in @($data, (Join-Path $data 'uploads'), (Join-Path $data 'backups')
 }
 
 # 已有实例在跑就不重复拉起
+# Web Push demo VAPID: generate on first run (untracked data dir), inject into env below
+$vapidFile = Join-Path $data 'vapid.json'
+if (-not (Test-Path $vapidFile)) { & node (Join-Path $root 'scripts\gen-vapid.mjs') $vapidFile | Out-Null }
+$vapid = $null
+if (Test-Path $vapidFile) { try { $vapid = Get-Content $vapidFile -Raw | ConvertFrom-Json } catch { $vapid = $null } }
+
 $busy = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($busy) {
   Write-Host "[demo] 端口 $Port 已在监听（PID $($busy[0].OwningProcess)），无需重启"
@@ -42,6 +48,14 @@ $lines = @(
   "set CORS_ORIGIN=http://127.0.0.1:$Port",
   'node api\server.bundle.mjs >> ".zcode-site\test\data\demo.log" 2>&1'
 )
+if ($vapid -and $vapid.publicKey -and $vapid.privateKey) {
+  # keep the node line LAST: cmd runs top-down, env vars must be set before node starts
+  $lines = @($lines[0..($lines.Count - 2)]) + @(
+    "set VAPID_PUBLIC_KEY=$($vapid.publicKey)"
+    "set VAPID_PRIVATE_KEY=$($vapid.privateKey)"
+    'set VAPID_SUBJECT=mailto:demo@campus-wall.local'
+  ) + @($lines[-1])
+}
 Set-Content -Path $cmdFile -Value $lines -Encoding ASCII
 
 $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "cmd.exe /c `"$cmdFile`"" }

@@ -92,8 +92,16 @@ async function enablePush() {
     await pushApi.subscribe(sub.toJSON())
     pushEnabled.value = true
     toast.success('消息推送已开启')
-  } catch {
-    // 错误已由拦截器 toast
+  } catch (err: any) {
+    // HTTP 错误已由 axios 拦截器 toast；但 subscribe/权限层的异常不走拦截器，
+    // 静默吞掉会让按钮看起来「点了没反应」——必须给用户可读的失败原因
+    if (!err?.isAxiosError) {
+      toast.error(
+        err?.name === 'NotAllowedError'
+          ? '推送被浏览器拦截：请在地址栏检查通知权限'
+          : '浏览器推送服务暂不可达，稍后重试'
+      )
+    }
   } finally {
     pushBusy.value = false
   }

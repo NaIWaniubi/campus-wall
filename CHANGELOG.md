@@ -30,7 +30,8 @@
 - **前台/后台 AI 分轨**：当面等的成稿/划重点/助手只走快网关链（fastOnly 剔除慢免费档；空链不开熔断），auth 短路后 ~1.5s 即落离线套版（实测 15.3s→1.56s）；慢但免费的真模型专职后台简报
 - **AI 免费档真跑通**：OpenRouter reasoning 模型严格 JSON 提示词下会把 token 烧进思考导致 content 空——免费档预算提到 4096 + 传 `reasoning.effort=low` + `salvageJsonFromReasoning` 从思考尾部打捞 JSON；今日简报改后台大预算（100s、ignoreBreaker）真实出稿（实测 60s 后 offline 转 false），成功即复位熔断等于为前台探活；+3 条打捞单测
 - **AI 网关级 auth 短路**：自建网关返回 401/Invalid token 时，同端点其余模型不再逐个空耗重试（endpointKeyFor 以 url+key 尾 6 位为指纹），直接切 OpenRouter 免费档；实测失败调用与错误日志从 6+ 降到 3
-- 测试 259 条全过（SEO 24+5 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
+- **Web Push 通电落地**：VAPID 从纸面预埋变为真开关——`scripts/gen-vapid.mjs` 首跑自动生成密钥对（只落 gitignored 数据目录，永不进仓库），start-demo 注入环境（cmd 逐行执行，env 必须排在 node 行之前——踩坑修复）；demo 真机闭环：设置页开启→订阅拿到真实 FCM endpoint 落库→他人评论触发 VAPID 签名真发→关闭→服务端删行；修 enablePush 静默失败 bug（pushManager/权限层异常不走 axios 拦截器，现给出可读 toast；另实锤 Chrome 无痕模式整体禁用 Push API，自动化必须持久 profile）；push 路由 0→7 条集成测（鉴权/结构校验/未配置 501/同 endpoint 换主刷新/退订）
+- 测试 266 条全过（SEO 24+5 / push 集成 7 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
 
 ### V4 · 纸感海报设计系统（2026-11-12）
 - 全站换肤：暖纸底 + 1.5px 墨线 + 硬投影 + 大字排版 + 荧光四色（lime/coral/sky/violet）

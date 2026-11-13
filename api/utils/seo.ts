@@ -25,6 +25,9 @@ export interface SeoMeta {
   image: string | null
   url: string
   type: 'website' | 'article'
+  /** article 专属：发布时间（ISO）与署名（匿名已归一） */
+  publishedAt?: string
+  authorName?: string
 }
 
 /** HTML 属性值转义：OG 内容里出现引号会直接破坏 head */
@@ -54,7 +57,7 @@ export function seoMetaForPath(pathname: string, base: string): SeoMeta {
   if (m) {
     const row = db
       .prepare(
-        `SELECT p.title, p.content, p.images, p.is_anonymous, p.status,
+        `SELECT p.title, p.content, p.images, p.is_anonymous, p.status, p.created_at,
                 u.nickname, s.name AS section_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
@@ -87,6 +90,8 @@ export function seoMetaForPath(pathname: string, base: string): SeoMeta {
       image: firstImage,
       url: `${base}${pathname}`,
       type: 'article',
+      publishedAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
+      authorName: who,
     }
   }
   return {
@@ -118,20 +123,44 @@ export function buildMetaTags(meta: SeoMeta, defaultImage: string): string {
   ].join('\n    ')
 }
 
-/** 把 OG 注入进 index.html 模板 */
+/**
+ * JSON-LD 结构化数据（V5）：article 型输出 schema.org/SocialMediaPosting，
+ * 帮助 Google/百度富媒体摘录取（OG 面向社交爬虫，JSON-LD 面向搜索引擎）。
+ */
+export function buildJsonLd(meta: SeoMeta): string | null {
+  if (meta.type !== 'article') return null
+  const ld: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'SocialMediaPosting',
+    headline: meta.title.replace(' - 校园墙', ''),
+    url: meta.url,
+    description: meta.description,
+    isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: meta.url.replace(/\/post\/\d+.*$/, '/') },
+  }
+  if (meta.publishedAt) ld.datePublished = meta.publishedAt
+  if (meta.authorName) ld.author = { '@type': 'Person', name: meta.authorName }
+  if (meta.image) ld.image = meta.image
+  // </script> 注入防护：把 < > 转成 unicode 转义（JSON 合法，HTML 解析器不再误闭合）
+  const json = JSON.stringify(ld).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+  return '<script type="application/ld+json">' + json + '</script>'
+}
+
+/** 把 OG + JSON-LD 注入进 index.html 模板 */
 export function injectSeo(html: string, meta: SeoMeta, defaultImage: string): string {
   const tags = buildMetaTags(meta, defaultImage)
+  const ld = buildJsonLd(meta)
+  const block = ld ? `${tags}\n    ${ld}` : tags
   let out = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeAttr(meta.title)}</title>`)
   // 先删掉模板里预置的所有 og:/twitter: 标签，避免与注入块重复打架
   out = out.replace(/[ \t]*<meta\s+(?:property="og:[^"]+"|name="twitter:[^"]+")[^>]*>\s*?\n?/gi, '')
+  // 模板若预置了 ld+json，先清掉再注入，保证同一页面只有一份结构化数据
+  out = out.replace(/[ \t]*<script type="application\/ld\+json">[\s\S]*?<\/script>\s*?\n?/gi, '')
   // 站点原有 description meta：有就替换，没有就随 OG 一起注入
   if (/<meta\s+name="description"/i.test(out)) {
     out = out.replace(/<meta\s+name="description"[^>]*>/i, `<meta name="description" content="${escapeAttr(meta.description)}">`)
-  } else {
-    out = out.replace('</head>', `    <meta name="description" content="${escapeAttr(meta.description)}">\n    ${tags}\n  </head>`)
-    return out
+    return out.replace('</head>', `    ${block}\n  </head>`)
   }
-  return out.replace('</head>', `    ${tags}\n  </head>`)
+  return out.replace('</head>', `    <meta name="description" content="${escapeAttr(meta.description)}">\n    ${block}\n  </head>`)
 }
 
 /** 按 mtime 缓存模板内容：发版改文件立即失效，避免引用到已不存在的旧 chunk */
@@ -201,7 +230,83 @@ export function buildSitemapXml(entries: SitemapEntry[]): string {
 const SITEMAP_TTL = 600_000
 const SITEMAP_CACHE_KEY = 'seo:sitemap'
 
-/** 注册 robots/sitemap（必须早于 SPA fallback 的通配路由） */
+// ─────────────────────────────────────────────────────────────
+// RSS 订阅面（V5）：/rss.xml（/feed 别名）
+// 最近 30 条已发布帖子，10 分钟缓存；匿名统一归一为「匿名同学」，
+// 绝不在订阅输出里泄露真实昵称与未过审内容。
+// ─────────────────────────────────────────────────────────────
+
+export interface RssItem {
+  title: string
+  link: string
+  guid: string
+  /** RFC 822 时间（RSS 2.0 标准要求） */
+  pubDate: string
+  description: string
+  author: string
+}
+
+/** 纯函数：拼 RSS 2.0 XML（独立出来便于单测）。所有动态字段一律 XML 转义 */
+export function buildRssXml(base: string, items: RssItem[]): string {
+  const channel = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">`,
+    `<channel>`,
+    `<title>${escapeAttr(SITE_NAME)}</title>`,
+    `<link>${escapeAttr(`${base}/`)}</link>`,
+    `<description>${escapeAttr(SITE_DESC)}</description>`,
+    `<language>zh-CN</language>`,
+    `<generator>campus-wall</generator>`,
+    `<lastBuildDate>${new Date().toUTCString()}</lastBuildDate>`,
+  ].join('')
+  const body = items
+    .map(
+      (it) =>
+        `<item><title>${escapeAttr(it.title)}</title>` +
+        `<link>${escapeAttr(it.link)}</link>` +
+        `<guid isPermaLink="false">${escapeAttr(it.guid)}</guid>` +
+        `<pubDate>${escapeAttr(it.pubDate)}</pubDate>` +
+        `<dc:creator>${escapeAttr(it.author)}</dc:creator>` +
+        `<description>${escapeAttr(it.description)}</description></item>`
+    )
+    .join('')
+  return `${channel}${body}</channel></rss>`
+}
+
+const RSS_TTL = 600_000
+const RSS_CACHE_KEY = 'seo:rss'
+
+/** 查库拼 RSS（带缓存）；查库失败直接抛出，由调用方决定降级 */
+function rssXmlFor(base: string): string {
+  const hit = cacheGet<string>(RSS_CACHE_KEY)
+  if (hit) return hit
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.created_at, p.title, p.content, p.is_anonymous, u.nickname
+       FROM posts p
+       LEFT JOIN users u ON u.id = p.user_id
+       WHERE p.status = 'published'
+       ORDER BY p.id DESC LIMIT 30`
+    )
+    .all() as { id: number; created_at: number | string; title: string | null; content: string; is_anonymous: number; nickname: string | null }[]
+  const items: RssItem[] = rows.map((r) => {
+    const who = r.is_anonymous ? '匿名同学' : r.nickname || '同学'
+    const when = r.created_at ? new Date(r.created_at) : null
+    return {
+      title: clip(r.title || r.content, 60) || `帖子 #${r.id}`,
+      link: `${base}/post/${r.id}`,
+      guid: `campus-wall:post:${r.id}`,
+      pubDate: when && !Number.isNaN(when.getTime()) ? when.toUTCString() : new Date().toUTCString(),
+      description: clip(`${who}：${r.content || ''}`, 200),
+      author: who,
+    }
+  })
+  const xml = buildRssXml(base, items)
+  cacheSet(RSS_CACHE_KEY, xml, RSS_TTL)
+  return xml
+}
+
+/** 注册 robots/sitemap/rss（必须早于 SPA fallback 的通配路由） */
 export function registerCrawlEndpoints(app: Application): void {
   app.get('/robots.txt', (req, res) => {
     const base = requestBase(req)
@@ -234,4 +339,14 @@ export function registerCrawlEndpoints(app: Application): void {
       res.status(500).type('text/plain').send('sitemap unavailable')
     }
   })
+
+  const rssHandler = (req: Request, res: Response) => {
+    try {
+      res.type('application/rss+xml').set('Cache-Control', 'public, max-age=600').send(rssXmlFor(requestBase(req)))
+    } catch {
+      res.status(500).type('text/plain').send('feed unavailable')
+    }
+  }
+  app.get('/rss.xml', rssHandler)
+  app.get('/feed', rssHandler)
 }

@@ -19,6 +19,8 @@
 - **PWA 一键安装**：`beforeinstallprompt` 捕获单例 + 设置页「安装校园墙」（已安装/可安装/手动指引三分支）
 - **全局实时通知**：任意页面收到 WS 推送即刷新未读徽标 + toast 摘要（消息页内不打扰）；修 `main.ts` 仅在已登录时 start 导致游客→登录不装 WS token-watch 的根因（改无条件 start，内部按 token 决策）
 - **SEO 静态面**：`robots.txt`（屏蔽 /admin /api + 绝对 Sitemap 指向）与动态 `sitemap.xml`（published 帖 + 全板块入图，缓存 10min），注册在 SPA 通配回退之前
+- **JSON-LD 结构化数据**：`/post/:id` 注入 schema.org SocialMediaPosting（headline/datePublished/author/image/isPartOf），面向搜索引擎富摘要；`<`/`>` 统一转 `\u003c` 防内容提前闭合 `</script>`；模板若预置 ld+json 先清后注保证单份；website 页不输出
+- **RSS 订阅输出**：`/rss.xml`（`/feed` 别名同 handler）吐最近 30 条 published 帖，缓存 10min；匿名条目 `dc:creator` 归一「匿名同学」，全字段 XML 转义；index.html 声明 `rel=alternate` 自动发现；实测 demo 19 条与库存精确一致（1 条 pending 不外泄）、3 条匿名逐 item 断言零昵称泄露
 - **全局错误兜底**：`router.onError` 识别旧 chunk 404 自动硬刷新一次（sessionStorage 防死循环、storage 不可用则保守不刷）；`app.config.errorHandler` 把未捕获 Vue 错误降级为提示而非白屏；`errorGuard` 纯函数抽出 + 单测锁死
 - **小程序 V4 结构级同源**：全部 wxss 去渐变/玻璃拟态/蓝灰柔影 → 纸白实底 + 墨线硬影；私信 CTA 墨底柠字；全局分区标题柠色标记条；发布页海报小标头 + NEW 贴纸；8 分类色与 mock 调色板对齐 web 板块色；3 条风格回潮回归锁
 - **细节**：路由顶部进度条、首页回到顶部、toast/信誉色彻底退绿（紫/深青/深琥珀/红）、PWA 图标重绘为 V4 墨底荧光砖、`:focus-visible` 焦点环、`prefers-reduced-motion` 降级
@@ -28,7 +30,7 @@
 - **前台/后台 AI 分轨**：当面等的成稿/划重点/助手只走快网关链（fastOnly 剔除慢免费档；空链不开熔断），auth 短路后 ~1.5s 即落离线套版（实测 15.3s→1.56s）；慢但免费的真模型专职后台简报
 - **AI 免费档真跑通**：OpenRouter reasoning 模型严格 JSON 提示词下会把 token 烧进思考导致 content 空——免费档预算提到 4096 + 传 `reasoning.effort=low` + `salvageJsonFromReasoning` 从思考尾部打捞 JSON；今日简报改后台大预算（100s、ignoreBreaker）真实出稿（实测 60s 后 offline 转 false），成功即复位熔断等于为前台探活；+3 条打捞单测
 - **AI 网关级 auth 短路**：自建网关返回 401/Invalid token 时，同端点其余模型不再逐个空耗重试（endpointKeyFor 以 url+key 尾 6 位为指纹），直接切 OpenRouter 免费档；实测失败调用与错误日志从 6+ 降到 3
-- 测试 245 条全过（SEO 15+5 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
+- 测试 259 条全过（SEO 24+5 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
 
 ### V4 · 纸感海报设计系统（2026-11-12）
 - 全站换肤：暖纸底 + 1.5px 墨线 + 硬投影 + 大字排版 + 荧光四色（lime/coral/sky/violet）

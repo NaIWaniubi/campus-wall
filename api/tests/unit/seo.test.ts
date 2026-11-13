@@ -14,7 +14,7 @@ vi.mock('../../utils/cache.js', () => ({
   cacheSet: () => {},
 }));
 
-import { escapeAttr, buildMetaTags, injectSeo, seoMetaForPath } from '../../utils/seo.js';
+import { escapeAttr, buildMetaTags, buildJsonLd, injectSeo, seoMetaForPath } from '../../utils/seo.js';
 
 const BASE = 'https://wall.example.edu.cn';
 
@@ -117,5 +117,70 @@ describe('seoMetaForPath · 帖子页', () => {
     expect(fakeGet).not.toHaveBeenCalled();
     expect(meta.title).toContain('校园墙');
     expect(meta.url).toBe(`${BASE}/`);
+  });
+});
+
+describe('buildJsonLd · schema.org 结构化数据', () => {
+  const article = {
+    title: '出九成新 iPad - 校园墙',
+    description: '二手交易 · 数码小白：1500 元可小刀',
+    image: `${BASE}/uploads/a.jpg`,
+    url: `${BASE}/post/1`,
+    type: 'article' as const,
+    publishedAt: '2026-11-01T00:00:00.000Z',
+    authorName: '数码小白',
+  };
+
+  it('website 型不输出 JSON-LD（首页没有可声明的正文实体）', () => {
+    expect(buildJsonLd({ ...article, type: 'website' })).toBeNull();
+  });
+
+  it('article 型输出合法 SocialMediaPosting：headline 去站名后缀、isPartOf 指回根、带时间/作者/图', () => {
+    const tag = buildJsonLd(article);
+    expect(tag).toBeTruthy();
+    const json = (tag as string).replace(/^<script type="application\/ld\+json">/, '').replace(/<\/script>$/, '');
+    const ld = JSON.parse(json);
+    expect(ld['@type']).toBe('SocialMediaPosting');
+    expect(ld.headline).toBe('出九成新 iPad');
+    expect(ld.url).toBe(`${BASE}/post/1`);
+    expect(ld.datePublished).toBe('2026-11-01T00:00:00.000Z');
+    expect(ld.author).toEqual({ '@type': 'Person', name: '数码小白' });
+    expect(ld.image).toBe(`${BASE}/uploads/a.jpg`);
+    expect(ld.isPartOf).toEqual({ '@type': 'WebSite', name: '校园墙', url: `${BASE}/` });
+  });
+
+  it('缺 publishedAt/authorName/image 时对应字段省略，JSON 依旧合法', () => {
+    const tag = buildJsonLd({ ...article, publishedAt: undefined, authorName: undefined, image: null });
+    const ld = JSON.parse((tag as string).replace(/^<script[^>]*>/, '').replace(/<\/script>$/, ''));
+    expect(ld.datePublished).toBeUndefined();
+    expect(ld.author).toBeUndefined();
+    expect(ld.image).toBeUndefined();
+  });
+
+  it('内容里塞 </script> 被转成 \\u003c —— 不得提前闭合 script 标签', () => {
+    const evil = { ...article, description: 'x</script><script>alert(1)</script>' };
+    const tag = buildJsonLd(evil) as string;
+    // 整个注入串里 </script> 只允许出现 1 次（就是自己那枚闭合）
+    expect((tag.match(/<\/script>/g) || []).length).toBe(1);
+    expect(tag).toContain('\\u003c');
+    const ld = JSON.parse(tag.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, ''));
+    expect(ld.description).toContain('</script>'); // 反转义后内容原样保留
+  });
+
+  it('injectSeo：article 页面 head 内同时有 OG 与 ld+json；website 页面只有 OG', () => {
+    const tpl = '<html><head><title>t</title><meta name="description" content="d"></head><body></body></html>';
+    const art = injectSeo(tpl, article, `${BASE}/i.png`);
+    expect(art).toContain('application/ld+json');
+    expect(art.indexOf('SocialMediaPosting')).toBeLessThan(art.indexOf('</head>'));
+    const web = injectSeo(tpl, { ...article, type: 'website' }, `${BASE}/i.png`);
+    expect(web).not.toContain('application/ld+json');
+    expect(web).toContain('og:title');
+  });
+
+  it('模板预置的 ld+json 被清理，不出现两份结构化数据', () => {
+    const tpl = '<html><head><title>t</title><script type="application/ld+json">{"@type":"WebSite"}</script></head><body></body></html>';
+    const out = injectSeo(tpl, article, `${BASE}/i.png`);
+    expect((out.match(/application\/ld\+json/g) || []).length).toBe(1);
+    expect(out).not.toContain('"@type":"WebSite"}');
   });
 });

@@ -20,7 +20,8 @@ export const test = base.extend({
 
 export async function login(page: Page, studentId = '23770001', password = 'demo1234') {
   await page.goto('/login')
-  await page.getByPlaceholder('请输入学号').fill(studentId)
+  // V5 登录重构后账号框为「手机号 / 拼音 / 账号」；正则一并兼容旧「学号」文案
+  await page.getByPlaceholder(/账号|学号/).fill(studentId)
   await page.getByPlaceholder('请输入密码').fill(password)
   await page.getByRole('button', { name: '登录', exact: true }).click()
   // 登录成功后跳转（默认回首页），以导航离开登录页为成功信号
@@ -29,7 +30,7 @@ export async function login(page: Page, studentId = '23770001', password = 'demo
 
 export async function adminLogin(page: Page) {
   await page.goto('/admin/login')
-  await page.getByPlaceholder('请输入学号').fill('admin')
+  await page.getByPlaceholder(/管理员账号|账号|学号/).fill('admin')
   await page.getByPlaceholder('请输入密码').fill('admin123')
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await page.waitForURL((u) => u.pathname.startsWith('/admin') && !u.pathname.includes('/login'), {

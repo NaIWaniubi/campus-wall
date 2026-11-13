@@ -62,8 +62,7 @@ jobs:
 
   # 契约压测门：24 并发 × 20s，断言零 5xx/零连接错误 + 8 端点契约状态码全命中 + p95<800ms。
   # 独立临时库 + RATE_LIMIT_ENABLED=0（限流本身有单测覆盖，这里压的是服务端健康度）。
-  load:
-    name: Contract load gate
+  load:    name: Contract load gate
     runs-on: ubuntu-latest
     needs: verify
     timeout-minutes: 10
@@ -83,3 +82,30 @@ jobs:
       - name: Server log on failure
         if: failure()
         run: tail -50 /tmp/lt-server.log
+
+  # 浏览器门：12 条核心用户流（浏览/搜索/登录/发帖/互动/审核）真 Chromium 跑。
+  # e2e-backend.mjs 用隔离库 api/e2e-test.db 自动重灌 seed，不污染任何共享状态。
+  # 此前 E2E 只在本地跑过，V5 登录重构后就静默腐烂了 10 条——这条 job 防止「演示流只在我机器上能跑」。
+  e2e:
+    name: Browser E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E
+        run: npx playwright test --reporter=line
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7

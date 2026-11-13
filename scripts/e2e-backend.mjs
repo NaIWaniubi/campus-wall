@@ -10,7 +10,9 @@ import path from 'node:path'
 
 const root = process.cwd()
 const dbFile = path.join(root, 'api', 'e2e-test.db')
-const env = { ...process.env, DB_PATH: 'api/e2e-test.db', PORT: '3001' }
+// ADMIN_INITIAL_PASSWORD：db.ts 的生产加固要求首启必须显式口令（与演示站一致 admin123）；
+// 本地 .env 若带 NODE_ENV=production，缺它会直接崩在 seed 之前的模块加载。
+const env = { ...process.env, DB_PATH: 'api/e2e-test.db', PORT: '3001', ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD || 'admin123', JWT_SECRET: process.env.JWT_SECRET || 'e2e-local-secret-0123456789abcdef0123456789abcdef' }
 
 for (const suffix of ['', '-shm', '-wal']) {
   fs.rmSync(dbFile + suffix, { force: true })

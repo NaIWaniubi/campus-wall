@@ -7,7 +7,10 @@ import { login } from './helpers'
 
 test('可对种子帖点赞且状态翻转', async ({ page }) => {
   await login(page)
-  await page.goto('/')
+  // 从搜索进详情：首页是虚拟列表，卡内标题会因重渲染脱离 DOM 让 click 悬挂（此前 30s 超时的根因）
+  await page.goto('/search')
+  await page.getByPlaceholder('搜索帖子').fill('iPad')
+  await page.getByPlaceholder('搜索帖子').press('Enter')
   await page.getByText('出九成新 iPad Air 5 蓝色 64G').first().click()
   await expect(page).toHaveURL(/\/post\/\d+/)
 
@@ -23,7 +26,9 @@ test('可对种子帖点赞且状态翻转', async ({ page }) => {
 
 test('可发表评论并立即上楼', async ({ page }) => {
   await login(page)
-  await page.goto('/')
+  await page.goto('/search')
+  await page.getByPlaceholder('搜索帖子').fill('捡到一张校园卡')
+  await page.getByPlaceholder('搜索帖子').press('Enter')
   await page.getByText('捡到一张校园卡').first().click()
   await expect(page).toHaveURL(/\/post\/\d+/)
 

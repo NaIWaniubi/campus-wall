@@ -18,7 +18,7 @@ test('演示用户可登录并保持登录态', async ({ page }) => {
 
 test('错误密码被拒绝并停留在登录页', async ({ page }) => {
   await page.goto('/login')
-  await page.getByPlaceholder('请输入学号').fill('23770001')
+  await page.getByPlaceholder(/账号|学号/).fill('23770001')
   await page.getByPlaceholder('请输入密码').fill('wrong-password')
   await page.getByRole('button', { name: '登录', exact: true }).click()
   // 失败提示（「学号或密码错误」统一文案，防枚举）且未跳走

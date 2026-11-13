@@ -9,7 +9,7 @@ test('管理员可登录并看到数据总览', async ({ page }) => {
   await adminLogin(page)
   // 六卡下钻 + echarts 趋势容器渲染（TrendChart canvas）
   await expect(page.getByText('帖子总数')).toBeVisible()
-  await expect(page.getByText('近7天趋势')).toBeVisible()
+  await expect(page.getByText(/近\s*7\s*天趋势/)).toBeVisible()
 })
 
 test('管理员可在人工审核队列通过待审帖', async ({ page }) => {

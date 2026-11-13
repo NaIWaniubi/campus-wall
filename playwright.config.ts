@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test'
+import fs from 'node:fs'
 import path from 'node:path'
 
 /**
@@ -7,8 +8,23 @@ import path from 'node:path'
  * - 前端：vite dev 5173（代理 /api、/uploads、/ws 到 3001）
  * - 跑 E2E 前请停掉本地 dev（concurrently 起的那套），端口被占会直接报错不静默复用
  * 注：root 用 process.cwd()——playwright 总在项目根运行，import.meta.url 在配置转译后不可靠
+ *
+ * 浏览器可执行文件：本地 ms-playwright 目录里的 chromium 修订号常落后于 @playwright/test
+ * 内置默认（报 "Executable doesn't exist at ...-1234"），故优先用 PW_EXECUTABLE 环境变量，
+ * 其次回落到本机常见安装路径；CI 不设这些时自然走 playwright 自带浏览器（见 ci.yml e2e job）。
  */
 const root = process.cwd()
+
+function resolveChromium(): string | undefined {
+  if (process.env.PW_EXECUTABLE) return process.env.PW_EXECUTABLE
+  if (process.env.CI) return undefined
+  const candidates = [
+    'F:/ms-playwright/chromium-1223/chrome-win64/chrome.exe',
+    'F:/ms-playwright/chromium-1161/chrome-win64/chrome.exe',
+  ]
+  return candidates.find((p) => fs.existsSync(p))
+}
+const chromiumExecutable = resolveChromium()
 
 export default defineConfig({
   testDir: path.join(root, 'tests', 'e2e'),
@@ -22,6 +38,7 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
     locale: 'zh-CN',
+    launchOptions: chromiumExecutable ? { executablePath: chromiumExecutable } : {},
   },
   webServer: [
     {

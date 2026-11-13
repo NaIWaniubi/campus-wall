@@ -123,3 +123,9 @@
 - **OG 分享卡片**：`api/utils/seo.ts` 在 SPA fallback 注入（仅 published 帖；模板按 mtime 缓存——发版后旧 chunk 引用必须失效）。
 - **发布页**：剪贴板图片粘贴 / 拖拽上传共用 `addFiles()` 通道。
 - **路由进度条**：`RouteProgress`（懒加载顶条）；`prefers-reduced-motion` 已降级；焦点环 `:focus-visible` 全局启用。
+- **发布前预览**：`PublishPage` 预览弹窗内嵌 `<PostCard :post="previewPost">`，外层捕获层 `@click.capture.stop` 拦截点赞/评论等互动。
+- **评论直达**：通知消息携带 `relatedSubId`（回复锚到顶层评论）；详情页 `?comment={id}` 滚到 `#cmt-{id}` 并播 2.6s `cmt-flash` 柠环动画；小程序端 `scroll-into-view` 同语义。
+- **分享海报**：`SharePosterModal` 纯 canvas 750×1000@2（恒暗品牌头 + 板块色胶囊；`STATS_Y=690` 固定带，空间不足先舍图、再减摘要行），下载/复制/系统分享三分支。
+- **模态焦点陷阱**：`useModalInert.trapWithInert(visibleRef)`——弹窗打开给 `#app` 加 `inert`，背景退出 Tab 序列/无障碍树；已接命令面板、新手引导、分享海报。
+- **PWA 安装**：`usePwaInstall` 模块级单例捕获 `beforeinstallprompt`；设置页 03「安装校园墙」三分支（已安装 tag / 一键安装按钮 / 手动指引文案）。
+- **小程序 V4 同源**：纸白实底 + 墨线 + 硬投影取代渐变/玻璃拟态/柔影（`static.test.ts` 三条回潮锁：135 渐变仅允许 mine 海报头、禁 `backdrop-filter: blur`、禁旧色相 rgba 家族）；全局 `.section-title` 柠色标记条；发布页 `.pub-hero` 海报小标头 + NEW 贴纸；8 分类色与 mock 调色板对齐 `src/utils/sections.ts` 板块色。

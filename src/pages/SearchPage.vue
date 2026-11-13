@@ -2,10 +2,11 @@
 /**
  * 搜索页：历史记录 + 热门搜索 + 防抖搜索 + 结果列表（分页 + 竞态防护 + 板块/排序筛选）
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { Ref } from 'vue'
 import { ArrowLeft, Search, X, Clock, Flame, Loader2 } from '@lucide/vue'
+import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { sectionApi } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
 import PostCard from '@/components/PostCard.vue'
@@ -27,6 +28,28 @@ const loadingMore = ref(false)
 const searched = ref(false)
 // 竞态防护：每次请求递增 id，过期响应直接丢弃
 let requestSeq = 0
+
+// A-T3 窗口虚拟化（与首页/板块页同源）：搜索结果可能很多，DOM 不随滚动无限增长
+const listRef = ref<HTMLElement | null>(null)
+const scrollMargin = ref(0)
+const virtualizer = useWindowVirtualizer(
+  computed(() => ({
+    count: results.value.length,
+    estimateSize: () => 320,
+    overscan: 6,
+    scrollMargin: scrollMargin.value,
+  })),
+)
+const virtualItems = computed(() => virtualizer.value.getVirtualItems())
+const totalSize = computed(() => virtualizer.value.getTotalSize())
+function measureRow(el: any) {
+  if (el) virtualizer.value.measureElement(el)
+}
+function updateScrollMargin() {
+  scrollMargin.value = listRef.value
+    ? listRef.value.getBoundingClientRect().top + window.scrollY
+    : 0
+}
 let currentKw = ''
 // 板块/排序筛选（参考 SectionPage 范式）
 const activeSection = ref(0) // 0 = 全部
@@ -114,6 +137,7 @@ async function doSearch(kw: string) {
     hasMore.value = false
   } finally {
     if (seq === requestSeq) loading.value = false
+    if (seq === requestSeq) nextTick(updateScrollMargin)
   }
 }
 
@@ -317,7 +341,23 @@ onUnmounted(() => {
         <div class="space-y-3">
           <PostSkeleton v-if="loading" :count="3" />
           <template v-else>
-            <PostCard v-for="post in results" :key="post.id" :post="post" :keyword="keyword" />
+            <div ref="listRef" class="relative" :style="{ height: totalSize + 'px' }">
+              <div
+                v-for="v in virtualItems"
+                :key="v.index"
+                :ref="measureRow"
+                class="pb-3"
+                :style="{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${v.start - scrollMargin}px)`,
+                }"
+              >
+                <PostCard :post="results[v.index]" :keyword="keyword" />
+              </div>
+            </div>
             <div v-if="loadingMore" class="ds-label flex items-center justify-center gap-2 py-3">
               <Loader2 class="w-4 h-4 animate-spin" /> 加载中...
             </div>

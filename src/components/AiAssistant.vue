@@ -6,8 +6,6 @@
 import { ref, reactive, nextTick, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bot, X, Send, Loader2, MessagesSquare, ChevronRight, Trash2 } from '@lucide/vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { aiApi, type AiForumItem } from '@/utils/api'
 import { toast } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
@@ -75,7 +73,10 @@ async function toggleOpen() {
  return
  }
  open.value = !open.value
- if (open.value) scrollToBottom()
+ if (open.value) {
+ void ensureMarkdown()
+ scrollToBottom()
+ }
 }
 
 function scrollToBottom() {
@@ -97,11 +98,30 @@ function clearChat() {
 }
 
 // ---------- Markdown 渲染 + 论坛引用角标 ----------
-marked.setOptions({ breaks: true, gfm: true })
+// marked/dompurify 懒加载：助手不打开就不求值这两个库（Lighthouse 启动期 TBT 大头）。
+// 加载完成前 v-html 走纯文本兜底，mdReady 触发重渲染。
+let markedMod: typeof import('marked') | null = null
+let purifyMod: typeof import('dompurify') | null = null
+const mdReady = ref(false)
+
+async function ensureMarkdown(): Promise<void> {
+ if (markedMod && purifyMod) return
+ const [m, d] = await Promise.all([import('marked'), import('dompurify')])
+ m.marked.setOptions({ breaks: true, gfm: true })
+ markedMod = m
+ purifyMod = d
+ mdReady.value = true
+}
+
+function escapeHtml(s: string): string {
+ return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
 function renderMarkdown(content: string): string {
- const html = marked.parse(content, { async: false }) as string
- let safe = DOMPurify.sanitize(html)
+ void mdReady.value // 建立响应式依赖：懒加载完成后重渲染
+ if (!markedMod || !purifyMod) return escapeHtml(content)
+ const html = markedMod.marked.parse(content, { async: false }) as string
+ let safe = purifyMod.default.sanitize(html)
  // [论坛N] → 可点击角标（编号对应 forums 数组序号）
  safe = safe.replace(/\[论坛(\d+)\]/g, (_, n: string) => {
  return `<sup class="ai-cite" data-post-id="${n}">[论坛${n}]</sup>`
@@ -131,6 +151,7 @@ function buildRequestMessages(): { role: 'user' | 'assistant'; content: string }
 async function send(text?: string) {
  const content = (text ?? input.value).trim()
  if (!content || loading.value) return
+ await ensureMarkdown()
  input.value = ''
  confirmClear.value = false
 

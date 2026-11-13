@@ -7,7 +7,7 @@
 [![CI](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml?query=branch:master)
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
-> **V5 · 纸感海报**：墨线硬影设计语言 + AI 主链路（成稿/划重点/简报，全部带离线套版兜底）+ Web Push 离线推送 + 传播面全装（OG/JSON-LD/sitemap/RSS）+ CI 五道门常绿。
+> **V5 · 纸感海报**：墨线硬影设计语言 + AI 主链路（成稿/划重点/简报，全部带离线套版兜底）+ Web Push 离线推送 + 传播面全装（OG/JSON-LD/sitemap/RSS/小程序服务端分享卡）+ CI 六道门常绿。
 
 校园墙按场景分类提供**二手交易、失物招领、表白墙、吐槽树洞、互助问答、校园活动、拼车、组队**八大垂直板块，支持 **Web 网页端 + 微信小程序**双端访问，解决校园信息碎片化、传播效率低、匿名表达需求强等痛点。
 
@@ -88,7 +88,7 @@
 - **运营埋点**：`events` 表记录注册/登录/首帖/首评/成交等转化事件；看板展示今日活跃、7 日活跃、激活率、成交闭环、审核时效
 - **管理审计**：封禁/解封/改信誉/重置密码/内容审核/删评/举报处理全部写 `admin_logs`，且仅在真实状态变更时记录
 - **算法回归门**：`npm run eval:radar -- --gate` 对失物雷达跑标注集，召回/误报/P@1 跌破阈值即 CI 失败
-- **CI 四道门**：静态（lint/typecheck/266 测试/雷达门/构建/体积预算 gzip）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms）→ 浏览器 E2E（12 条核心用户流真 Chromium：浏览/搜索/登录/发帖/点赞/评论/审核）——任一失守即红
+- **CI 六道门**：静态（lint/typecheck/279 测试/雷达门/构建/体积预算 gzip/文档死链）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms）→ 浏览器 E2E（12 条核心用户流真 Chromium）→ Lighthouse（移动端 3 次中位数 perf≥72/a11y≥90/bp≥90/seo≥90，实测 79/95/100/100）——任一失守即红
 - **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
 - 图片上传压缩管线：大图重编码 + WebP 缩略图；解码像素上限 5000 万（防解压炸弹），失败即拒绝而非回落原图
 - **数据库**：WAL + `busy_timeout` + 预编译语句缓存；FTS 触发器按列触发（浏览/点赞不再重建索引，实测快约 19 倍）

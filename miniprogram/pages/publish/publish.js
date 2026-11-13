@@ -3,6 +3,7 @@ const { getCategoryList, getSubTypeList } = require('../../utils/category')
 const { get, post, put, uploadFile, drafts, ai } = require('../../utils/api')
 const { CATEGORY_TO_SECTION, SECTION_TO_CATEGORY } = require('../../utils/constants')
 const { showToast, chooseImage } = require('../../utils/util')
+const { ensureSystemSubscribe } = require('../../utils/subscribe')
 
 /**
  * 各板块补充字段（键名必须在后端 extraFields 白名单内：
@@ -450,6 +451,8 @@ Page({
     }
     if (this.data.submitting) return
     this.setData({ submitting: true })
+    // 订阅消息授权（tap 链内、上传前）：发帖后评论/匹配通知可离线触达；未配置模板静默跳过
+    ensureSystemSubscribe()
 
     const { title, content, selectedCategory, selectedSubType, isAnonymous, imageList, extraData, editId, isEdit } = this.data
 

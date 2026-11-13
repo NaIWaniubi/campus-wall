@@ -1,15 +1,32 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AiAssistant from '@/components/AiAssistant.vue'
-import CommandPalette from '@/components/CommandPalette.vue'
 import RouteProgress from '@/components/RouteProgress.vue'
 import OnboardingGuide from '@/components/OnboardingGuide.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import { useNotifyFeed } from '@/composables/useNotifyFeed'
+
+// 命令面板懒挂载：首次 Ctrl/⌘+K 或 cp:open 才加载 chunk（启动期不求值面板代码）
+const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette.vue'))
+const paletteMounted = ref(false)
+function mountPalette() {
+  if (paletteMounted.value) return
+  ;(window as any).__cpPendingOpen = true
+  paletteMounted.value = true
+}
+function onPaletteShortcut(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !paletteMounted.value) {
+    e.preventDefault()
+    mountPalette()
+  }
+}
+function onPaletteEvent() {
+  if (!paletteMounted.value) mountPalette()
+}
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
@@ -61,11 +78,15 @@ onMounted(async () => {
   startPoll()
   window.addEventListener('focus', onWake)
   document.addEventListener('visibilitychange', onWake)
+  window.addEventListener('keydown', onPaletteShortcut)
+  window.addEventListener('cp:open', onPaletteEvent)
 })
 onUnmounted(() => {
   stopPoll()
   window.removeEventListener('focus', onWake)
   document.removeEventListener('visibilitychange', onWake)
+  window.removeEventListener('keydown', onPaletteShortcut)
+  window.removeEventListener('cp:open', onPaletteEvent)
 })
 </script>
 
@@ -91,7 +112,7 @@ onUnmounted(() => {
     <AnnouncementDialog />
     <AiAssistant />
     <RouteProgress />
-    <CommandPalette />
+    <CommandPalette v-if="paletteMounted" />
     <OnboardingGuide />
   </div>
 </template>

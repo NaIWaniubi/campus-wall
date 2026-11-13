@@ -4,6 +4,8 @@ const { getCategoryById } = require('../../utils/category')
 const { get, post, followStatus, trades, radar } = require('../../utils/api')
 const { showToast, showModal } = require('../../utils/util')
 const { optimisticToggle } = require('../../utils/optimistic')
+const { buildPostShare } = require('../../utils/share')
+const { ensureSystemSubscribe } = require('../../utils/subscribe')
 
 Page({
   data: {
@@ -344,6 +346,8 @@ Page({
       showToast('请输入评论内容')
       return
     }
+    // 订阅消息授权（tap 链内）：配置了 system 模板才弹，拒绝不影响发评论
+    ensureSystemSubscribe()
     if (!app.checkLogin()) {
       showToast('请先登录')
       return
@@ -446,11 +450,12 @@ Page({
   },
 
   onShareAppMessage() {
-    const post = this.data.post
-    return {
-      title: post.title || post.content.substring(0, 30),
-      path: `/pages/detail/detail?id=${post.id}`,
-      imageUrl: post.images && post.images.length > 0 ? post.images[0] : ''
-    }
+    return buildPostShare(this.data.post, this.data.postId)
+  },
+
+  // 朋友圈分享（V5）：与好友分享同卡同路径
+  onShareTimeline() {
+    const share = buildPostShare(this.data.post, this.data.postId)
+    return { title: share.title, query: `id=${this.data.postId}`, imageUrl: share.imageUrl }
   }
 })

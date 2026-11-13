@@ -37,7 +37,8 @@ const sortOptions: { key: SortKey; label: string }[] = [
 const activeSort = ref<SortKey>('hot')
 const list = ref<any[]>([])
 const page = ref(1)
-const pageSize = 20
+// 首屏 12 条：虚拟列表只渲染可视区，但数据解析/预处理成本随 pageSize 线性涨（Lighthouse TBT 实测优化）
+const pageSize = 12
 const hasMore = ref(true)
 const loading = ref(false)
 const loadingMore = ref(false)

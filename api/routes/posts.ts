@@ -16,6 +16,7 @@ import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
 import { validate, postSchemas, commonSchemas } from '../utils/validation.js';
 import { safeJsonParse, logger } from '../utils/logger.js';
 import { trackEvent, trackFirstEvent, touchActive } from '../utils/events.js';
+import { getShareCardPng } from '../utils/shareCard.js';
 
 const router = Router();
 
@@ -311,6 +312,19 @@ router.get('/:id/radar', authOptional, (req, res) => {
 
   const matches = findRadarMatches(id, postSec.section_id, 3);
   success(res, { threshold: MATCH_THRESHOLD, matches });
+});
+
+// 分享卡片图（V5）：公开、仅 published；微信分享 imageUrl 用（无图帖不再截页面当封面）
+router.get('/:id/share-card.png', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(404).end();
+  try {
+    const png = await getShareCardPng(id);
+    if (!png) return res.status(404).end();
+    res.type('image/png').set('Cache-Control', 'public, max-age=600').send(png);
+  } catch {
+    res.status(500).end();
+  }
 });
 
 // 帖子详情

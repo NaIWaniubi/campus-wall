@@ -239,6 +239,11 @@ function onOpenEvent() { openPalette() }
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('cp:open', onOpenEvent)
+  // 懒挂载契约：App 在首次触发时置标志，chunk 加载完成后据此直接打开
+  if ((window as any).__cpPendingOpen) {
+    delete (window as any).__cpPendingOpen
+    openPalette()
+  }
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)

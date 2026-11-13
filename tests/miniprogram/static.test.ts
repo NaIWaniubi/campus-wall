@@ -413,3 +413,28 @@ describe('小程序 AI 一句话成稿接线（V5）', () => {
     expect(js).toContain('套版');
   });
 });
+
+describe('小程序分享卡 + 订阅消息接线（V5）', () => {
+  it('无图帖分享回退服务端 share-card，首图绝对化', () => {
+    const share = read('utils/share.js');
+    expect(share).toContain('/share-card.png');
+    expect(share).toContain('absUrl(images[0])');
+    expect(share).toContain('getServerOrigin()');
+  });
+
+  it('详情页好友/朋友圈双分享出口都走 buildPostShare', () => {
+    const js = read('pages/detail/detail.js');
+    expect(js).toMatch(/onShareAppMessage\(\)\s*\{\s*return buildPostShare/);
+    expect(js).toContain('onShareTimeline()');
+    expect(js).toContain('query: `id=${this.data.postId}`');
+  });
+
+  it('system 订阅授权在 tap 链内（发帖/评论），未配置模板静默', () => {
+    const sub = read('utils/subscribe.js');
+    expect(sub).toContain('systemTemplateId');
+    expect(sub).toContain('wx.requestSubscribeMessage');
+    expect(sub).toMatch(/if \(asked \|\| !wx\.requestSubscribeMessage\) return/);
+    expect(read('pages/publish/publish.js')).toContain('ensureSystemSubscribe()');
+    expect(read('pages/detail/detail.js')).toContain('ensureSystemSubscribe()');
+  });
+});

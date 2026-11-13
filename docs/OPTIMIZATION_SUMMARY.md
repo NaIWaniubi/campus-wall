@@ -376,7 +376,7 @@ if (!dbData) {
 - [完整优化报告](./OPTIMIZATION_REPORT.md)
 - [架构文档](./ARCHITECTURE.md)
 - [API 文档](./API-MAPPING.md)
-- [贡献指南](../CONTRIBUTING.md)
+- [贡献指南](https://github.com/NaIWaniubi/campus-wall/blob/master/CONTRIBUTING.md)
 
 ---
 

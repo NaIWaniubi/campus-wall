@@ -32,7 +32,10 @@
 - **AI 网关级 auth 短路**：自建网关返回 401/Invalid token 时，同端点其余模型不再逐个空耗重试（endpointKeyFor 以 url+key 尾 6 位为指纹），直接切 OpenRouter 免费档；实测失败调用与错误日志从 6+ 降到 3
 - **Web Push 通电落地**：VAPID 从纸面预埋变为真开关——`scripts/gen-vapid.mjs` 首跑自动生成密钥对（只落 gitignored 数据目录，永不进仓库），start-demo 注入环境（cmd 逐行执行，env 必须排在 node 行之前——踩坑修复）；demo 真机闭环：设置页开启→订阅拿到真实 FCM endpoint 落库→他人评论触发 VAPID 签名真发→关闭→服务端删行；修 enablePush 静默失败 bug（pushManager/权限层异常不走 axios 拦截器，现给出可读 toast；另实锤 Chrome 无痕模式整体禁用 Push API，自动化必须持久 profile）；push 路由 0→7 条集成测（鉴权/结构校验/未配置 501/同 endpoint 换主刷新/退订）
 - **E2E 复活并进 CI**：tests/e2e 12 条浏览器流自 V5 登录重构后静默腐烂 10 条——修 e2e-backend.mjs（db.ts 生产加固后缺 ADMIN_INITIAL_PASSWORD/JWT_SECRET 直接崩在 seed 前）、playwright.config 自动探测本机 chromium 可执行（版本代差 headless_shell-1234 缺件）、helper 登录 placeholder 兼容新旧文案、3 处「点首页卡内标题」改走搜索入口（虚拟列表重渲染脱离 DOM 导致 click 悬挂）、断言文案对齐（近 7 天趋势空格）与匿名断言补真（选真匿名帖断言脱敏）；CI 新增 Browser E2E job（needs verify，与 load 并行，失败上传 report），本地 12/12 全绿 1.9min
-- 测试 266 条全过（SEO 24+5 / push 集成 7 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
+- **小程序分享卡 + 订阅消息接通**：服务端 sharp 合成 750×600 V4 纸感分享卡（`/api/posts/:id/share-card.png`，仅 published、卡面零作者信息、10min 缓存带 updated_at 键）；无图帖不再让微信截页面当封面，首图绝对化；详情页补朋友圈分享；system 订阅模板在发帖/评论 tap 链内授权（未配置静默）；Dockerfile/Render 补 fonts-noto-cjk；13 条新测试（版式/转义/匿名/404/缓存/静态锁）
+- **docs 站成书**：vitepress 首页 hero + 功能全景/AI 架构/安全匿名/质量门/设计系统/版本史六新章 + 全量侧栏 + 本地搜索；修旧文档死链；docs:build 进 CI 做死链门
+- **Lighthouse 性能门进 CI**：移动端模拟 3 次中位数（单跑波动 ±15 必 flaky）；先修后设阈——marked/dompurify 懒加载（助手不打开不求值）、命令面板首次 Ctrl+K 才挂载 chunk、首屏 pageSize 20→12、卡片 contain 布局隔离，perf 67→79；门阈值 perf≥72/a11y≥90/bp≥90/seo≥90（实测 79/95/100/100）
+- 测试 279 条全过（SEO 24+5 / push 集成 7 / 分享卡 13 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）+ 浏览器 E2E 12/12；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
 
 ### V4 · 纸感海报设计系统（2026-11-12）
 - 全站换肤：暖纸底 + 1.5px 墨线 + 硬投影 + 大字排版 + 荧光四色（lime/coral/sky/violet）

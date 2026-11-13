@@ -154,3 +154,38 @@ describe('AI V3 · 宽容 JSON 解析 / 规则成稿', () => {
     expect(d.content).not.toContain('📌');
   });
 });
+
+describe('AI V5 · 离线套版回归锁（防巨型假地点/半截标签回潮）', () => {
+  const val = (fields: Array<[string, string]>, k: string) => fields.find((f) => f[0] === k)?.[1];
+
+  it('地点不吃虚词：「昨天下午在操场」→ 操场，不是整句', () => {
+    const d = ruleDraft('昨天下午在操场丢了AirPods Pro耳机 捡到请联系QQ2856789012 重谢50元', 2);
+    expect(val(d.fields, '地点')).toBe('操场');
+    // 方向以首现者为准：先「丢」后「捡」→ 判为丢失寻找（不是捡到待认领）
+    expect(val(d.fields, '状态')).toBe('丢失寻找');
+  });
+
+  it('时间相邻词缝合：昨天 + 下午 → 昨天下午', () => {
+    const d = ruleDraft('昨天下午在操场丢了钥匙', 2);
+    expect(val(d.fields, '时间')).toBe('昨天下午');
+  });
+
+  it('交易地点不被前置描述污染', () => {
+    const d = ruleDraft('出九成新自行车 200元 先到先得 东门自提', 1);
+    expect(val(d.fields, '地点')).toBe('东门');
+    expect(val(d.fields, '价格')).toBe('¥200');
+  });
+
+  it('标签零半截词：种子在场时滑窗不触发', () => {
+    const d = ruleDraft('出九成新自行车 200元 先到先得 东门自提', 1);
+    for (const t of d.tags) {
+      // 每个标签要么命中原文子串，要么是 ¥价格 形态；杜绝「到一张校」式滑窗碎片
+      expect(d.content.includes(t) || /^¥\d+$/.test(t)).toBe(true);
+    }
+  });
+
+  it('中文点位「大学生活动中心」整体命中', () => {
+    const d = ruleDraft('音乐社本周六晚七点在大学生活动中心办草地音乐节 免费入场', 6);
+    expect(val(d.fields, '地点')).toBe('大学生活动中心');
+  });
+});

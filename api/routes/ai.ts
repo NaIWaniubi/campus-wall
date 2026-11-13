@@ -437,8 +437,8 @@ export const TAG_LEXICON = [
   '志愿', '竞赛', '自习', '表白', '寻人', '失物招领', '二手交易',
 ];
 
-/** 从文本里抽标签：词表短语 → ASCII 词块 → 价格 → 中文滑窗兜底 */
-export function extractTags(raw: string, limit = 4): string[] {
+/** 从文本里抽标签：seeds（调用方给的干净词）→ 校园词表 → ASCII 词块 → 价格 → 中文滑窗兜底 */
+export function extractTags(raw: string, limit = 4, seeds: string[] = []): string[] {
   const tags: string[] = [];
   const seen = new Set<string>();
   const push = (t: string) => {
@@ -447,6 +447,8 @@ export function extractTags(raw: string, limit = 4): string[] {
     tags.push(t);
   };
 
+  // 0) 调用方种子（如套版抽出的物品/地点）优先级最高
+  for (const sd of seeds) push(sd);
   // 1) 校园词表命中（最像标签）
   for (const w of TAG_LEXICON) if (raw.includes(w)) push(w);
   // 2) ASCII 词块（iPad / Air / GTX…）
@@ -531,10 +533,24 @@ export function parseJsonLoose(text: string): any | null {
 }
 
 /** 结构化字段抽取（离线套版用）：只抽取原文里确实出现的，绝不编造 */
-const OFFLINE_LOC_RE =
-  /([\u4e00-\u9fa5A-Za-z0-9]{1,10}(?:楼|栋|馆|舍|室|门|驿站|超市|浴室|食堂|操场|体育馆|教学楼|实验楼|行政楼|图书馆|广场|车站|地铁站|机场|自习区|研讨室))/;
-const OFFLINE_TIME_RE =
-  /(今天|明天|后天|周[一二三四五六日天]|星期[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]?|[上下]午\s*\d{1,2}(?:[:：]\d{2})?|\d{1,2}[:：]\d{2}|\d{1,2}\s*点(?:半|[零一二三四五六七八九十\d]{1,2}分)?)/;
+// 地点 = 可选「≤8 个逐字校验的实义字」+ 场所后缀（长词在前）。
+// 每个前缀字都要过虚词黑名单，「昨天下午在操场」到「在」即断，不会吞出巨型假地点。
+const LOC_STOP = '在了的往向从到对跟和与是这那哪几个么吗呢吧啊呀有要能过给被把叫让做作每两去'
+const OFFLINE_LOC_RE = new RegExp(
+  '((?:(?![' + LOC_STOP + '])[\\u4e00-\\u9fa5A-Za-z0-9]){0,8}'
+  + '(?:体育馆|教学楼|实验楼|行政楼|图书馆|快递驿站|自习室|研讨室|操场|食堂|浴室|超市|驿站|车站|地铁站|机场|广场|宿舍|中心|礼堂|剧场|楼|栋|馆|舍|室|门|站))'
+);
+const OFFLINE_TIME_HEAD = /(今天|明天|后天|昨天|前天|昨晚|今夜|今晚|今早|凌晨|中午|上午|下午|晚上|早上|周[一二三四五六日天]|星期[一二三四五六日天]|礼拜[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]?|[上下]午\s*\d{1,2}(?:[:：]\d{2})?|\d{1,2}[:：]\d{2}|[零一二三四五六七八九十两]{1,3}\s*点(?:半|[零一二三四五六七八九十\d]{1,2}分)?|\d{1,2}\s*点(?:半|\d{1,2}分)?)/;
+// 相邻时间词缝合：「昨天下午」分开命中时拼回完整时间
+const TIME_TAIL_RE = /^\s*的?(上午|下午|中午|晚上|傍晚|凌晨|早上)/;
+function extractOfflineTime(raw: string): string | null {
+  const m = raw.match(OFFLINE_TIME_HEAD);
+  if (!m || m.index == null) return null;
+  let val = m[1].trim();
+  const tail = raw.slice(m.index + m[0].length).match(TIME_TAIL_RE);
+  if (tail) val += tail[1];
+  return val;
+}
 const OFFLINE_CONTACT_RE =
   /(1[3-9]\d{9}|\d{7,11}|(?:微信|weixin|wx|QQ|q群|扣扣)\s*[:：]?\s*[A-Za-z0-9_-]{4,15}|[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,})/i;
 const OFFLINE_ITEM_LEXICON = [
@@ -557,8 +573,10 @@ function extractOfflineItem(raw: string): string | null {
  * 返回 [标签, 值] 列表；空数组表示原文信息太少，不值得套版。
  */
 function offlineFields(sectionId: number | null, raw: string, price: number | null): Array<[string, string]> {
-  const loc = raw.match(OFFLINE_LOC_RE)?.[1] ?? null;
-  const time = raw.match(OFFLINE_TIME_RE)?.[1]?.trim() ?? null;
+  const locRaw = raw.match(OFFLINE_LOC_RE)?.[1] ?? null;
+  // 只匹配到光杆后缀（「哪个楼」→「楼」）视为噪声
+  const loc = locRaw && locRaw.length >= 2 ? locRaw : null;
+  const time = extractOfflineTime(raw);
   const contact = raw.match(OFFLINE_CONTACT_RE)?.[1]?.trim() ?? null;
   const item = extractOfflineItem(raw);
   const cond = raw.match(OFFLINE_COND_RE)?.[1] ?? null;
@@ -572,8 +590,11 @@ function offlineFields(sectionId: number | null, raw: string, price: number | nu
   // 失物招领额外标注意向（捡到 or 丢失），其余板块按通用字段
   const rows: Array<[string, string]> = [];
   if (sectionId === 2) {
-    if (/捡|拾|拾到|发现|找到/.test(raw)) rows.push(['状态', '捡到待认领']);
-    else if (/丢|丢失|不见|忘在|落在/.test(raw)) rows.push(['状态', '丢失寻找']);
+    // 「丢了校园卡，捡到请联系」同时含两个方向词 —— 以首现者为准（那才是发帖人立场）
+    const iFound = raw.search(/[捡拾]/);
+    const iLost = raw.search(/[丢忘落]|不见/);
+    if (iLost >= 0 && (iFound < 0 || iLost < iFound)) rows.push(['状态', '丢失寻找']);
+    else if (iFound >= 0) rows.push(['状态', '捡到待认领']);
   }
   // 交易/拼车把价格提前，读起来更像正文
   const order = sectionId === 1 || sectionId === 7
@@ -625,13 +646,13 @@ export function ruleDraft(raw: string, sectionId?: number | null) {
   if (text.length < 12) {
     content += '\n\n（还想补充：物品成色 / 期望价格 / 见面地点 / 联系方式）';
   }
-  // 标签：结构化字段里的干净词（物品/地点）优先，其余交给词表/价格/ASCII 抽取
+  // 标签：结构化字段里的干净词（物品/地点）作种子，其余交给词表/价格/ASCII 抽取
   const seeds: string[] = [];
   for (const key of ['物品', '地点']) {
     const v = fields.find((f) => f[0] === key)?.[1];
     if (v && v.length >= 2) seeds.push(v);
   }
-  const tags = Array.from(new Set([...seeds, ...extractTags(text)])).slice(0, 4);
+  const tags = extractTags(text, 4, seeds);
   return { title, content, tags, sectionId: sid, sectionName, price, fields };
 }
 

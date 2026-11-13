@@ -97,3 +97,29 @@
 2. 每个页面至少有一个「海报级」元素：大字标题 / 贴纸 / 荧光块 / 走马条 / 编号章节头。
 3. 主按钮只有一个视觉重心（墨底荧光），次级操作一律描边。
 4. 手机 390px 下不横向溢出；卡片间距一致；底部不被 TabBar 遮挡（页面根 `pb-24`）。
+
+## 7. V5 深色翻转原语（违反必出黑底黑字）
+
+深色主题下 `--ink ⇄ --paper` 互换。所以 **任何「恒暗画布」里不能用 `var(--paper)` 当文字色，任何「恒亮小控件」里不能用 `var(--ink)` 当底 + 亮色字**。统一用：
+
+| 类 | 用途 | 亮色 | 深色 |
+|---|---|---|---|
+| `.ds-poster` | 恒暗大画布：hero 类头部、后台侧栏、提交条、弹窗头 | 墨底 #14110F + 亮字 | 更深 #080706 + 亮字 |
+| `.on-poster` / `.on-poster-soft` / `.on-poster-accent` | 海报画布上的文字 | 恒亮白 / 70% / 荧光 | 同左（不随主题翻） |
+| `.ds-ink-btn` | 小控件（FAB、发送、清空） | 墨底 + 荧光字 | **荧光底 + 墨字**（自动翻） |
+| `.ds-scrim` | 模态遮罩 | 墨 55% | 纯黑 72% |
+
+规则：
+1. 要一块「黑底白字」区 → `class="ds-poster"`，不要写 `style="background: var(--ink)"`。
+2. 该区域内的次级文字用 `on-poster-soft`，强调字用 `on-poster-accent`，**不要**用 `color: var(--paper)`（深色下它翻成近黑 = 隐形）。
+3. 弹层遮罩一律 `ds-scrim`；主按钮 `ds-btn--primary`（已内置翻转）。
+4. 信誉/状态阶梯已去绿：`helpers.creditColor` = 紫(#6D3BF5)/深青(#0E7C86)/深琥珀(#B45309)/红(#DC2626)。
+
+## 8. V5 功能面（新增，回归时一并验收）
+
+- **登录**：`一键体验（免输入）` 直接登演示号；`先随便逛逛` 游客模式；字段级内联错误；桌面自动聚焦。
+- **命令面板**：`Ctrl/⌘+K` 或 `window.dispatchEvent(new CustomEvent('cp:open'))`；空查询=最近搜索+入口+板块，有查询=帖子实时结果。
+- **新手引导**：`OnboardingGuide` 首次到首页 0.8s 自动弹一次（`localStorage['onboarding:v1']` 记忆；`CustomEvent('onboarding:open')` 重看；Esc 可关）。
+- **OG 分享卡片**：`api/utils/seo.ts` 在 SPA fallback 注入（仅 published 帖；模板按 mtime 缓存——发版后旧 chunk 引用必须失效）。
+- **发布页**：剪贴板图片粘贴 / 拖拽上传共用 `addFiles()` 通道。
+- **路由进度条**：`RouteProgress`（懒加载顶条）；`prefers-reduced-motion` 已降级；焦点环 `:focus-visible` 全局启用。

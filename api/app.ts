@@ -26,7 +26,7 @@ import { stats as wsStats } from './ws/hub.js'
 import { buildOpenApiDocument, swaggerHtml } from './openapi/document.js'
 import { captureError } from './observability.js'
 import { cacheStats } from './utils/cache.js'
-import { spaHandler } from './utils/seo.js'
+import { spaHandler, registerCrawlEndpoints } from './utils/seo.js'
 import crypto from 'crypto'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
@@ -271,6 +271,12 @@ app.use('/api/health', (_req: Request, res: Response) => {
     },
   })
 })
+
+/**
+ * 爬虫静态面（V5）：robots.txt + 动态 sitemap.xml
+ * 注册在生产托管块之前 —— SPA 通配回退会把未注册路径都当成前端路由。
+ */
+registerCrawlEndpoints(app)
 
 /**
  * 生产环境：托管前端构建产物 + SPA fallback

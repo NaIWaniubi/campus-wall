@@ -9,10 +9,12 @@ import CommandPalette from '@/components/CommandPalette.vue'
 import RouteProgress from '@/components/RouteProgress.vue'
 import OnboardingGuide from '@/components/OnboardingGuide.vue'
 import BottomNav from '@/components/BottomNav.vue'
+import { useNotifyFeed } from '@/composables/useNotifyFeed'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
 const userStore = useUserStore()
+useNotifyFeed()
 
 // 未读红点激活：30s 低频轮询 + focus/回前台边沿即时刷新；后台标签页暂停轮询
 let pollTimer: ReturnType<typeof setInterval> | null = null

@@ -6,7 +6,6 @@ import './style.css'
 import './styles/v4.css'
 import App from './App.vue'
 import router from './router'
-import { useUserStore } from './stores/user'
 import { useWebSocket } from './composables/useWebSocket'
 
 // 创建Vue应用实例
@@ -29,8 +28,9 @@ pinia.use(piniaPluginPersistedstate)
 app.use(pinia)
 app.use(router)
 
-// 登录态下启动 WS 实时连接（私信 + 通知；token 变化自动跟随，登出断开）
-if (useUserStore().isLoggedIn) useWebSocket().start()
+// 启动 WS：无条件 start（内部仅有 token 时才真连接，并 $subscribe 跟随登录/换号/登出）。
+// 若只在已登录时 start，游客→登录路径就没人装 watch，登录后收不到实时推送。
+useWebSocket().start()
 
 // PWA：仅生产环境注册 Service Worker（开发环境不注册，避免缓存干扰 HMR）
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

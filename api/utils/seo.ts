@@ -8,7 +8,7 @@
  * 结果进内存缓存（默认 120s），爬虫来抓也只是一次极轻量的本地查询。
  */
 import { promises as fs } from 'fs'
-import type { NextFunction, Request, Response } from 'express'
+import type { Application, NextFunction, Request, Response } from 'express'
 import { db } from '../db'
 import { cacheGet, cacheSet, cacheInvalidate } from './cache'
 
@@ -173,4 +173,65 @@ export function spaHandler(indexPath: string) {
       }
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 爬虫静态面（V5）：robots.txt + 动态 sitemap.xml
+// 帖子是内容主体，收录它们才有公域流量；结果缓存 10 分钟。
+// ─────────────────────────────────────────────────────────────
+
+export interface SitemapEntry {
+  loc: string
+  lastmod?: string
+  priority?: string
+}
+
+/** 纯函数：拼 sitemap XML（独立出来便于单测） */
+export function buildSitemapXml(entries: SitemapEntry[]): string {
+  const body = entries
+    .map((e) => {
+      const lastmod = e.lastmod ? `<lastmod>${escapeAttr(e.lastmod)}</lastmod>` : ''
+      const priority = e.priority ? `<priority>${e.priority}</priority>` : ''
+      return `<url><loc>${escapeAttr(e.loc)}</loc>${lastmod}${priority}</url>`
+    })
+    .join('')
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${body}</urlset>`
+}
+
+const SITEMAP_TTL = 600_000
+const SITEMAP_CACHE_KEY = 'seo:sitemap'
+
+/** 注册 robots/sitemap（必须早于 SPA fallback 的通配路由） */
+export function registerCrawlEndpoints(app: Application): void {
+  app.get('/robots.txt', (req, res) => {
+    const base = requestBase(req)
+    res.type('text/plain').set('Cache-Control', 'public, max-age=3600')
+      .send(`User-agent: *\nDisallow: /admin\nDisallow: /api\nSitemap: ${base}/sitemap.xml\n`)
+  })
+
+  app.get('/sitemap.xml', (req, res) => {
+    try {
+      const base = requestBase(req)
+      const hit = cacheGet<string>(SITEMAP_CACHE_KEY)
+      if (hit) {
+        res.type('application/xml').set('Cache-Control', 'public, max-age=600').send(hit)
+        return
+      }
+      const posts = db
+        .prepare("SELECT id, created_at FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 5000")
+        .all() as { id: number; created_at: string }[]
+      const sections = db.prepare('SELECT id FROM sections ORDER BY id').all() as { id: number }[]
+      const entries: SitemapEntry[] = [
+        { loc: `${base}/`, priority: '1.0' },
+        { loc: `${base}/topics`, priority: '0.6' },
+        ...sections.map((s) => ({ loc: `${base}/section/${s.id}`, priority: '0.7' })),
+        ...posts.map((p) => ({ loc: `${base}/post/${p.id}`, lastmod: String(p.created_at || '').slice(0, 10), priority: '0.8' })),
+      ]
+      const xml = buildSitemapXml(entries)
+      cacheSet(SITEMAP_CACHE_KEY, xml, SITEMAP_TTL)
+      res.type('application/xml').set('Cache-Control', 'public, max-age=600').send(xml)
+    } catch {
+      res.status(500).type('text/plain').send('sitemap unavailable')
+    }
+  })
 }

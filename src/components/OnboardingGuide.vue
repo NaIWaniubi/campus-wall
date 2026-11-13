@@ -9,6 +9,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { X, ArrowRight, LayoutGrid, PenSquare, Sparkles } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
+import { trapWithInert } from '@/composables/useModalInert'
 
 const STORAGE_KEY = 'onboarding:v1'
 const router = useRouter()
@@ -97,6 +98,7 @@ onUnmounted(() => {
 })
 
 watch(open, (v) => { document.body.style.overflow = v ? 'hidden' : '' })
+trapWithInert(open)
 </script>
 
 <template>

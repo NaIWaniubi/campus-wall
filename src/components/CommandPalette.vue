@@ -16,6 +16,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { sectionApi } from '@/utils/api'
+import { trapWithInert } from '@/composables/useModalInert'
 
 interface Item {
   id: string
@@ -247,6 +248,7 @@ onUnmounted(() => {
 watch(open, (v) => {
   document.body.style.overflow = v ? 'hidden' : ''
 })
+trapWithInert(open)
 </script>
 
 <template>

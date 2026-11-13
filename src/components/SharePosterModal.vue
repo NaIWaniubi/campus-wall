@@ -4,10 +4,11 @@
  * 纯 Canvas 绘制 750×1000 的 V4 海报（纸底墨字 + 板块色 + 首图 + 统计），
  * 零新依赖。产出：下载 PNG / 复制到剪贴板 / 系统分享（支持时）。
  */
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Download, ClipboardCopy, Share2, Loader2, X } from '@lucide/vue'
 import { sectionColor } from '@/utils/sections'
 import { toast } from '@/utils/request'
+import { trapWithInert } from '@/composables/useModalInert'
 
 const props = defineProps<{
   visible: boolean
@@ -263,6 +264,9 @@ async function systemShare() {
     }
   } catch { /* 用户取消分享不算错误 */ }
 }
+
+const visibleRef = computed(() => props.visible)
+trapWithInert(visibleRef)
 
 watch(() => props.visible, async (v) => {
   if (v) {

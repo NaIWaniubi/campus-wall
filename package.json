@@ -29,7 +29,7 @@
     "bench": "node scripts/bench.mjs"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.5.0"
   },
   "dependencies": {
     "@lucide/vue": "^1.0.0",

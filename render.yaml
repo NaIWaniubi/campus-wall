@@ -23,6 +23,9 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      # 钉死 Node 24：node:sqlite 原生绑定需 >=22.5，默认运行时版本不保证
+      - key: NODE_VERSION
+        value: "24"
       - key: NODE_ENV
         value: production
       - key: DATA_DIR

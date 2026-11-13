@@ -56,14 +56,14 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <!-- 顶部 -->
     <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center px-4 h-12">
-        <button class="p-1.5 -ml-1.5 hover:bg-zinc-100 rounded-full" @click="router.back()">
-          <ArrowLeft class="w-5 h-5 text-zinc-700" />
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
+          <ArrowLeft class="w-5 h-5" />
         </button>
-        <h1 class="flex-1 text-center font-medium text-zinc-900">草稿箱</h1>
+        <h1 class="flex-1 text-center ds-display text-[17px]" style="color: var(--ink)">草稿箱</h1>
         <div class="w-8"></div>
       </div>
     </header>
@@ -90,18 +90,18 @@ onMounted(load)
           class="ds-card p-3.5 flex items-center gap-3 hover:transition cursor-pointer"
           @click="useDraft(d)"
         >
-          <div class="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-            <FileText class="w-4.5 h-4.5 text-brand-600" />
+          <div class="w-9 h-9 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background: var(--sky); border: 1.5px solid var(--ink)">
+            <FileText class="w-4 h-4" style="color: var(--ink)" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 text-xs ds-sub mb-0.5">
-              <span class="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded">{{ d.sectionName || '未选板块' }}</span>
+              <span class="ds-tag !py-0.5">{{ d.sectionName || '未选板块' }}</span>
               <span>{{ formatTime(d.createdAt) }}</span>
             </div>
-            <p class="text-sm text-zinc-900 font-medium truncate">{{ d.title || '无标题' }}</p>
-            <p class="text-xs text-zinc-500 truncate mt-0.5">{{ d.content || '无内容' }}</p>
+            <p class="text-sm font-bold truncate" style="color: var(--ink)">{{ d.title || '无标题' }}</p>
+            <p class="text-xs truncate mt-0.5" style="color: var(--ink-mute)">{{ d.content || '无内容' }}</p>
           </div>
-          <button class="p-1.5 ds-sub hover:text-red-500 hover:bg-red-50 rounded-full flex-shrink-0" @click.stop="confirmDelete(d)">
+          <button class="p-1.5 rounded-full flex-shrink-0 transition" style="color: var(--ink-mute)" @click.stop="confirmDelete(d)">
             <Trash2 class="w-4 h-4" />
           </button>
         </div>

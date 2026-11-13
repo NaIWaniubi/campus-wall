@@ -236,47 +236,47 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-white rounded-xl shadow-sm overflow-hidden">
+  <div class="flex flex-col h-full ds-card overflow-hidden">
     <!-- 面板头 -->
-    <div class="flex items-center gap-2 px-3 h-12 border-b border-zinc-100 flex-shrink-0">
+    <div class="flex items-center gap-2 px-3 h-12 flex-shrink-0" style="border-bottom: 1.5px solid var(--ink)">
       <!-- 返回按钮：手机端（< md）显示。原 sm:hidden 因 sm=0px 永不生效，手机上无法退回会话列表 -->
-      <button class="p-1.5 -ml-1.5 text-zinc-600 hover:text-zinc-900 md:hidden" @click="emit('back')" aria-label="返回会话列表">
+      <button type="button" class="ds-icon-btn !w-8 !h-8 -ml-1 md:hidden" style="border-color: var(--hairline); box-shadow: none" aria-label="返回会话列表" @click="emit('back')">
         <ArrowLeft class="w-5 h-5" />
       </button>
-      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+      <div class="w-8 h-8 flex items-center justify-center overflow-hidden flex-shrink-0" style="background: var(--lime); border: 1.5px solid var(--ink); border-radius: 10px">
         <img v-if="conv.peer.avatar" :src="conv.peer.avatar" class="w-full h-full object-cover" alt="" />
-        <span v-else class="text-sm font-bold text-brand-700">{{ conv.peer.nickname?.charAt(0) || '友' }}</span>
+        <span v-else class="text-sm font-black" style="color: var(--ink)">{{ conv.peer.nickname?.charAt(0) || '友' }}</span>
       </div>
-      <span class="font-medium text-zinc-900 truncate">{{ conv.peer.nickname || '用户' }}</span>
+      <span class="text-[13.5px] font-extrabold truncate" style="color: var(--ink)">{{ conv.peer.nickname || '用户' }}</span>
     </div>
 
     <!-- 消息气泡区 -->
-    <div ref="listRef" class="flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-zinc-50/60 min-h-[240px]">
+    <div ref="listRef" class="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-[240px]" style="background: var(--color-bg)">
       <div v-if="loading" class="h-full flex items-center justify-center">
-        <span class="text-xs text-zinc-400">加载中...</span>
+        <span class="text-xs" style="color: var(--ink-mute)">加载中...</span>
       </div>
       <template v-else>
         <EmptyState v-if="!messages.length" text="还没有消息，打个招呼吧" />
         <div v-for="m in messages" :key="m.id"
           class="flex items-end gap-2" :class="m.isMine ? 'justify-end' : 'justify-start'">
-          <p v-if="m.createdAt && !m.isMine" class="text-[10px] text-zinc-300 flex-shrink-0">{{ formatTime(m.createdAt) }}</p>
+          <p v-if="m.createdAt && !m.isMine" class="text-[10px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(m.createdAt) }}</p>
           <div class="max-w-[70%] px-3 py-2 rounded-2xl text-sm leading-relaxed break-words whitespace-pre-wrap"
-            :class="m.isMine ? 'bg-brand-500 text-white rounded-br-sm' : 'bg-white text-zinc-800 border border-zinc-100 rounded-bl-sm'">
+            :class="m.isMine ? 'ds-bubble-user rounded-br-sm' : 'ds-bubble-ai rounded-bl-sm'">
             {{ m.content }}
           </div>
-          <p v-if="m.createdAt && m.isMine" class="text-[10px] text-zinc-300 flex-shrink-0">{{ formatTime(m.createdAt) }}</p>
+          <p v-if="m.createdAt && m.isMine" class="text-[10px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(m.createdAt) }}</p>
         </div>
       </template>
     </div>
 
     <!-- 输入区 -->
-    <div class="flex items-center gap-2 p-2.5 border-t border-zinc-100 flex-shrink-0">
+    <div class="flex items-center gap-2 p-2.5 flex-shrink-0" style="border-top: 1.5px solid var(--ink)">
       <input v-model="draft" type="text" maxlength="500" placeholder="输入消息..."
-        class="flex-1 h-9 px-3 rounded-full bg-zinc-100 focus:bg-white border border-transparent focus:border-brand-500 focus:outline-none text-sm transition"
+        class="ds-input flex-1 !h-9 !rounded-full !py-0 !text-[13px]"
         @keyup.enter="send" />
-      <button :disabled="sending || !draft.trim()"
-        class="w-9 h-9 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white flex items-center justify-center flex-shrink-0 transition"
-        @click="send">
+      <button type="button" :disabled="sending || !draft.trim()"
+        class="ds-btn ds-btn--primary w-9 h-9 !p-0 rounded-[12px] flex items-center justify-center flex-shrink-0"
+        aria-label="发送消息" @click="send">
         <Send class="w-4 h-4" />
       </button>
     </div>

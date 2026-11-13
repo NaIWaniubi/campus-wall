@@ -63,10 +63,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-6">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-extrabold" style="color: var(--ink)">我的收藏</span>
@@ -85,7 +85,7 @@ onUnmounted(() => {
         <div v-if="list.length && loading" class="flex items-center justify-center gap-2 py-3 text-sm ds-sub">
           <Loader2 class="w-4 h-4 animate-spin" /> 加载中...
         </div>
-        <p v-else-if="list.length && !hasMore" class="text-center text-xs text-zinc-300 py-3">没有更多了</p>
+        <p v-else-if="list.length && !hasMore" class="text-center text-xs py-3" style="color: var(--ink-mute)">没有更多了</p>
       </template>
     </main>
   </div>

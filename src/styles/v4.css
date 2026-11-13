@@ -72,6 +72,10 @@ body {
 }
 .ds-rule { height: 1.5px; background: var(--ink); opacity: 0.9; }
 .ds-hairline { height: 1px; background: var(--hairline); }
+.ds-divide > * + * { border-top: 1px solid var(--hairline); }
+.ds-row:hover { background: var(--color-surface); }
+.ds-hairline-b { border-bottom: 1px solid var(--hairline); }
+.ds-hairline-b:last-child { border-bottom: 0; }
 
 /* ---------- 容器：贴纸卡片 ---------- */
 .ds-card {

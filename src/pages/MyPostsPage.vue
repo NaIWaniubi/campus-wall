@@ -31,9 +31,9 @@ async function load() {
 }
 
 function statusMeta(post: any) {
-  if (post.status === 'pending') return { text: '审核中', class: 'bg-amber-100 text-amber-600' }
-  if (post.status === 'rejected') return { text: '已驳回', class: 'bg-red-100 text-red-600' }
-  if (post.status === 'offline') return { text: '已下架', class: 'bg-zinc-200 text-zinc-500' }
+  if (post.status === 'pending') return { text: '审核中', class: 'st-pending' }
+  if (post.status === 'rejected') return { text: '已驳回', class: 'st-rejected' }
+  if (post.status === 'offline') return { text: '已下架', class: 'st-offline' }
   return null
 }
 
@@ -74,10 +74,10 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-6">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-extrabold" style="color: var(--ink)">我的帖子</span>
@@ -94,23 +94,25 @@ onMounted(load)
           <PostCard :post="post" />
           <!-- 状态标签 -->
           <div v-if="statusMeta(post)" class="absolute top-3 right-3 pointer-events-none">
-            <span class="px-2 py-0.5 rounded text-xs font-medium" :class="statusMeta(post)!.class">
+            <span class="ds-tag text-[11px]" :class="statusMeta(post)!.class">
               {{ statusMeta(post)!.text }}
             </span>
           </div>
           <!-- 驳回原因 -->
           <div v-if="post.status === 'rejected' && (post.rejectReason || post.reason)"
-            class="mt-1 px-3 py-2 rounded-lg bg-red-50 text-xs text-red-600">
+            class="ds-card ds-card--flat mt-1 px-3 py-2 text-[12px] leading-relaxed"
+            style="border-left: 3px solid var(--coral); color: var(--ink-soft)">
             驳回原因：{{ post.rejectReason || post.reason }}
           </div>
           <!-- 操作按钮：编辑/修改重发 + 删除 -->
           <div class="absolute bottom-3 right-3 flex items-center gap-2">
-            <button v-if="canEdit(post)"
-              class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 text-xs hover:bg-brand-100 transition"
+            <button v-if="canEdit(post)" type="button"
+              class="ds-btn ds-btn--sm flex items-center gap-1"
+              style="background: var(--lime); color: var(--ink); border-color: var(--ink)"
               @click.stop="goEdit(post)">
               <Pencil class="w-3.5 h-3.5" /> {{ post.status === 'rejected' ? '修改重发' : '编辑' }}
             </button>
-            <button class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-500 text-xs hover:bg-red-100 transition"
+            <button type="button" class="ds-btn ds-btn--sm ds-btn--danger flex items-center gap-1"
               @click.stop="onDelete(post)">
               <Trash2 class="w-3.5 h-3.5" /> 删除
             </button>
@@ -126,3 +128,9 @@ onMounted(load)
   </div>
 </template>
 
+
+<style scoped>
+.st-pending { background: var(--color-surface); color: var(--ink-soft); }
+.st-rejected { background: var(--coral); color: var(--paper); border-color: var(--ink); }
+.st-offline { background: var(--color-surface); color: var(--ink-mute); }
+</style>

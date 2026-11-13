@@ -34,10 +34,10 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-6">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-extrabold" style="color: var(--ink)">我的评论</span>
@@ -51,16 +51,16 @@ onMounted(load)
 
       <template v-else>
         <button v-for="c in list" :key="c.id"
-          class="w-full text-left ds-card p-4 hover:shadow-md transition active:bg-zinc-50"
+          type="button" class="w-full text-left ds-card ds-card--hover p-4 transition"
           @click="goPost(c)">
           <div class="flex items-center gap-1.5 text-xs ds-sub mb-1.5">
-            <MessageCircle class="w-3.5 h-3.5 text-brand-500 flex-shrink-0" />
+            <MessageCircle class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--violet)" />
             <span class="truncate">评论了：{{ c.postTitle || '已删除的帖子' }}</span>
           </div>
-          <p class="text-sm text-zinc-700 post-content line-clamp-3">{{ c.content }}</p>
+          <p class="text-sm post-content line-clamp-3" style="color: var(--ink-soft)">{{ c.content }}</p>
           <div class="flex items-center justify-between mt-2">
             <span class="text-xs ds-sub">{{ formatTime(c.createdAt) }}</span>
-            <ChevronRight class="w-4 h-4 text-zinc-300" />
+            <ChevronRight class="w-4 h-4" style="color: var(--ink-mute)" />
           </div>
         </button>
 

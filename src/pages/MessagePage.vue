@@ -34,13 +34,14 @@ const list = ref<any[]>([])
 const loading = ref(true)
 
 function typeMeta(type: string) {
-  if (type === 'comment') return { icon: MessageCircle, color: 'text-brand-500', bg: 'bg-brand-50' }
-  if (type === 'like') return { icon: Heart, color: 'text-red-500', bg: 'bg-red-50' }
+  // 颜色是语义提示（评论=紫 / 点赞=珊瑚 / 匹配=天蓝 / 摘要=荧光 / 系统=墨），供图标底色使用
+  if (type === 'comment') return { icon: MessageCircle, tone: 'var(--violet)' }
+  if (type === 'like') return { icon: Heart, tone: 'var(--coral)' }
   // 失物匹配：related_id 即对方帖子 id
-  if (type === 'match') return { icon: MapPin, color: 'text-emerald-500', bg: 'bg-emerald-50' }
+  if (type === 'match') return { icon: MapPin, tone: 'var(--sky)' }
   // 每日板块摘要
-  if (type === 'digest') return { icon: Newspaper, color: 'text-violet-500', bg: 'bg-violet-50' }
-  return { icon: Bell, color: 'text-amber-500', bg: 'bg-amber-50' }
+  if (type === 'digest') return { icon: Newspaper, tone: 'var(--lime)' }
+  return { icon: Bell, tone: 'var(--ink)' }
 }
 
 // digest 摘要较长：默认收起两行，点击展开全文

@@ -59,10 +59,10 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-6">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-extrabold" style="color: var(--ink)">我的订阅</span>
@@ -78,20 +78,21 @@ onMounted(load)
           <div
             v-for="s in list"
             :key="s.id"
-            class="flex items-center gap-3 px-4 py-3.5 border-b border-zinc-50 last:border-0"
+            class="flex items-center gap-3 px-4 py-3.5 ds-hairline-b last:!border-b-0"
           >
             <button class="flex items-center gap-3 flex-1 min-w-0 text-left" @click="goSection(s)">
-              <div class="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-                <BellRing class="w-5 h-5 text-brand-500" />
+              <div class="w-10 h-10 rounded-[10px] flex items-center justify-center flex-shrink-0" style="background: var(--lime); border: 1.5px solid var(--ink)">
+                <BellRing class="w-5 h-5" style="color: var(--ink)" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-zinc-800 truncate">{{ s.name }}</div>
+                <div class="text-sm font-bold truncate" style="color: var(--ink)">{{ s.name }}</div>
                 <div class="text-xs ds-sub mt-0.5">每日摘要将推送该板块新帖</div>
               </div>
-              <ChevronRight class="w-4 h-4 text-zinc-300 flex-shrink-0" />
+              <ChevronRight class="w-4 h-4 flex-shrink-0" style="color: var(--ink-mute)" />
             </button>
             <button
-              class="flex-shrink-0 ml-2 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 text-xs hover:bg-zinc-200 active:scale-95 transition flex items-center gap-1"
+              type="button"
+              class="ds-chip flex-shrink-0 ml-2 !py-1 !text-[11.5px] active:scale-95 transition flex items-center gap-1"
               :disabled="removing.has(s.id)"
               @click="remove(s)"
             >

@@ -77,7 +77,7 @@ function highlight(text: string): string {
             <CreditBadge v-if="!post.isAnonymous && author.creditScore != null" :score="author.creditScore" size="sm" />
             <span v-if="post.isTop" class="ds-tag !py-0 !px-1.5 !text-[10px]" style="background: var(--coral); color: #fff; border-color: var(--ink)">置顶</span>
           </div>
-          <div class="text-[11px] text-zinc-400 mt-0.5">{{ formatTime(post.createdAt) }}</div>
+          <div class="text-[11px] mt-0.5" style="color: var(--ink-mute)">{{ formatTime(post.createdAt) }}</div>
         </div>
       </div>
       <span v-if="section.name" class="cat-tag-grad mt-0.5" :style="{ background: catGradient }">{{ section.name }}</span>

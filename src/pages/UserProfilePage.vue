@@ -84,11 +84,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-10">
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
     <!-- 顶部导航 -->
-    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-100">
+    <header class="sticky top-0 z-20" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
       <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
+        <button type="button" class="ds-icon-btn !w-9 !h-9 -ml-1" style="border-color: var(--hairline); box-shadow: none" aria-label="返回" @click="router.back()">
           <ArrowLeft class="w-5 h-5" />
         </button>
         <span class="ml-1 font-extrabold" style="color: var(--ink)">个人主页</span>
@@ -116,17 +116,17 @@ onMounted(() => {
 
     <!-- 加载失败（网络/服务异常）：给重试，不伪装成「用户不存在」 -->
     <main v-else-if="loadError" class="max-w-[960px] mx-auto px-4 py-16 text-center">
-      <p class="text-sm text-zinc-500 mb-3">加载失败，请检查网络后重试</p>
-      <button class="px-4 py-2 rounded-full bg-brand-500 hover:bg-brand-600 text-white text-sm" @click="retryLoad">重新加载</button>
+      <p class="text-sm mb-3" style="color: var(--ink-mute)">加载失败，请检查网络后重试</p>
+      <button type="button" class="ds-btn ds-btn--primary" @click="retryLoad">重新加载</button>
     </main>
 
     <main v-else-if="user" class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
       <!-- 公开资料卡 -->
-      <div class="bg-gradient-to-b from-brand-500 to-brand-600 rounded-2xl text-white p-5">
+      <div class="hero p-5" style="border-radius: 18px">
         <div class="flex items-center gap-4">
-          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-white/30 to-white/10 overflow-hidden border-2 border-white/50 flex items-center justify-center flex-shrink-0 shadow">
+          <div class="w-16 h-16 overflow-hidden flex items-center justify-center flex-shrink-0" style="background: rgb(255 255 255 / 0.12); border: 1.5px solid rgb(255 255 255 / 0.4); border-radius: 18px">
             <img v-if="user.avatar" :src="user.avatar" class="w-full h-full object-cover" alt="头像" />
-            <span v-else class="text-xl font-bold text-white drop-shadow">{{ user.nickname?.charAt(0) || '友' }}</span>
+            <span v-else class="ds-display text-[22px] text-white">{{ user.nickname?.charAt(0) || '友' }}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
@@ -144,12 +144,12 @@ onMounted(() => {
       <div class="ds-card p-4">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-zinc-700">信誉分</span>
+            <span class="ds-label">信誉分</span>
             <CreditBadge :score="credit" size="md" />
           </div>
           <span class="text-xl font-bold" :style="{ color: creditColor(credit) }">{{ credit }}</span>
         </div>
-        <div class="h-2.5 rounded-full bg-zinc-100 overflow-hidden">
+        <div class="h-2.5 overflow-hidden" style="background: var(--color-surface); border: 1px solid var(--hairline); border-radius: 999px">
           <div class="h-full rounded-full transition-all duration-500" :style="{ width: Math.min(credit, 100) + '%', backgroundColor: creditColor(credit) }"></div>
         </div>
       </div>
@@ -158,29 +158,29 @@ onMounted(() => {
       <div class="ds-card p-4">
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-zinc-700">交易评价</span>
-            <span v-if="ratingAvg !== null" class="text-xs font-medium text-amber-500">{{ ratingAvg }} 分</span>
+            <span class="ds-label">交易评价</span>
+            <span v-if="ratingAvg !== null" class="text-xs font-bold ds-num" style="color: var(--coral)">{{ ratingAvg }} 分</span>
           </div>
           <span v-if="ratingTotal > 0" class="text-xs ds-sub">共 {{ ratingTotal }} 条</span>
         </div>
         <p v-if="!ratings.length" class="text-xs ds-sub py-2">暂无交易评价</p>
-        <div v-else class="divide-y divide-zinc-50">
+        <div v-else class="ds-divide">
           <div v-for="r in ratings" :key="r.id" class="flex items-start gap-2.5 py-2.5">
-            <div class="w-7 h-7 rounded-full bg-zinc-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+            <div class="w-7 h-7 flex-shrink-0 overflow-hidden flex items-center justify-center" style="background: var(--color-surface); border: 1px solid var(--hairline); border-radius: 8px">
               <img v-if="r.rater?.avatar" :src="r.rater.avatar" class="w-full h-full object-cover" alt="" />
               <span v-else class="text-xs ds-sub">{{ r.rater?.nickname?.charAt(0) || '匿' }}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-medium text-zinc-600 truncate">{{ r.rater?.nickname || '匿名用户' }}</span>
+                <span class="text-xs font-bold truncate" style="color: var(--ink-soft)">{{ r.rater?.nickname || '匿名用户' }}</span>
                 <div class="flex gap-px">
                   <Star v-for="i in 5" :key="i" class="w-3 h-3"
-                    :class="i <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-zinc-200'" />
+                    :style="{ color: i <= r.rating ? 'var(--lime)' : 'var(--hairline)', fill: i <= r.rating ? 'var(--lime)' : 'none' }" />
                 </div>
-                <span class="ml-auto text-[11px] text-zinc-300 flex-shrink-0">{{ formatTime(r.createdAt) }}</span>
+                <span class="ml-auto text-[11px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(r.createdAt) }}</span>
               </div>
-              <p v-if="r.comment" class="text-xs text-zinc-500 mt-0.5 line-clamp-2">{{ r.comment }}</p>
-              <button class="text-[11px] text-brand-500 hover:text-brand-600 mt-0.5 truncate max-w-full block text-left" @click="r.postId && router.push(`/post/${r.postId}`)">
+              <p v-if="r.comment" class="text-xs mt-0.5 line-clamp-2" style="color: var(--ink-soft)">{{ r.comment }}</p>
+              <button type="button" class="text-[11px] font-bold underline underline-offset-2 mt-0.5 truncate max-w-full block text-left" style="color: var(--violet)" @click="r.postId && router.push(`/post/${r.postId}`)">
                 来自「{{ r.postTitle || '已删除帖子' }}」
               </button>
             </div>
@@ -191,22 +191,22 @@ onMounted(() => {
       <!-- 公开帖子列表（GET /posts?authorId=） -->
       <div class="ds-card p-4">
         <div class="flex items-center gap-2">
-          <FileText class="w-4 h-4 text-brand-500" />
-          <span class="text-sm font-medium text-zinc-700">TA 的帖子</span>
+          <FileText class="w-4 h-4" style="color: var(--violet)" />
+          <span class="ds-label">TA 的帖子</span>
           <span v-if="postsTotal > 0" class="text-xs ds-sub">共 {{ postsTotal }} 条</span>
         </div>
         <p v-if="!posts.length" class="text-xs ds-sub py-3 text-center">暂无公开帖子</p>
-        <div v-else class="divide-y divide-zinc-50">
+        <div v-else class="ds-divide">
           <button
             v-for="p in posts"
             :key="p.id"
-            class="w-full text-left py-2.5 flex items-start gap-2.5 hover:bg-zinc-50/60 transition rounded"
+            type="button" class="ds-row w-full text-left py-2.5 flex items-start gap-2.5 rounded transition"
             @click="router.push(`/post/${p.id}`)"
           >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5">
-                <span class="text-sm text-zinc-800 font-medium truncate">{{ p.title }}</span>
-                <span v-if="p.isTop" class="px-1 py-0.5 rounded text-[10px] bg-brand-100 text-brand-600 flex-shrink-0">置顶</span>
+                <span class="text-sm font-bold truncate" style="color: var(--ink)">{{ p.title }}</span>
+                <span v-if="p.isTop" class="px-1 py-0.5 text-[10px] font-bold flex-shrink-0" style="background: var(--sky); color: var(--ink); border-radius: 4px">置顶</span>
               </div>
               <div class="flex items-center gap-3 mt-1 text-[11px] ds-sub">
                 <span>{{ formatTime(p.createdAt) }}</span>

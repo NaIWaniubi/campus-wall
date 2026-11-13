@@ -31,7 +31,7 @@ const COVERS = [
 ];
 
 /** 形状图层：每种 motif 返回一段 SVG（透明底） */
-function motifSvg(motif, c) {
+function motifSvg(motif, _c) {
   const white = (o) => `rgba(255,255,255,${o})`;
   switch (motif) {
     case 'device':

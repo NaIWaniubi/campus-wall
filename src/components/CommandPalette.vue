@@ -223,7 +223,8 @@ function onKeydown(e: KeyboardEvent) {
   const metaK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
   if (metaK) {
     e.preventDefault()
-    open.value ? close() : openPalette()
+    if (open.value) close()
+    else openPalette()
     return
   }
   if (!open.value) return

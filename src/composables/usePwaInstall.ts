@@ -6,8 +6,8 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-let deferred = shallowRef<BeforeInstallPromptEvent | null>(null)
-let installed = ref(false)
+const deferred = shallowRef<BeforeInstallPromptEvent | null>(null)
+const installed = ref(false)
 let bound = false
 
 /**

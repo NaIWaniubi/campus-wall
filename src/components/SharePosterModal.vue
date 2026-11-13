@@ -225,7 +225,7 @@ async function render() {
     ctx.fillText(`${link}/post/${p.id ?? ''} · 微信搜「校园墙」看全校新鲜事`, 176, H - 60)
 
     dataUrl.value = canvas.toDataURL('image/png')
-  } catch (e) {
+  } catch {
     toast.error('海报生成失败，请重试')
   } finally {
     busy.value = false

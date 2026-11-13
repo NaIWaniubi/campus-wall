@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'public/**', 'miniprogram/**', 'docs/.vitepress/cache/**', 'docs/.vitepress/dist/**', 'coverage/**'],
+    ignores: ['dist/**', '.zcode-site/**', 'api/*.bundle.mjs', 'node_modules/**', 'public/**', 'miniprogram/**', 'docs/.vitepress/cache/**', 'docs/.vitepress/dist/**', 'coverage/**'],
   },
   // essential：只启用错误级规则，避免对存量代码做全量风格重排
   ...pluginVue.configs['flat/essential'],

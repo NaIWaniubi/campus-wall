@@ -56,9 +56,12 @@ describe('app.json 结构与页面完整性', () => {
     expect(app.lazyCodeLoading).toBe('requiredComponents');
   });
 
-  it('导航栏底色与 tokens.wxss 的 --color-bg-page 同源（#F5F6F8）', () => {
-    expect(app.window.navigationBarBackgroundColor).toBe('#F5F6F8');
-    expect(read('styles/tokens.wxss')).toContain('--color-bg-page: #F5F6F8');
+  it('导航栏底色与 tokens.wxss 的 --color-bg-page 同源（V4 纸底 #F7F2E8）', () => {
+    // 真正的不变式是「两处相等」，而非钉死某个历史值；换肤时不会误报
+    const tokenBg = read('styles/tokens.wxss').match(/--color-bg-page:\s*(#[0-9a-fA-F]{6})/)?.[1];
+    expect(tokenBg).toBeTruthy();
+    expect(app.window.navigationBarBackgroundColor.toUpperCase()).toBe(tokenBg!.toUpperCase());
+    expect(tokenBg!.toUpperCase()).toBe('#F7F2E8');
   });
 });
 

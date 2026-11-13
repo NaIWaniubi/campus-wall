@@ -28,7 +28,7 @@
   position: relative;
   width: 100%;
   height: 420rpx;
-  background: var(--color-bg-muted, #f4f4f5);
+  background: var(--color-bg-muted, #EFE8DA);
 }
 .pc-cover-img {
   width: 100%;
@@ -67,7 +67,7 @@
 .pc-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: var(--color-text-primary, #17202A);
+  color: var(--color-text-primary, #14110F);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -77,7 +77,7 @@
 .pc-summary {
   margin-top: var(--space-1, 8rpx);
   font-size: 26rpx;
-  color: var(--color-text-secondary, #4e5969);
+  color: var(--color-text-secondary, #4A443C);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -96,12 +96,12 @@
 .pc-price {
   font-size: 32rpx;
   font-weight: 700;
-  color: var(--color-accent, #FF6B6B);
+  color: var(--color-accent, #FF4D2E);
 }
 .pc-tag {
   font-size: 22rpx;
-  color: var(--color-text-tertiary, #86909c);
-  background: var(--color-bg-muted, #f4f4f5);
+  color: var(--color-text-tertiary, #6E6659);
+  background: var(--color-bg-muted, #EFE8DA);
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
 }
@@ -122,7 +122,7 @@
   height: 210rpx;
   border-radius: var(--radius-md, 12rpx);
   overflow: hidden;
-  background: var(--color-bg-muted, #f4f4f5);
+  background: var(--color-bg-muted, #EFE8DA);
 }
 .pc-grid-item image {
   width: 100%;
@@ -133,7 +133,7 @@
 .pc-location {
   margin-top: var(--space-2, 12rpx);
   font-size: 22rpx;
-  color: var(--color-text-tertiary, #86909c);
+  color: var(--color-text-tertiary, #6E6659);
 }
 
 /* ---------- 底部：作者 + 操作 ---------- */
@@ -143,7 +143,7 @@
   justify-content: space-between;
   margin-top: var(--space-3, 16rpx);
   padding-top: var(--space-3, 16rpx);
-  border-top: 1rpx solid var(--color-divider, #ececee);
+  border-top: 1rpx solid var(--color-divider, #DED3BF);
 }
 .pc-author {
   display: flex;
@@ -156,11 +156,11 @@
   height: 44rpx;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--color-bg-muted, #f4f4f5);
+  background: var(--color-bg-muted, #EFE8DA);
 }
 .pc-author-name {
   font-size: 24rpx;
-  color: var(--color-text-secondary, #4e5969);
+  color: var(--color-text-secondary, #4A443C);
   max-width: 180rpx;
   overflow: hidden;
   white-space: nowrap;
@@ -175,7 +175,7 @@
 .pc-credit--gold { color: #B45309; background: rgba(245, 158, 11, 0.15); }
 .pc-credit--blue { color: #1D4ED8; background: rgba(59, 130, 246, 0.12); }
 .pc-credit--orange { color: #C2410C; background: rgba(249, 115, 22, 0.12); }
-.pc-credit--gray { color: var(--color-text-tertiary, #86909c); background: var(--color-bg-muted, #f4f4f5); }
+.pc-credit--gray { color: var(--color-text-tertiary, #6E6659); background: var(--color-bg-muted, #EFE8DA); }
 .pc-dot, .pc-time {
   font-size: 22rpx;
   color: var(--color-text-placeholder, #c9cdd4);
@@ -193,7 +193,7 @@
   align-items: center;
   gap: 4rpx;
   font-size: 24rpx;
-  color: var(--color-text-tertiary, #86909c);
+  color: var(--color-text-tertiary, #6E6659);
   padding: 4rpx 0;
 }
 .pc-action-symbol {
@@ -201,7 +201,7 @@
   line-height: 1;
 }
 .pc-action--liked {
-  color: var(--color-accent, #FF6B6B);
+  color: var(--color-accent, #FF4D2E);
 }
 .pc-action--fav {
   color: var(--color-warning, #F59E0B);

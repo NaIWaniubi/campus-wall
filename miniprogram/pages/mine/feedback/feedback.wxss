@@ -1,5 +1,5 @@
 .page-feedback {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
   padding-bottom: 172rpx;
 }
@@ -16,7 +16,7 @@
 .label {
   font-size: 28rpx;
   font-weight: 900;
-  color: #17202A;
+  color: #14110F;
   margin-bottom: 20rpx;
   display: block;
   letter-spacing: 0;
@@ -35,7 +35,7 @@
   line-height: 1.8;
   padding: 24rpx;
   border-radius: 24rpx;
-  background: #F7F8FA;
+  background: #F7F2E8;
   letter-spacing: 0;
 }
 
@@ -51,7 +51,7 @@
   min-height: 72rpx;
   padding: 0 24rpx;
   border-radius: 22rpx;
-  background: #F7F8FA;
+  background: #F7F2E8;
   letter-spacing: 0;
 }
 
@@ -101,7 +101,7 @@
 
 .add-icon {
   font-size: 52rpx;
-  color: #16A085;
+  color: #6D3BF5;
   line-height: 1;
 }
 

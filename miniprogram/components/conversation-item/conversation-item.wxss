@@ -36,7 +36,7 @@
 }
 
 .name {
-  color: #17202A;
+  color: #14110F;
   font-size: 30rpx;
   font-weight: 800;
 }
@@ -48,7 +48,7 @@
 
 .last {
   display: block;
-  color: #7B8794;
+  color: #6E6659;
   font-size: 26rpx;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -60,7 +60,7 @@
   height: 32rpx;
   padding: 0 8rpx;
   border-radius: 16rpx;
-  background: linear-gradient(135deg, #FF6B6B, #EF4444);
+  background: linear-gradient(135deg, #FF4D2E, #EF4444);
   color: #FFFFFF;
   font-size: 20rpx;
   line-height: 32rpx;

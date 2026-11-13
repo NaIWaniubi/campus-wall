@@ -2,7 +2,7 @@
   padding: 24rpx;
   /* 底部留白避开自定义 tabBar（104rpx + 安全区），否则「校园活动」卡与按钮被压住 */
   padding-bottom: calc(176rpx + env(safe-area-inset-bottom));
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
 }
 
@@ -13,7 +13,7 @@
 
 .topic-title {
   display: block;
-  color: #17202A;
+  color: #14110F;
   font-size: 44rpx;
   font-weight: 900;
   letter-spacing: -0.8rpx;
@@ -22,7 +22,7 @@
 .topic-subtitle {
   display: block;
   margin-top: 8rpx;
-  color: #7B8794;
+  color: #6E6659;
   font-size: 26rpx;
 }
 
@@ -71,7 +71,7 @@
 .category-card-name {
   font-size: 32rpx;
   font-weight: 900;
-  color: #17202A;
+  color: #14110F;
   letter-spacing: 0;
 }
 
@@ -84,7 +84,7 @@
 
 .subtype-text {
   font-size: 22rpx;
-  color: #0E7C67;
+  color: #542BC4;
   padding: 8rpx 16rpx;
   background: rgba(22, 160, 133, 0.08);
   border-radius: 999rpx;

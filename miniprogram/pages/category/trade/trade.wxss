@@ -1,5 +1,5 @@
 .page-sub-category {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
   padding-bottom: 140rpx;
 }
@@ -18,7 +18,7 @@
 
 .filter-picker {
   padding: 14rpx 20rpx;
-  background: #F7F8FA;
+  background: #F7F2E8;
   border-radius: 999rpx;
   font-size: 26rpx;
   letter-spacing: 0;
@@ -36,7 +36,7 @@
   width: 108rpx;
   height: 108rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #16A085, #20C4A4);
+  background: linear-gradient(135deg, #6D3BF5, #8B5CF6);
   box-shadow: 0 18rpx 44rpx rgba(22, 160, 133, 0.32), 0 6rpx 16rpx rgba(15, 23, 42, 0.08);
   display: flex;
   align-items: center;
@@ -62,5 +62,5 @@
 .cat-head-title {
   font-size: 30rpx;
   font-weight: 900;
-  color: #17202A;
+  color: #14110F;
 }

@@ -1,5 +1,5 @@
 .page-notification {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
   padding: 24rpx;
 }
@@ -17,13 +17,13 @@
   text-align: center;
   padding: 16rpx 0;
   font-size: 26rpx;
-  color: #65717D;
+  color: #4A443C;
   border-radius: 16rpx;
 }
 
 .notification-tabs .tab-item.active {
   background: rgba(22, 160, 133, 0.1);
-  color: #0E7C67;
+  color: #542BC4;
   font-weight: 800;
 }
 
@@ -67,7 +67,7 @@
 .notification-title {
   font-size: 28rpx;
   font-weight: 800;
-  color: #17202A;
+  color: #14110F;
   letter-spacing: 0;
 }
 
@@ -79,7 +79,7 @@
 
 .notification-content {
   font-size: 26rpx;
-  color: #65717D;
+  color: #4A443C;
   line-height: 1.6;
   letter-spacing: 0;
 }

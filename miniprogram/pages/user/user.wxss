@@ -49,11 +49,11 @@
   border-radius: 999rpx;
   font-size: 24rpx;
   color: #fff;
-  background-color: #16a085;
+  background-color: #6D3BF5;
 }
 .credit-badge.lv-gold { background-color: #d4a017; }
 .credit-badge.lv-good { background-color: #2f9e6e; }
-.credit-badge.lv-normal { background-color: #16a085; }
+.credit-badge.lv-normal { background-color: #6D3BF5; }
 .credit-badge.lv-warn { background-color: #e08a1e; }
 .credit-badge.lv-bad { background-color: #d9534f; }
 
@@ -72,12 +72,12 @@
 
 .action-primary {
   color: #fff;
-  background-color: #16a085;
+  background-color: #6D3BF5;
 }
 
 .action-secondary {
-  color: #16a085;
-  border: 1rpx solid #16a085;
+  color: #6D3BF5;
+  border: 1rpx solid #6D3BF5;
 }
 
 .user-stats {

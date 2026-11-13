@@ -1,5 +1,5 @@
 .page-drafts {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
 }
 
@@ -17,7 +17,7 @@
 }
 .draft-section {
   font-size: 22rpx;
-  color: var(--color-brand, #16A085);
+  color: var(--color-brand, #6D3BF5);
   background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
@@ -28,7 +28,7 @@
   display: block;
   font-size: 30rpx;
   font-weight: 600;
-  color: var(--color-text-primary, #17202A);
+  color: var(--color-text-primary, #14110F);
   margin-bottom: var(--space-2, 12rpx);
 }
 
@@ -43,19 +43,19 @@
 }
 
 .draft-foot {
-  border-top: 1rpx solid var(--color-divider, #ececee);
+  border-top: 1rpx solid var(--color-divider, #DED3BF);
   padding-top: var(--space-3, 16rpx);
 }
 .draft-edit-hint {
   font-size: 24rpx;
-  color: var(--color-brand, #16A085);
+  color: var(--color-brand, #6D3BF5);
 }
 .draft-delete {
   font-size: 24rpx;
-  color: var(--color-danger, #FF6B6B);
+  color: var(--color-danger, #FF4D2E);
   padding: 6rpx 20rpx;
   border-radius: 999rpx;
-  border: 1rpx solid var(--color-danger, #FF6B6B);
+  border: 1rpx solid var(--color-danger, #FF4D2E);
 }
 .draft-delete--hover { opacity: 0.6; }
 .draft-main--hover { opacity: 0.85; }

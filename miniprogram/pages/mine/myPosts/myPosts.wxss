@@ -1,5 +1,5 @@
 .page-my-posts {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .tab-item.active {
-  color: #0E7C67;
+  color: #542BC4;
   background: rgba(22, 160, 133, 0.1);
   font-weight: 900;
 }
@@ -59,14 +59,14 @@
 
 .edit-btn {
   background: rgba(22, 160, 133, 0.1);
-  color: #0E7C67;
+  color: #542BC4;
 }
 
 .reject-reason {
   margin: -6rpx 24rpx 0;
   padding: 14rpx 20rpx;
   background: rgba(255, 107, 107, 0.08);
-  border-left: 4rpx solid #FF6B6B;
+  border-left: 4rpx solid #FF4D2E;
   border-radius: 8rpx;
 }
 
@@ -83,5 +83,5 @@
 
 .delete-btn {
   background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.06));
-  color: #FF6B6B;
+  color: #FF4D2E;
 }

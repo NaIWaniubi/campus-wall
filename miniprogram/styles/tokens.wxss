@@ -5,29 +5,35 @@
 
 page {
   /* 颜色：中性 */
-  --color-bg: #ffffff;
-  --color-bg-soft: #fafafa;
-  --color-bg-muted: #f4f4f5;
+  --color-bg: #FFFFFF;
+  --color-bg-soft: #FBF7EE;
+  --color-bg-muted: #EFE8DA;
   --color-bg-elevated: #ffffff;
-  --color-bg-page: #F5F6F8;
+  --color-bg-page: #F7F2E8;
   --color-bg-overlay: rgba(0, 0, 0, 0.45);
-  --color-divider: #ececee;
-  --color-text-primary: #17202A;
-  --color-text-secondary: #4e5969;
-  --color-text-tertiary: #86909c;
-  --color-text-placeholder: #c9cdd4;
+  --color-divider: #DED3BF;
+  --color-text-primary: #14110F;
+  --color-text-secondary: #4A443C;
+  --color-text-tertiary: #6E6659;
+  --color-text-placeholder: #A79E8D;
   --color-text-inverse: #ffffff;
 
-  /* 颜色：品牌（沿用现有校园墙绿，避免破坏业务识别） */
-  --color-brand: #16A085;
-  --color-brand-soft: #20C4A4;
-  --color-brand-strong: #0E7C67;
-  --color-brand-tint: rgba(22, 160, 133, 0.1);
-  --color-accent: #FF6B6B;
-  --color-warning: #F59E0B;
-  --color-danger: #FF6B6B;
-  --color-success: #10B981;
-  --color-info: #2CC9DD;
+  /* 颜色：V4 纸感海报体系（紫为品牌，绿白旧皮肤已废弃） */
+  --color-brand: #6D3BF5;
+  --color-brand-soft: #8B5CF6;
+  --color-brand-strong: #542BC4;
+  --color-brand-tint: rgba(109, 59, 245, 0.08);
+  --color-ink: #14110F;
+  --color-paper: #F7F2E8;
+  --color-lime: #C8F04A;
+  --color-coral: #FF4D2E;
+  --color-sky: #38D6F5;
+  --color-violet: #6D3BF5;
+  --color-accent: #FF4D2E;
+  --color-warning: #B45309;
+  --color-danger: #FF4D2E;
+  --color-success: #0E7C86;
+  --color-info: #38D6F5;
 
   /* 间距（4 倍数） */
   --space-1: 4rpx;
@@ -45,8 +51,8 @@ page {
   --radius-xs: 4rpx;
   --radius-sm: 8rpx;
   --radius-md: 12rpx;
-  --radius-lg: 16rpx;
-  --radius-xl: 24rpx;
+  --radius-lg: 24rpx;
+  --radius-xl: 36rpx;
   --radius-pill: 999rpx;
 
   /* 字号 */
@@ -73,9 +79,9 @@ page {
   --line-height-relaxed: 1.7;
 
   /* 阴影 */
-  --shadow-sm: 0 2rpx 8rpx rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4rpx 16rpx rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 8rpx 24rpx rgba(15, 23, 42, 0.08);
+  --shadow-sm: 4rpx 4rpx 0 #14110F;
+  --shadow-md: 6rpx 6rpx 0 #14110F;
+  --shadow-lg: 12rpx 12rpx 0 #14110F;
 
   /* 动效 */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);

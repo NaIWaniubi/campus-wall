@@ -1,5 +1,5 @@
 .page-profile {
-  background: #F5F6F8;
+  background: #F7F2E8;
   min-height: 100vh;
   padding: 24rpx;
 }
@@ -11,7 +11,7 @@
 
 .form-label {
   font-size: 30rpx;
-  color: #17202A;
+  color: #14110F;
   flex-shrink: 0;
   font-weight: 800;
   letter-spacing: 0;
@@ -19,7 +19,7 @@
 
 .form-value {
   font-size: 28rpx;
-  color: #65717D;
+  color: #4A443C;
   max-width: 400rpx;
   letter-spacing: 0;
 }
@@ -68,7 +68,7 @@
 .auth-tab--active {
   color: #1F2329;
   font-weight: 800;
-  border-bottom: 4rpx solid #FF6B6B;
+  border-bottom: 4rpx solid #FF4D2E;
 }
 
 .auth-input {
@@ -88,7 +88,7 @@
   line-height: 92rpx;
   font-size: 32rpx;
   background: rgba(255, 255, 255, 0.96);
-  color: #FF6B6B;
+  color: #FF4D2E;
   border: 1rpx solid rgba(255, 107, 107, 0.24);
   border-radius: 999rpx;
   letter-spacing: 2rpx;

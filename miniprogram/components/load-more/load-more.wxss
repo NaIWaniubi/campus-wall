@@ -13,7 +13,7 @@
 
 .loading text {
   font-size: 24rpx;
-  color: #98A3AE;
+  color: #6E6659;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -22,7 +22,7 @@
   width: 32rpx;
   height: 32rpx;
   border: 4rpx solid rgba(22, 160, 133, 0.1);
-  border-top-color: #16A085;
+  border-top-color: #6D3BF5;
   border-radius: 50%;
   animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -33,7 +33,7 @@
 
 .load-text text {
   font-size: 24rpx;
-  color: #98A3AE;
+  color: #6E6659;
   font-weight: 600;
   letter-spacing: 0;
 }

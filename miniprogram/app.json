@@ -32,15 +32,15 @@
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#F5F6F8",
+    "navigationBarBackgroundColor": "#F7F2E8",
     "navigationBarTitleText": "校园墙",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F6F8"
+    "backgroundColor": "#F7F2E8"
   },
   "tabBar": {
     "custom": true,
-    "color": "#98A3AE",
-    "selectedColor": "#16A085",
+    "color": "#6E6659",
+    "selectedColor": "#6D3BF5",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [

@@ -21,7 +21,7 @@
   align-self: flex-start;
   font-size: 22rpx;
   font-weight: 800;
-  color: #0E7C67;
+  color: #542BC4;
   background: rgba(22, 160, 133, 0.1);
   padding: 6rpx 18rpx;
   border-radius: 999rpx;
@@ -48,7 +48,7 @@
 
 .ad-btn {
   margin-top: 32rpx;
-  background: #16A085;
+  background: #6D3BF5;
   color: #fff;
   font-size: 30rpx;
   font-weight: 800;

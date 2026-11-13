@@ -1,10 +1,10 @@
 @import './styles/tokens.wxss';
 
 page {
-  background-color: var(--color-bg-page, #F5F6F8);
+  background-color: var(--color-bg-page, #F7F2E8);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: var(--font-size-body, 28rpx);
-  color: var(--color-text-primary, #17202A);
+  color: var(--color-text-primary, #14110F);
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
 }
@@ -64,11 +64,11 @@ view, text, image, scroll-view, swiper {
 }
 
 .primary-color {
-  color: #16A085;
+  color: #6D3BF5;
 }
 
 .danger-color {
-  color: #FF6B6B;
+  color: #FF4D2E;
 }
 
 .warning-color {
@@ -76,11 +76,11 @@ view, text, image, scroll-view, swiper {
 }
 
 .success-color {
-  color: #10B981;
+  color: #0E7C86;
 }
 
 .gray-color {
-  color: #7B8794;
+  color: #6E6659;
 }
 
 .bg-white {
@@ -92,14 +92,14 @@ view, text, image, scroll-view, swiper {
   border-radius: var(--radius-xl, 28rpx);
   padding: var(--space-6, 28rpx);
   margin-bottom: var(--space-6, 24rpx);
-  box-shadow: var(--shadow-md, 0 18rpx 48rpx rgba(15, 23, 42, 0.06));
-  border: 1rpx solid var(--color-divider, #ececee);
+  box-shadow: var(--shadow-md, 6rpx 6rpx 0 #14110F);
+  border: 3rpx solid var(--color-ink, #14110F);
   transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-brand, #16A085), var(--color-brand-soft, #20C4A4));
-  color: var(--color-text-inverse, #ffffff);
+  background: var(--color-ink, #14110F);
+  color: var(--color-lime, #C8F04A);
   border: none;
   border-radius: var(--radius-xl, 24rpx);
   padding: var(--space-5, 22rpx) var(--space-8, 44rpx);
@@ -117,7 +117,7 @@ view, text, image, scroll-view, swiper {
 
 .btn-outline {
   background-color: var(--color-brand-tint, rgba(22, 160, 133, 0.06));
-  color: var(--color-brand, #16A085);
+  color: var(--color-brand, #6D3BF5);
   border: 1rpx solid rgba(22, 160, 133, 0.18);
   border-radius: var(--radius-xl, 24rpx);
   padding: 18rpx 38rpx;
@@ -145,7 +145,7 @@ view, text, image, scroll-view, swiper {
 
 .tag-primary {
   background: var(--color-brand-tint, rgba(22, 160, 133, 0.1));
-  color: var(--color-brand-strong, #0E7C67);
+  color: var(--color-brand-strong, #542BC4);
 }
 
 .tag-warning {
@@ -208,7 +208,7 @@ view, text, image, scroll-view, swiper {
 .section-title {
   font-size: 32rpx;
   font-weight: 800;
-  color: #17202A;
+  color: #14110F;
   margin-bottom: 20rpx;
   letter-spacing: 0;
 }
@@ -293,3 +293,53 @@ view, text, image, scroll-view, swiper {
   transform: none !important;
   opacity: 0.95 !important;
 }
+
+
+/* ── V4 海报原语（纸感 · 墨线 · 荧光）────────────────────────── */
+.mp-hero {
+  background: #14110F;
+  color: #F7F2E8;
+  padding: 40rpx 32rpx 48rpx;
+  border-bottom: 3rpx solid #14110F;
+}
+.mp-sticker {
+  display: inline-block;
+  background: var(--color-lime, #C8F04A);
+  color: #14110F;
+  border: 3rpx solid #F7F2E8;
+  border-radius: 12rpx;
+  padding: 4rpx 16rpx;
+  font-size: 20rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+  transform: rotate(-2deg);
+}
+.mp-sticker--coral { background: var(--color-coral, #FF4D2E); color: #FFFFFF; }
+.mp-sticker--sky { background: var(--color-sky, #38D6F5); color: #14110F; }
+.mp-display {
+  font-size: 56rpx;
+  font-weight: 900;
+  letter-spacing: -1rpx;
+  line-height: 1.15;
+}
+.mp-num { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mp-label {
+  font-size: 20rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--color-text-tertiary, #6E6659);
+}
+/* 编号章节头：01 —— 标题 */
+.mp-section-head { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
+.mp-section-head__num {
+  font-size: 22rpx; font-weight: 900; color: var(--color-text-tertiary, #6E6659);
+  border: 2rpx solid var(--color-divider, #DED3BF); border-radius: 8rpx; padding: 0 10rpx;
+}
+.mp-section-head__line { flex: 1; height: 2rpx; background: var(--color-divider, #DED3BF); }
+.mp-chip {
+  display: inline-flex; align-items: center; gap: 8rpx;
+  background: #FFFFFF; color: var(--color-text-primary, #14110F);
+  border: 3rpx solid var(--color-ink, #14110F); border-radius: 999rpx;
+  padding: 10rpx 24rpx; font-size: 24rpx; font-weight: 700;
+}
+.mp-chip--active { background: var(--color-ink, #14110F); color: var(--color-lime, #C8F04A); }

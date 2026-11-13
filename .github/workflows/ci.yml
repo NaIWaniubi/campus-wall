@@ -121,7 +121,8 @@ jobs:
 
   # Lighthouse 门：生产构建 + 灌种子临时库，移动端模拟 3 次取中位数。
   # 阈值见 scripts/lighthouse-gate.mjs（perf≥72 / a11y≥90 / bp≥90 / seo≥90，实测中位 79/95/100/100）。
-  # ubuntu-latest 自带 google-chrome；单跑波动 ±15 故取中位数（LHCI 同款纪律）。
+  # 浏览器用 Playwright chromium（系统 google-chrome wrapper 在 runner 上起不来，e2e job 同款已验证）。
+  # 单跑波动 ±15 故取中位数（LHCI 同款纪律）。
   lighthouse:
     name: Lighthouse gate
     runs-on: ubuntu-latest
@@ -143,7 +144,10 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4102/api/health >/dev/null && break; sleep 1; done
           curl -sf http://127.0.0.1:4102/api/health >/dev/null || { echo "server failed to start"; tail -30 /tmp/lh-server.log; exit 1; }
       - name: Lighthouse (median of 3)
-        run: BASE=http://127.0.0.1:4102 CHROME_PATH=$(which google-chrome) node scripts/lighthouse-gate.mjs
+        run: |
+          npx playwright install --with-deps chromium
+          export CHROME_PATH=$(node -e "console.log(require('playwright-core').chromium.executablePath())")
+          BASE=http://127.0.0.1:4102 node scripts/lighthouse-gate.mjs
       - name: Server log on failure
         if: failure()
         run: tail -50 /tmp/lh-server.log

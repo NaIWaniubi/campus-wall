@@ -27,7 +27,7 @@ export default {
         // 状态色
         accent:   { 500: '#F59E0B', 600: '#D97706' },
         danger:   { 500: '#EF4444', 600: '#DC2626' },
-        success:  { 500: '#10B981' },
+        success:  { 500: '#0E7C86' },
         warning:  { 500: '#F59E0B' },
         info:     { 500: '#3B82F6' },
         // 表面/文字/边框 token 桥

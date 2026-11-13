@@ -13,6 +13,7 @@ vi.mock('../../db.js', () => ({
 vi.mock('../../utils/cache.js', () => ({
   cacheGet: () => undefined,
   cacheSet: () => {},
+  cacheInvalidate: () => 0,
 }));
 
 import { spaHandler } from '../../utils/seo.js';

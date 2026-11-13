@@ -10,12 +10,12 @@
 import { promises as fs } from 'fs'
 import type { NextFunction, Request, Response } from 'express'
 import { db } from '../db'
-import { cacheGet, cacheSet } from './cache'
+import { cacheGet, cacheSet, cacheInvalidate } from './cache'
 
 const SITE_NAME = '校园墙'
 const SITE_DESC = '本校学生的信息聚合社区：二手、拼车、失物招领、课程交流、表白墙。'
+// 注入结果缓存要跟着模板指纹走：发版后旧 HTML 引用的 chunk 已消失，绝不能继续吐缓存
 const SPA_CACHE_TTL = 120_000
-const TPL_CACHE_KEY = 'seo:tpl'
 const SPA_CACHE_PREFIX = 'seo:spa:'
 
 export interface SeoMeta {
@@ -134,28 +134,33 @@ export function injectSeo(html: string, meta: SeoMeta, defaultImage: string): st
   return out.replace('</head>', `    ${tags}\n  </head>`)
 }
 
+/** 按 mtime 缓存模板内容：发版改文件立即失效，避免引用到已不存在的旧 chunk */
+const tplCache = { mtimeMs: -1, html: '' }
+
 /**
  * 生产环境 SPA fallback 处理器：
- * GET /post/35 → 查一次库拼 OG → 返回注入后的 index.html（缓存 120s）
+ * GET /post/35 → 查一次库拼 OG → 返回注入后的 index.html（结果 120s 缓存，跟模板 mtime 走）
  */
 export function spaHandler(indexPath: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.method !== 'GET') { next(); return }
     try {
       const base = requestBase(req)
-      const key = SPA_CACHE_PREFIX + req.path
+      const stat = await fs.stat(indexPath)
+      // 模板变了（发版），连同注入结果一起作废
+      if (tplCache.mtimeMs !== stat.mtimeMs) {
+        tplCache.html = await fs.readFile(indexPath, 'utf8')
+        tplCache.mtimeMs = stat.mtimeMs
+        cacheInvalidate(SPA_CACHE_PREFIX)
+      }
+      const key = `${SPA_CACHE_PREFIX}${stat.mtimeMs}:${req.path}`
       const hit = cacheGet<string>(key)
       if (hit) {
         res.type('html').set('Cache-Control', 'public, max-age=120').send(hit)
         return
       }
-      let tpl = cacheGet<string>(TPL_CACHE_KEY)
-      if (!tpl) {
-        tpl = await fs.readFile(indexPath, 'utf8')
-        cacheSet(TPL_CACHE_KEY, tpl, 600_000)
-      }
       const meta = seoMetaForPath(req.path, base)
-      const html = injectSeo(tpl, meta, `${base}/icons/icon-512.png`)
+      const html = injectSeo(tplCache.html, meta, `${base}/icons/icon-512.png`)
       cacheSet(key, html, SPA_CACHE_TTL)
       res.type('html').set('Cache-Control', 'public, max-age=120').send(html)
     } catch (err) {

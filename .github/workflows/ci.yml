@@ -138,9 +138,10 @@ jobs:
         run: npm run build
       - name: Start production server (seeded throwaway db)
         run: |
-          DB_PATH=/tmp/lh.db UPLOAD_DIR=/tmp/lh-uploads JWT_SECRET=ci-lh-secret-0123456789abcdef ADMIN_INITIAL_PASSWORD=admin123 LOG_TO_FILE=0 npx tsx api/seed-demo.ts
-          PORT=4102 HOST=127.0.0.1 NODE_ENV=production DB_PATH=/tmp/lh.db UPLOAD_DIR=/tmp/lh-uploads JWT_SECRET=ci-lh-secret-0123456789abcdef LOG_TO_FILE=0 npx tsx api/server.ts > /tmp/lh-server.log 2>&1 &
+          DB_PATH=/tmp/lh.db UPLOAD_DIR=/tmp/lh-uploads JWT_SECRET=ci-lighthouse-secret-0123456789abcdef ADMIN_INITIAL_PASSWORD=admin123 LOG_TO_FILE=0 npx tsx api/seed-demo.ts
+          PORT=4102 HOST=127.0.0.1 NODE_ENV=production DB_PATH=/tmp/lh.db UPLOAD_DIR=/tmp/lh-uploads JWT_SECRET=ci-lighthouse-secret-0123456789abcdef LOG_TO_FILE=0 npx tsx api/server.ts > /tmp/lh-server.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4102/api/health >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:4102/api/health >/dev/null || { echo "server failed to start"; tail -30 /tmp/lh-server.log; exit 1; }
       - name: Lighthouse (median of 3)
         run: BASE=http://127.0.0.1:4102 CHROME_PATH=$(which google-chrome) node scripts/lighthouse-gate.mjs
       - name: Server log on failure

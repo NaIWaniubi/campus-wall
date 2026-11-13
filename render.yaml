@@ -40,6 +40,13 @@ services:
         generateValue: true
       - key: ADMIN_INITIAL_PASSWORD
         value: CampusWall@2026
+      # 可选：Web Push 离线推送（三者齐用才生效；本地 node scripts/gen-vapid.mjs 生成后粘贴，勿提交进仓库）
+      # - key: VAPID_PUBLIC_KEY
+      #   sync: false
+      # - key: VAPID_PRIVATE_KEY
+      #   sync: false
+      # - key: VAPID_SUBJECT
+      #   value: mailto:you@example.com
       # 可选：接上大模型网关（不配则三个 AI 入口走站内规则版，功能照常）
       # - key: AI_BASE_URL
       #   sync: false

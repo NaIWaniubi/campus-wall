@@ -394,3 +394,22 @@ describe('V4 纸感风格不回潮（结构级换肤回归锁）', () => {
     expect(read('app.wxss')).toMatch(/\.section-title\s*\{[^}]*border-left:\s*8rpx solid #C8F04A/s);
   });
 });
+
+describe('小程序 AI 一句话成稿接线（V5）', () => {
+  it('endpoints 导出 ai.draft 且 api facade 透传', () => {
+    const endpoints = read('utils/endpoints.js');
+    expect(endpoints).toMatch(/const ai = \{/);
+    expect(endpoints).toMatch(/draft: \(data\) => post\('\/ai\/draft', data\)/);
+    const api = read('utils/api.js');
+    expect(api).toMatch(/Object\.assign\(\{\}, endpoints, auth/);
+  });
+  it('发布页有 AI 按钮且 handler 完整（busy 防重入 + 离线文案）', () => {
+    const wxml = read('pages/publish/publish.wxml');
+    expect(wxml).toContain('一句话成稿');
+    expect(wxml).toContain('bindtap="onAiDraft"');
+    const js = read('pages/publish/publish.js');
+    expect(js).toMatch(/onAiDraft\(\)/);
+    expect(js).toMatch(/if \(this\.data\.aiBusy\) return/);
+    expect(js).toContain('套版');
+  });
+});

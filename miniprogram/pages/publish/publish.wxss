@@ -438,3 +438,21 @@
   border-left: 8rpx solid #C8F04A;
   padding-left: 12rpx;
 }
+
+/* ✨ 一句话成稿（V5）：贴纸按钮，busy 灰态防连点 */
+.ai-draft-btn {
+  background: #6D3BF5;
+  color: #FFFFFF;
+  font-size: 22rpx;
+  font-weight: 800;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid #14110F;
+  box-shadow: 3rpx 3rpx 0 #14110F;
+  margin-bottom: 16rpx;
+}
+.ai-draft-btn.is-busy {
+  background: #B9AED9;
+  box-shadow: none;
+  color: #FFFFFF;
+}

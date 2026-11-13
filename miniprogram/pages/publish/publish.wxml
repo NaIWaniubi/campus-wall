@@ -50,8 +50,11 @@
     </view>
 
     <view class="content-input card">
-      <text class="label">内容</text>
-      <textarea class="content-field" placeholder="分享你的校园生活...（至少10个字）" maxlength="500" value="{{content}}" bindinput="onContentInput" auto-height />
+      <view class="flex-between">
+        <text class="label">内容</text>
+        <view class="ai-draft-btn {{aiBusy ? 'is-busy' : ''}}" bindtap="onAiDraft">{{aiBusy ? '成稿中…' : '✨ 一句话成稿'}}</view>
+      </view>
+      <textarea class="content-field" placeholder="随便写一句，如：三号楼捡到一张校园卡。点「一句话成稿」自动排版" maxlength="500" value="{{content}}" bindinput="onContentInput" auto-height />
       <view class="content-footer flex-between">
         <text class="char-count gray-color">{{content.length}}/500</text>
       </view>

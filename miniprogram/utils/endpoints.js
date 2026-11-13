@@ -206,9 +206,15 @@ const followingList = follow.following
 const followersList = follow.followers
 const followStatus = follow.status
 
+/* ---------- ai（V5：一句话成稿，服务端离线套版兜底） ---------- */
+const ai = {
+  /** 发布助手：POST /ai/draft {raw, sectionId} -> {title,content,tags,sectionId,offline,fields} */
+  draft: (data) => post('/ai/draft', data),
+}
+
 module.exports = {
   get, post, put, del, request, uploadFile,
   absUrl, toMs,
   followToggle, followingList, followersList, followStatus,
-  posts, users, follow, search, messages, sections, feedback, admin, drafts, trades, radar,
+  posts, users, follow, search, messages, sections, feedback, admin, drafts, trades, radar, ai,
 }

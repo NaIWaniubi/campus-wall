@@ -1,6 +1,6 @@
 const app = getApp()
 const { getCategoryList, getSubTypeList } = require('../../utils/category')
-const { get, post, put, uploadFile, drafts } = require('../../utils/api')
+const { get, post, put, uploadFile, drafts, ai } = require('../../utils/api')
 const { CATEGORY_TO_SECTION, SECTION_TO_CATEGORY } = require('../../utils/constants')
 const { showToast, chooseImage } = require('../../utils/util')
 
@@ -50,6 +50,7 @@ Page({
     forcedAnonymous: false,
     title: '',
     content: '',
+    aiBusy: false,
     imageList: [],
     submitting: false,
     canPublish: false,
@@ -298,6 +299,43 @@ Page({
   onContentInput(e) {
     this.setData({ content: e.detail.value })
     this.checkCanPublish()
+  },
+
+  /**
+   * ✨ 一句话成稿（V5）：拿已填 内容||标题 当原料 → POST /ai/draft 回填标题/正文；
+   * AI 不可用时服务端返回离线套版稿（📌 结构化字段），功能不挂。
+   * 未选分类且后端有板块建议 → 走与手动选择完全一致的 onSelectCategory 链路。
+   */
+  async onAiDraft() {
+    if (this.data.aiBusy) return
+    const raw = (this.data.content || '').trim() || (this.data.title || '').trim()
+    if (!raw) {
+      showToast('先随便写一句，比如：三号楼丢了校园卡')
+      return
+    }
+    this.setData({ aiBusy: true })
+    try {
+      const sectionId = CATEGORY_TO_SECTION[this.data.selectedCategory] || null
+      const d = await ai.draft({ raw, sectionId })
+      if (!d || (!d.title && !d.content)) {
+        showToast('成稿失败，请稍后重试')
+        return
+      }
+      this.setData({
+        title: String(d.title || '').slice(0, 50),
+        content: String(d.content || '').slice(0, 500),
+      })
+      this.checkCanPublish()
+      const cat = d.sectionId ? SECTION_TO_CATEGORY[Number(d.sectionId)] : ''
+      if (cat && cat !== this.data.selectedCategory) {
+        this.onSelectCategory({ currentTarget: { dataset: { id: cat } } })
+      }
+      showToast(d.offline ? '已按校园墙规范为你套版成稿' : 'AI 已为你成稿')
+    } catch (e) {
+      showToast('成稿失败，请检查网络')
+    } finally {
+      this.setData({ aiBusy: false })
+    }
   },
 
   async onChooseImage() {

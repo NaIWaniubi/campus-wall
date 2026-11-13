@@ -203,14 +203,14 @@ onUnmounted(() => {
     <header class="hero sticky top-0 z-10">
       <div class="max-w-[960px] mx-auto flex items-center gap-2.5 h-14 px-3">
         <button
-          class="shrink-0 w-9 h-9 rounded-[12px] flex items-center justify-center"
-          style="border: 1.5px solid rgb(255 255 255 / 0.34); color: var(--paper)"
+          class="shrink-0 w-9 h-9 rounded-[12px] flex items-center justify-center on-poster"
+          style="border: 1.5px solid rgb(255 255 255 / 0.34)"
           aria-label="返回"
           @click="router.back()"
         >
           <ArrowLeft class="w-5 h-5" />
         </button>
-        <h1 class="ds-display text-[22px]" style="color: var(--paper)">消息</h1>
+        <h1 class="ds-display text-[22px] on-poster">消息</h1>
       </div>
     </header>
 

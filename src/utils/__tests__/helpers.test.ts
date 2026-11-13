@@ -45,10 +45,10 @@ describe('formatTime 相对时间', () => {
 
 describe('creditColor / creditLevel / creditTitle 信誉档位边界', () => {
   it('四档阈值：90/80/60 边界值归属正确', () => {
-    expect(creditColor(90)).toBe('#10b981')
-    expect(creditColor(80)).toBe('#3b82f6')
-    expect(creditColor(60)).toBe('#f59e0b')
-    expect(creditColor(59)).toBe('#ef4444')
+    expect(creditColor(90)).toBe('#6D3BF5')
+    expect(creditColor(80)).toBe('#0E7C86')
+    expect(creditColor(60)).toBe('#B45309')
+    expect(creditColor(59)).toBe('#DC2626')
     expect(creditLevel(90)).toBe('优秀')
     expect(creditLevel(80)).toBe('良好')
     expect(creditLevel(60)).toBe('一般')

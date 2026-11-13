@@ -67,7 +67,7 @@ await shoot(page, 'm-home', 2200)
 // 3) 命令面板 Ctrl+K（移动端无键盘，走事件唤起同样路径）
 await page.evaluate(() => window.dispatchEvent(new CustomEvent('cp:open')))
 await shoot(page, 'm-palette', 400)
-await page.keyboard.type('耳机')
+await page.keyboard.type('晚会')
 await page.waitForTimeout(1200)
 await shoot(page, 'm-palette-query', 300)
 await page.keyboard.press('Escape')
@@ -99,8 +99,12 @@ if (await themeBtn.count()) {
   await shoot(page, 'd-home-dark', 700)
   await page.goto(`${BASE}/profile`, { waitUntil: 'domcontentloaded' }); await shoot(page, 'd-profile-dark')
   await page.goto(`${BASE}/profile/settings`, { waitUntil: 'domcontentloaded' }); await shoot(page, 'd-settings-dark')
-  // 切回浅色再拍常规页
-  await page.getByRole('button', { name: /切换到浅色模式/ }).first().click()
+  await page.goto(`${BASE}/message`, { waitUntil: 'domcontentloaded' }); await shoot(page, 'd-message-dark')
+  await page.goto(`${BASE}/admin`, { waitUntil: 'domcontentloaded' }); await shoot(page, 'd-admin-dark', 2200)
+  // 切回浅色：直接写主题偏好并刷新（比点按钮稳，不依赖当前在哪个页面）
+  await page.evaluate(() => localStorage.setItem('app:theme', 'light'))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(400)
 }
 await page.goto(`${BASE}/topics`, { waitUntil: 'domcontentloaded' }); await shoot(page, 'd-topics')
 const postId = await page.evaluate(async () => {

@@ -106,13 +106,14 @@ function showToast(message: string, type: ToastType = 'info') {
   lastToastKey = key
   lastToastTime = now
   const toast = document.createElement('div')
+  // V4 贴纸 toast：全部走 CSS 变量，深色主题自动换色
   const colors: Record<ToastType, string> = {
-    success: '#10b981',
-    error: '#ef4444',
-    info: '#3b82f6',
+    success: 'background:var(--lime);color:var(--ink)',
+    error: 'background:var(--coral);color:var(--paper)',
+    info: 'background:var(--card);color:var(--ink)',
   }
   toast.textContent = message
-  toast.style.cssText = `background:${colors[type]};color:#fff;padding:10px 20px;border-radius:9999px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:fadeIn 0.2s ease-out;max-width:90vw;word-break:break-word;`
+  toast.style.cssText = `${colors[type]};padding:9px 16px;border:1.5px solid var(--ink);border-radius:12px;font-size:13px;font-weight:800;box-shadow:3px 3px 0 var(--ink);animation:fadeIn 0.2s ease-out;max-width:90vw;word-break:break-word;`
   toastContainer.appendChild(toast)
   setTimeout(() => {
     toast.style.opacity = '0'

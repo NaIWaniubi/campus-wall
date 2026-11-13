@@ -74,13 +74,14 @@ export function formatTime(time: string): string {
 }
 
 /**
- * 信誉分对应颜色
+ * 信誉分对应颜色（V4 阶梯：紫/深青/深琥珀/红，白底全部 ≥3:1 大字对比）
+ * 旧「绿白校园」配色已废弃，success 语义在 V4 里由荧光绿块 + 紫承担
  */
 export function creditColor(score: number): string {
-  if (score >= 90) return '#10b981'
-  if (score >= 80) return '#3b82f6'
-  if (score >= 60) return '#f59e0b'
-  return '#ef4444'
+  if (score >= 90) return '#6D3BF5'
+  if (score >= 80) return '#0E7C86'
+  if (score >= 60) return '#B45309'
+  return '#DC2626'
 }
 
 /**

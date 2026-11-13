@@ -223,8 +223,8 @@ onUnmounted(() => {
           />
           <button
             v-if="keyword"
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full"
-            style="background: var(--ink); color: var(--paper)"
+            class="ds-ink-btn absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full"
+            
             aria-label="清空输入"
             @click="keyword = ''; onInput()"
           >

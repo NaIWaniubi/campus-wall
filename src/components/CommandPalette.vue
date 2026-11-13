@@ -371,6 +371,10 @@ watch(open, (v) => {
   background: var(--ink);
   color: var(--lime);
 }
+[data-theme='dark'] .cp-item.is-active {
+  background: var(--lime);
+  color: #14110F;
+}
 .cp-item.is-active .cp-ico {
   background: rgb(255 255 255 / 0.1);
   border-color: rgb(255 255 255 / 0.28);

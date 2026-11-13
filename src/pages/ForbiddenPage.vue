@@ -18,7 +18,7 @@ const is404 = computed(() => route.name === 'notFound')
       class="w-20 h-20 flex items-center justify-center mb-6"
       style="background: var(--coral); border: 1.5px solid var(--ink); border-radius: 22px; box-shadow: var(--shadow-hard)"
     >
-      <ShieldX class="w-10 h-10" style="color: var(--paper)" />
+      <ShieldX class="w-10 h-10" style="color: #F7F2E8" />
     </div>
     <span class="ds-sticker ds-sticker--sky">{{ is404 ? '404' : '403' }}</span>
     <h1 class="ds-display ds-display-lg mt-3 text-center" style="color: var(--ink)">

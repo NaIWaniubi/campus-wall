@@ -772,7 +772,7 @@ async function handleSubmit() {
       </section>
 
       <!-- 底部提交条：墨底 + 荧光大按钮（唯一视觉重心） -->
-      <section class="ds-card flex items-center gap-3 p-3" style="background: var(--ink)">
+      <section class="ds-poster flex items-center gap-3 p-3" style="border-radius: 18px">
         <button
           v-if="!editId"
           class="pub-draft ds-btn shrink-0"
@@ -808,10 +808,11 @@ async function handleSubmit() {
 .pub-upload:hover { color: var(--ink); }
 .pub-card { transition: box-shadow 0.15s ease; }
 .is-dropzone { box-shadow: 0 0 0 3px var(--lime), var(--shadow-hard); }
+/* 恒暗提交条上的幽灵按钮：文字必须恒亮（--paper 深色会翻黑） */
 .pub-draft {
   padding: 12px 18px;
   background: transparent;
-  color: var(--paper);
+  color: #F7F2E8;
   border-color: rgb(255 255 255 / 0.42);
   box-shadow: none;
 }

@@ -48,7 +48,7 @@ function onLogout() {
 <template>
   <div class="min-h-screen" style="background: var(--paper)">
     <!-- 桌面侧边栏：墨色画布 -->
-    <aside class="hidden md:flex flex-col w-[208px] fixed inset-y-0 left-0 z-20" style="background: var(--ink)">
+    <aside class="ds-poster hidden md:flex flex-col w-[208px] fixed inset-y-0 left-0 z-20">
       <div class="h-14 flex items-center px-4" style="border-bottom: 1px solid rgb(255 255 255 / 0.1)">
         <span class="w-6 h-6 rounded-[7px] flex items-center justify-center shrink-0" style="background: var(--lime)">
           <Shield class="w-3.5 h-3.5" style="color: var(--ink)" />
@@ -63,7 +63,7 @@ function onLogout() {
           class="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-[13px] transition"
           :class="isActive(item.path) ? 'font-extrabold' : 'font-semibold'"
           :style="isActive(item.path)
-            ? 'background: var(--lime); color: var(--ink)'
+            ? 'background: var(--lime); color: #14110F'
             : 'color: rgb(247 242 232 / 0.62)'"
         >
           <component :is="item.icon" class="w-4 h-4 shrink-0" />

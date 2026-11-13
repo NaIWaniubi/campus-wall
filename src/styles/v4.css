@@ -565,6 +565,24 @@ body {
   box-shadow: var(--shadow-hard-sm);
 }
 
+/* ── 海报画布原语（V5 深色修复）──────────────────────────────────
+   问题：var(--ink) 在深色翻成米白、var(--paper) 翻成近黑。
+   「恒暗画布」（hero / 品牌卡 / 提交条 / 弹窗头）必须配恒亮文字，
+   所以这些块统一用 .ds-poster + .on-poster，而不是 --ink/--paper。 */
+.ds-poster { background: #14110F; color: #F7F2E8; }
+[data-theme='dark'] .ds-poster { background: #080706; color: #F7F2E8; }
+.on-poster { color: #F7F2E8; }
+.on-poster-soft { color: rgb(247 242 232 / 0.72); }
+.on-poster-accent { color: var(--lime); }
+
+/* 小控件：亮=墨底荧光 / 深=荧光底墨（与 ds-btn--primary 同一翻转规则） */
+.ds-ink-btn { background: var(--ink); color: var(--lime); border: 1.5px solid var(--ink); }
+[data-theme='dark'] .ds-ink-btn { background: var(--lime); color: #14110F; border-color: var(--lime); }
+
+/* 模态遮罩：深色下不能再叠米白 */
+.ds-scrim { background: rgb(20 17 15 / 0.55); }
+[data-theme='dark'] .ds-scrim { background: rgb(0 0 0 / 0.72); }
+
 /* ── 可访问性基线（V5） ─────────────────────────────────────────── */
 /* 键盘焦点：只在 :focus-visible 出现，鼠标点击不打扰 */
 :where(a, button, [role='button'], summary):focus-visible {

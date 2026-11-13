@@ -614,11 +614,11 @@ function closeMoreMenu(e: MouseEvent) {
 <template>
   <div class="min-h-screen pb-24">
     <!-- 顶部导航：墨底常驻（返回 / 板块名 / 更多） -->
-    <header class="sticky top-0 z-20" style="background: var(--ink)">
+    <header class="ds-poster sticky top-0 z-20">
       <div class="max-w-[960px] mx-auto flex items-center justify-between h-12 px-3 relative">
         <button
           class="ds-icon-btn"
-          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:var(--card);box-shadow:none"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:#F7F2E8;box-shadow:none"
           aria-label="返回"
           @click="router.back()"
         >
@@ -627,7 +627,7 @@ function closeMoreMenu(e: MouseEvent) {
         <span class="ds-label" style="color: rgb(255 255 255 / 0.55)">{{ post?.section?.name || '详情' }}</span>
         <button
           class="more-menu-trigger ds-icon-btn"
-          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:var(--card);box-shadow:none"
+          style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:#F7F2E8;box-shadow:none"
           aria-label="更多"
           @click.stop="showMoreMenu = !showMoreMenu"
         >
@@ -1101,8 +1101,8 @@ function closeMoreMenu(e: MouseEvent) {
           @keyup.enter="submitComment"
           @click="onCommentInputClick"
         />
-        <button :disabled="!canComment || commentPosting" class="ds-icon-btn shrink-0 disabled:opacity-50"
-          style="background: var(--ink); border-color: var(--ink); color: var(--lime)" @click="submitComment">
+        <button :disabled="!canComment || commentPosting" class="ds-icon-btn ds-ink-btn shrink-0 disabled:opacity-50"
+          @click="submitComment">
           <Loader2 v-if="commentPosting" class="w-4 h-4 animate-spin" />
           <Send v-else class="w-4 h-4" />
         </button>

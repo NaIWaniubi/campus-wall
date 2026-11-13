@@ -556,15 +556,15 @@ watch(list, () => nextTick(updateScrollMargin))
  </section>
 
  <!-- 品牌卡：墨色海报 + 荧光字 -->
- <section class="relative overflow-hidden p-4" style="background: var(--ink); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard)">
+ <section class="ds-poster relative overflow-hidden p-4" style="border: 1.5px solid rgb(247 242 232 / 0.18); border-radius: 18px">
  <span class="pointer-events-none absolute -right-8 -top-10 w-28 h-28 rounded-full blur-2xl" style="background: rgb(200 240 74 / 0.35)" aria-hidden="true"></span>
  <div class="relative">
  <span class="ds-sticker ds-sticker--coral">SINCE 2026</span>
- <p class="ds-display text-[22px] mt-2" style="color: var(--paper)">校园墙</p>
- <p class="mt-1.5 text-[11.5px] leading-relaxed" style="color: rgb(247 242 232 / 0.72)">
+ <p class="ds-display text-[22px] mt-2 on-poster">校园墙</p>
+ <p class="mt-1.5 text-[11.5px] leading-relaxed on-poster-soft">
  二手 · 失物 · 表白 · 树洞 · 互助 · 活动 · 拼车 · 组队
  </p>
- <p class="mt-2 text-[11px] font-bold" style="color: var(--lime)">失物雷达 / 信誉分 / 匿名治理 / 实时私信</p>
+ <p class="mt-2 text-[11px] font-bold on-poster-accent">失物雷达 / 信誉分 / 匿名治理 / 实时私信</p>
  </div>
  </section>
  </aside>
@@ -585,8 +585,8 @@ watch(list, () => nextTick(updateScrollMargin))
 
  <!-- 悬浮发布按钮 -->
  <button
- class="hidden md:flex fixed right-5 w-14 h-14 rounded-[16px] items-center justify-center transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] z-20"
- style="background: var(--ink); color: var(--lime); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard); bottom: calc(1.5rem + env(safe-area-inset-bottom))"
+ class="ds-ink-btn hidden md:flex fixed right-5 w-14 h-14 rounded-[16px] items-center justify-center transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] z-20"
+ style="box-shadow: var(--shadow-hard); bottom: calc(1.5rem + env(safe-area-inset-bottom))"
  aria-label="发布新内容"
  @click="goPublish"
  >

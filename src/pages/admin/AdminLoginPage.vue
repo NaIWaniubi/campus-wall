@@ -110,7 +110,7 @@ async function handleSubmit() {
       </section>
 
       <section class="ds-card ds-card--flat px-4 py-3 text-[12px] leading-relaxed" style="color: var(--ink-mute)">
-        默认账号见 README（超管 23770001 / 密码 admin123）
+        默认超管账号 admin / 密码 admin123（ADMIN_INITIAL_PASSWORD 可改）
       </section>
 
       <p class="text-center text-[13px] pt-1">

@@ -261,11 +261,11 @@ function goPost(id: number) {
  style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard-lg)"
  >
  <!-- 头部 -->
- <div class="flex items-center justify-between px-4 py-3" style="background: var(--ink); color: var(--paper)">
+ <div class="ds-poster flex items-center justify-between px-4 py-3">
  <div class="flex items-center gap-2">
  <Bot class="h-5 w-5" />
  <span class="text-sm font-semibold">AI 助手</span>
- <span class="ds-label" style="color: var(--lime)">官网知识库</span>
+ <span class="ds-label on-poster-accent">官网知识库</span>
  </div>
  <div class="flex items-center gap-1">
  <button
@@ -371,8 +371,8 @@ function goPost(id: number) {
  @keydown.enter="send()"
  />
  <button
- class="flex h-9 w-9 shrink-0 items-center justify-center transition active:translate-y-[1px] disabled:opacity-50"
- style="background: var(--ink); color: var(--lime); border: 1.5px solid var(--ink); border-radius: 12px"
+ class="ds-ink-btn flex h-9 w-9 shrink-0 items-center justify-center transition active:translate-y-[1px] disabled:opacity-50"
+ style="border-radius: 12px"
  :disabled="loading || !input.trim()"
  @click="send()"
  >

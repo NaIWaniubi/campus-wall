@@ -50,7 +50,7 @@ onMounted(() => {
         aria-modal="true"
         aria-labelledby="announcement-title"
       >
-        <div class="px-5 pt-6 pb-7 text-center" style="background: var(--ink); color: var(--paper)">
+        <div class="ds-poster px-5 pt-6 pb-7 text-center">
           <span class="ds-sticker ds-sticker--coral">NOTICE</span>
           <div
             class="w-14 h-14 mx-auto mt-4 mb-3 rounded-[14px] flex items-center justify-center"
@@ -58,7 +58,7 @@ onMounted(() => {
           >
             <Megaphone class="w-7 h-7" aria-hidden="true" />
           </div>
-          <h3 id="announcement-title" class="ds-display text-[20px]" style="color: var(--paper)">官方公告</h3>
+          <h3 id="announcement-title" class="ds-display text-[20px] on-poster">官方公告</h3>
         </div>
         <div class="p-5">
           <h4 class="ds-title mb-2" style="color: var(--ink)">{{ announcement?.title }}</h4>

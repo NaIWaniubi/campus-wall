@@ -68,6 +68,10 @@ const stopWatch = watch(() => route.path, (path) => {
   if (!seenDone && path === '/' && !open.value) schedule()
 })
 
+function onKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && open.value) dismiss()
+}
+
 function openGuide() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null }
   step.value = 0
@@ -83,9 +87,11 @@ onMounted(() => {
     if (route.path === '/') schedule()
   }
   window.addEventListener('onboarding:open', openGuide)
+  window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => {
   window.removeEventListener('onboarding:open', openGuide)
+  window.removeEventListener('keydown', onKey)
   if (autoTimer) clearTimeout(autoTimer)
   stopWatch()
 })
@@ -153,6 +159,7 @@ watch(open, (v) => { document.body.style.overflow = v ? 'hidden' : '' })
 
 <style scoped>
 .ob-overlay { background: rgb(20 17 15 / 0.58); backdrop-filter: blur(3px); }
+[data-theme='dark'] .ob-overlay { background: rgb(0 0 0 / 0.74); }
 .ob-card {
   border: 1.5px solid var(--line);
   border-radius: 20px;

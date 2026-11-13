@@ -25,7 +25,7 @@
 - **管理后台 V4 全量重构**：外壳 + 看板 + 帖子/评论/举报/用户/板块/反馈/公告/AI 设置共 11 页；图表跟随主题
 - **小程序 AI 成稿**：发布页「✨ 一句话成稿」贴纸按钮 → 服务端 /ai/draft（AI 或离线套版），回填标题/正文并自动采纳板块建议；busy 防重入；2 条接线锁测试
 - **离线智能成稿升级**：无 key/熔断时不再原样回吐——按板块抽取 物品/成色/价格/时间/地点/联系方式 套版（正文保留原话 + 📌 结构化清单，情绪板块不套版），标题自动【板块】前缀，滑窗碎片标签彻底移除（字段做种子标签）；实测失物招领一句话 → 「【失物招领】校园卡」+ 干净标签
-- **AI 免费档真跑通**：OpenRouter reasoning 模型严格 JSON 提示词下会把 token 烧进思考导致 content 空——免费档预算提到 4096 + 传  +  从思考尾部打捞 JSON；今日简报改后台大预算（100s、ignoreBreaker）真实出稿（实测 60s 后 offline 转 false），成功即复位熔断等于为前台探活；+3 条打捞单测
+- **AI 免费档真跑通**：OpenRouter reasoning 模型严格 JSON 提示词下会把 token 烧进思考导致 content 空——免费档预算提到 4096 + 传 `reasoning.effort=low` + `salvageJsonFromReasoning` 从思考尾部打捞 JSON；今日简报改后台大预算（100s、ignoreBreaker）真实出稿（实测 60s 后 offline 转 false），成功即复位熔断等于为前台探活；+3 条打捞单测
 - **AI 网关级 auth 短路**：自建网关返回 401/Invalid token 时，同端点其余模型不再逐个空耗重试（endpointKeyFor 以 url+key 尾 6 位为指纹），直接切 OpenRouter 免费档；实测失败调用与错误日志从 6+ 降到 3
 - 测试 245 条全过（SEO 15+5 / 评论直达 3 / 风格回潮锁 3 / errorGuard 5 / AI 短路 3）；Playwright 用户端 17 张 + 后台 7 张双主题实拍 + 海报/inert/PWA/全局通知 E2E 0 控制台报错；全路由爬取 ALL ROUTES HEALTHY
 

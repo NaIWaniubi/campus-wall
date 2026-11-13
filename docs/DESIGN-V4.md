@@ -132,4 +132,5 @@
 - **全局实时通知**：`useNotifyFeed`（App.vue 挂一次）消费 `notification:push` / `message:incoming` → `appStore.refreshUnread()` + 非消息页才 toast。`main.ts` 无条件 `useWebSocket().start()`（内部仅 token 存在才真连，并 `$subscribe` 跟随登录/换号/登出）——这是游客登录后能收到推送的前提。
 - **SEO 静态面**：`registerCrawlEndpoints`（在 SPA 通配回退**之前**注册）出 `robots.txt`（绝对 Sitemap、屏蔽 /admin /api）与 `sitemap.xml`（published 帖 + 板块，缓存 10min）；`buildSitemapXml` 纯函数、loc 转义防 XML 注入。
 - **离线智能成稿**：`ruleDraft` 无 AI 时按板块套版——`offlineFields` 只抽原文实有字段（物品/成色/价格/时间/地点/联系方式/捡到or丢失），正文=原话+📌 清单；表白/吐槽情绪板块不套版；标签以干净字段为种子，滑窗碎片仅在零标签时兜底。
+- **AI 免费档真链路**：`:free` reasoning 模型按 4096 预算 + `reasoning.effort:low` 请求，content 为空时用 `salvageJsonFromReasoning` 从思考尾打捞 JSON（须含 `"key":` 形状，否则宁走兜底）；今日简报后台刷新用大预算 + `ignoreBreaker`，成功复位熔断。前台成稿预算不变（用户不当面等慢模型），慢模型时代双轨：快兜底 + 后台真稿。
 - **全局错误兜底**：`errorGuard.isChunkLoadError/shouldReloadOnChunkError`（纯函数 + 单测）驱动 `router.onError`——旧 chunk 404 硬刷新一次防白屏，sessionStorage/storage 异常均有防死循环；`app.config.errorHandler` 兜未捕获 Vue 错误为 toast 而非白屏。

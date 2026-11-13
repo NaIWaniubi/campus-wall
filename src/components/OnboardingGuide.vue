@@ -6,16 +6,19 @@
  * - 三步说明：选板块 → 发一条 → AI 搭把手
  */
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { X, ArrowRight, LayoutGrid, PenSquare, Sparkles } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 
 const STORAGE_KEY = 'onboarding:v1'
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const open = ref(false)
 const step = ref(0)
+let autoTimer: ReturnType<typeof setTimeout> | null = null
+let seenDone = false
 
 const steps = [
   {
@@ -40,6 +43,7 @@ const steps = [
 
 function dismiss() {
   open.value = false
+  seenDone = true // 本次会话内不再自动弹（返回首页也不弹）
   try { localStorage.setItem(STORAGE_KEY, 'done') } catch { /* 隐私模式忽略 */ }
 }
 
@@ -52,7 +56,20 @@ function next() {
   }
 }
 
+function schedule() {
+  if (autoTimer) clearTimeout(autoTimer)
+  autoTimer = setTimeout(() => {
+    autoTimer = null
+    if (route.path === '/' && !open.value) { open.value = true; seenDone = true }
+  }, 800)
+}
+
+const stopWatch = watch(() => route.path, (path) => {
+  if (!seenDone && path === '/' && !open.value) schedule()
+})
+
 function openGuide() {
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null }
   step.value = 0
   open.value = true
 }
@@ -60,12 +77,18 @@ function openGuide() {
 onMounted(() => {
   let seen = ''
   try { seen = localStorage.getItem(STORAGE_KEY) || '' } catch { /* 忽略 */ }
+  if (seen) seenDone = true
   if (!seen) {
-    setTimeout(() => { if (!seen) open.value = true }, 1200)
+    // 登录/注册/后台页不打扰；到首页 0.8s 后自动弹一次
+    if (route.path === '/') schedule()
   }
   window.addEventListener('onboarding:open', openGuide)
 })
-onUnmounted(() => window.removeEventListener('onboarding:open', openGuide))
+onUnmounted(() => {
+  window.removeEventListener('onboarding:open', openGuide)
+  if (autoTimer) clearTimeout(autoTimer)
+  stopWatch()
+})
 
 watch(open, (v) => { document.body.style.overflow = v ? 'hidden' : '' })
 </script>

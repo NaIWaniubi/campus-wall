@@ -27,6 +27,7 @@ const form = reactive({
 })
 const loading = ref(false)
 const uploading = ref(false)
+const dragOver = ref(false)
 const showSectionPicker = ref(false)
 
 const sensitive = computed(() => assessRisk(form.title, form.content))
@@ -255,7 +256,9 @@ function onDocumentClick(e: MouseEvent) {
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
 })
+onMounted(() => { document.addEventListener('paste', onPaste) })
 onUnmounted(() => {
+  document.removeEventListener('paste', onPaste)
   document.removeEventListener('click', onDocumentClick)
 })
 
@@ -279,17 +282,15 @@ async function compressImage(file: File): Promise<File> {
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg' })
 }
 
-async function onUpload(e: Event) {
-  const input = e.target as HTMLInputElement
-  if (!input.files?.length) return
+/** 把一批图片压缩上传并塞进 form.images（点选 / 粘贴 / 拖拽共用同一入口） */
+async function addFiles(files: File[]): Promise<void> {
   const remaining = 9 - form.images.length
   if (remaining <= 0) {
     toast.error('最多上传9张图片')
-    input.value = ''
     return
   }
-  const files = Array.from(input.files).slice(0, remaining)
-  if (input.files.length > remaining) {
+  const picked = files.slice(0, remaining)
+  if (files.length > remaining) {
     toast.info(`仅上传前 ${remaining} 张，已达上限`)
   }
   uploading.value = true
@@ -297,10 +298,10 @@ async function onUpload(e: Event) {
     // 并发上传：分块（每块 ≤3 张）+ Promise.all，替代原先的串行 for-await
     const CONCURRENCY = 3
     const validFiles: File[] = []
-    for (const file of files) {
+    for (const file of picked) {
       if (form.images.length + validFiles.length >= 9) break
       if (file.size > 20 * 1024 * 1024) {
-        toast.error(`${file.name} 超过20MB，无法上传`)
+        toast.error(`${file.name || '图片'} 超过20MB，无法上传`)
         continue
       }
       validFiles.push(file)
@@ -326,8 +327,49 @@ async function onUpload(e: Event) {
     // 错误已由拦截器 toast
   } finally {
     uploading.value = false
-    input.value = ''
   }
+}
+
+async function onUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files?.length) return
+  const files = Array.from(input.files)
+  input.value = ''
+  await addFiles(files)
+}
+
+// 拖拽上传：拖图片进图片区直接上传（dragleave 在子元素间抖动可忽略）
+function onDragOver(e: DragEvent) {
+  if (!e.dataTransfer?.types?.includes('Files')) return
+  e.preventDefault()
+  dragOver.value = true
+}
+function onDragLeave(e: DragEvent) {
+  e.preventDefault()
+  dragOver.value = false
+}
+function onDrop(e: DragEvent) {
+  dragOver.value = false
+  if (!e.dataTransfer?.files?.length) return
+  e.preventDefault()
+  const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
+  if (files.length) addFiles(files)
+}
+
+// 粘贴上传：剪贴板里有图片才接管，纯文本粘贴不拦截（截图 Ctrl+V 直接进图床）
+function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  const imgs: File[] = []
+  for (const it of Array.from(items)) {
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      const f = it.getAsFile()
+      if (f) imgs.push(f)
+    }
+  }
+  if (!imgs.length) return
+  e.preventDefault()
+  addFiles(imgs)
 }
 
 function removeImage(idx: number) {
@@ -565,10 +607,13 @@ async function handleSubmit() {
         </div>
       </section>
 
-      <!-- 图片上传：墨线虚线框 -->
-      <section class="ds-card p-4">
-        <label class="ds-label block mb-2">图片（最多9张）</label>
-        <div class="grid grid-cols-3 gap-2">
+      <!-- 图片上传：墨线虚线框，支持点选 / Ctrl+V 粘贴 / 拖拽 -->
+      <section class="ds-card p-4" :class="{ 'is-dropzone': dragOver }">
+        <div class="flex items-center justify-between mb-2">
+          <label class="ds-label">图片（最多9张）</label>
+          <span class="text-[10.5px]" style="color: var(--ink-mute)">可粘贴截图 / 拖入图片</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
           <div v-for="(img, i) in form.images" :key="i" class="relative aspect-square rounded-xl overflow-hidden" style="border: 1.5px solid var(--ink)">
             <img :src="img" class="w-full h-full object-cover" alt="" />
             <button class="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center" style="background: var(--coral); color: var(--paper)" @click="removeImage(i)">
@@ -761,6 +806,8 @@ async function handleSubmit() {
 <style scoped>
 .pub-upload { border-style: dashed; border-color: var(--ink); color: var(--ink-mute); }
 .pub-upload:hover { color: var(--ink); }
+.pub-card { transition: box-shadow 0.15s ease; }
+.is-dropzone { box-shadow: 0 0 0 3px var(--lime), var(--shadow-hard); }
 .pub-draft {
   padding: 12px 18px;
   background: transparent;

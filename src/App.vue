@@ -5,6 +5,9 @@ import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AiAssistant from '@/components/AiAssistant.vue'
+import CommandPalette from '@/components/CommandPalette.vue'
+import RouteProgress from '@/components/RouteProgress.vue'
+import OnboardingGuide from '@/components/OnboardingGuide.vue'
 import BottomNav from '@/components/BottomNav.vue'
 
 const appStore = useAppStore()
@@ -73,8 +76,9 @@ onUnmounted(() => {
     通过 .app-container 工具类控制内层 max-width
   -->
   <div class="app-shell">
+    <a href="#app-main" class="skip-link">跳到主要内容</a>
     <div class="aurora-bg" aria-hidden="true"></div>
-    <div class="app-container">
+    <div id="app-main" tabindex="-1" class="app-container">
       <RouterView v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -84,6 +88,9 @@ onUnmounted(() => {
     <BottomNav />
     <AnnouncementDialog />
     <AiAssistant />
+    <RouteProgress />
+    <CommandPalette />
+    <OnboardingGuide />
   </div>
 </template>
 

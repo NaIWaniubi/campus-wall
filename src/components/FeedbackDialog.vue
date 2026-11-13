@@ -55,46 +55,64 @@ async function submit() {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" @click="close"></div>
-      <div class="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-base font-medium text-zinc-900">意见反馈</h3>
-          <button class="p-1.5 text-zinc-400 hover:text-zinc-600" @click="close">
+    <div v-if="visible" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
+      <div class="absolute inset-0 bg-black/50" aria-hidden="true" @click="close"></div>
+      <div
+        class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto ds-card p-4 sm:p-5 space-y-4 animate-scale-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-dialog-title"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="ds-sticker ds-sticker--sky shrink-0">FEEDBACK</span>
+            <h3 id="feedback-dialog-title" class="ds-title truncate" style="color: var(--ink)">意见反馈</h3>
+          </div>
+          <button type="button" class="ds-icon-btn shrink-0" aria-label="关闭反馈弹窗" @click="close">
             <X class="w-5 h-5" />
           </button>
         </div>
 
+        <div class="ds-hairline"></div>
+
         <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="text-sm text-zinc-600">反馈内容 <span class="text-red-500">*</span></label>
-            <span class="text-xs" :class="content.length > 500 ? 'text-red-500' : 'text-zinc-300'">{{ content.length }}/500</span>
+          <div class="flex items-baseline justify-between mb-1.5">
+            <label for="feedback-content" class="ds-label">
+              反馈内容 <span aria-hidden="true" style="color: var(--coral)">*</span>
+            </label>
+            <span
+              class="ds-num text-[11px] font-bold"
+              :style="{ color: content.length > 500 ? 'var(--coral)' : 'var(--ink-mute)' }"
+            >{{ content.length }}/500</span>
           </div>
           <textarea
+            id="feedback-content"
             v-model="content"
             maxlength="500"
             rows="5"
             placeholder="说说你在使用中遇到的问题或建议，我们会认真查看每一条反馈"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition resize-none text-sm"
+            class="ds-input resize-none leading-relaxed"
           ></textarea>
         </div>
 
         <div>
-          <label class="block text-sm text-zinc-600 mb-1.5">联系方式（选填）</label>
+          <label for="feedback-contact" class="ds-label block mb-1.5">联系方式（选填）</label>
           <input
+            id="feedback-contact"
             v-model="contact"
             type="text"
             maxlength="100"
             placeholder="微信/QQ/邮箱，便于我们回复你"
-            class="w-full px-3 py-2.5 rounded-lg bg-zinc-50 border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm"
+            class="ds-input"
           />
         </div>
 
-        <div class="flex gap-2 pt-1">
-          <button class="flex-1 py-2.5 rounded-full bg-zinc-100 text-zinc-600 text-sm font-medium hover:bg-zinc-200 transition" @click="close">取消</button>
+        <div class="flex gap-2.5 pt-1">
+          <button type="button" class="ds-btn flex-1" @click="close">取消</button>
           <button
+            type="button"
             :disabled="submitting"
-            class="flex-1 py-2.5 rounded-full bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white text-sm font-medium transition flex items-center justify-center gap-1.5"
+            class="ds-btn ds-btn--primary flex-1"
             @click="submit"
           >
             <Loader2 v-if="submitting" class="w-4 h-4 animate-spin" />

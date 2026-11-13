@@ -5,9 +5,10 @@
  */
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid, Sparkles, ChevronRight } from '@lucide/vue'
+import { Search, Bell, Plus, RefreshCw, BellRing, Megaphone, Flame, LayoutGrid, Sparkles, ChevronRight, Sun, Moon, ArrowUp } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { postApi, subscriptionApi, announcementApi, sectionApi, aiApi } from '@/utils/api'
 import { sectionGradient, sectionColor } from '@/utils/sections'
 import { toast } from '@/utils/request'
@@ -20,6 +21,12 @@ import EmptyState from '@/components/EmptyState.vue'
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
+
+// 明暗切换：直接落 light/dark，UI 立即生效并持久化
+function toggleTheme() {
+  themeStore.setMode(themeStore.effective === 'dark' ? 'light' : 'dark')
+}
 
 const activeSection = ref(0) // 0 = 全部
 type SortKey = 'hot' | 'new'
@@ -173,6 +180,15 @@ function updateScrollMargin() {
     : 0
 }
 
+// 回到顶部：滚动超过一屏再出现，避免和信息流抢注意力
+const showTop = ref(false)
+function onWinScroll() { showTop.value = window.scrollY > 600 }
+function backToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent('cp:open'))
+}
+
 function goPublish() {
   if (!userStore.isLoggedIn) {
     router.push({ path: '/login', query: { redirect: '/publish' } })
@@ -250,10 +266,13 @@ onMounted(() => {
   loadRailData()
   updateScrollMargin()
   window.addEventListener('resize', updateScrollMargin)
+  window.addEventListener('scroll', onWinScroll, { passive: true })
+  onWinScroll()
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', updateScrollMargin)
+  window.removeEventListener('scroll', onWinScroll)
 })
 // 列表变化后重算虚拟容器相对文档的偏移（首屏骨架卸载后才拿得到 listRef）
 watch(list, () => nextTick(updateScrollMargin))
@@ -273,6 +292,16 @@ watch(list, () => nextTick(updateScrollMargin))
             </h1>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <button
+              class="ds-icon-btn"
+              style="width:34px;height:34px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.32);color:#fff;box-shadow:none"
+              :aria-label="themeStore.effective === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
+              :title="themeStore.effective === 'dark' ? '浅色模式' : '深色模式'"
+              @click="toggleTheme"
+            >
+              <Sun v-if="themeStore.effective === 'dark'" class="w-4 h-4" />
+              <Moon v-else class="w-4 h-4" />
+            </button>
             <button
               class="hidden md:inline-flex ds-icon-btn"
               style="width:34px;height:34px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.32);color:#fff;box-shadow:none"
@@ -304,10 +333,14 @@ watch(list, () => nextTick(updateScrollMargin))
           <button
             class="flex-1 min-w-0 flex items-center gap-2 rounded-full px-4 py-2 text-[13px] text-white/60"
             style="background: rgba(255,255,255,.07); border: 1.2px solid rgba(255,255,255,.26)"
-            @click="router.push('/search')"
+            aria-label="打开搜索（Ctrl K）"
+            @click="openCommandPalette"
           >
             <Search class="w-4 h-4 opacity-70 shrink-0" />
-            <span class="truncate">搜索内容、话题、用户</span>
+            <span class="truncate">搜索帖子、板块，或跳转…</span>
+            <span class="hidden md:flex items-center gap-1 ml-auto shrink-0 opacity-70">
+              <kbd style="border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:0 4px;font-size:10px;font-family:ui-monospace,monospace">Ctrl</kbd><kbd style="border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:0 4px;font-size:10px;font-family:ui-monospace,monospace">K</kbd>
+            </span>
           </button>
           <button class="hero-pill shrink-0 font-bold !text-[12px]" aria-label="切换校区">
             <span>📍</span><span>本校</span>
@@ -536,6 +569,19 @@ watch(list, () => nextTick(updateScrollMargin))
         </section>
       </aside>
     </main>
+
+    <!-- 回到顶部（桌面端，出现在发布按钮上方） -->
+    <transition name="fade">
+      <button
+        v-show="showTop"
+        class="hidden md:flex fixed right-5 w-11 h-11 rounded-[14px] items-center justify-center transition-all duration-200 active:translate-y-[2px] z-20"
+        style="background: var(--card); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm); bottom: calc(6.5rem + env(safe-area-inset-bottom))"
+        aria-label="回到顶部"
+        @click="backToTop"
+      >
+        <ArrowUp class="w-5 h-5" />
+      </button>
+    </transition>
 
     <!-- 悬浮发布按钮 -->
     <button

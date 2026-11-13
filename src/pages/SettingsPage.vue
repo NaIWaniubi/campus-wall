@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /**
- * 账号设置：编辑资料 + 修改密码 + 危险操作
+ * 账号设置：编辑资料 + 修改密码 + 外观 + 帮助 + 危险操作
+ * V5：整页 V4 化；新增账号只读展示、密码可见性切换
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Bell, Camera, Loader2, Lock, LogOut, Monitor, Moon, Sun, UserX } from '@lucide/vue'
+import { ArrowLeft, Bell, Camera, Eye, EyeOff, Loader2, Lock, LogOut, Monitor, Moon, Sparkles, Sun, UserX } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { uploadApi, authApi, pushApi } from '@/utils/api'
@@ -110,6 +111,7 @@ const savingPassword = ref(false)
 const uploading = ref(false)
 const showLogout = ref(false)
 const showDelete = ref(false)
+const showPwd = ref(false)
 
 const profileDirty = computed(() =>
   profileForm.nickname !== (userStore.user?.nickname || '') ||
@@ -227,134 +229,205 @@ onMounted(() => {
     initForm()
   }
 })
+function replayOnboarding() {
+  window.dispatchEvent(new CustomEvent('onboarding:open'))
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-transparent pb-6">
-    <header class="sticky top-0 z-10" style="background: var(--paper); border-bottom: 1.5px solid var(--ink)">
-      <div class="max-w-[960px] mx-auto flex items-center h-14 px-3">
-        <button class="p-2 -ml-2 text-zinc-600 hover:text-zinc-900" @click="router.back()">
-          <ArrowLeft class="w-5 h-5" />
-        </button>
-        <span class="ml-1 font-extrabold" style="color: var(--ink)">设置</span>
+  <div class="min-h-screen pb-24" style="background: var(--paper)">
+    <!-- V4 海报头 -->
+    <header class="hero px-5 pt-6 pb-10 rounded-b-[24px]">
+      <div class="max-w-[960px] mx-auto">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="ds-sticker ds-sticker--coral shrink-0">SETTINGS</span>
+            <span class="ds-label text-white/45 truncate">账号与偏好</span>
+          </div>
+          <button
+            class="ds-icon-btn shrink-0"
+            style="width:34px;height:34px;background:rgb(255 255 255 / 0.1);border-color:rgb(255 255 255 / 0.32);color:rgb(255 255 255);box-shadow:none"
+            aria-label="返回" @click="router.back()"
+          >
+            <ArrowLeft class="w-4 h-4" />
+          </button>
+        </div>
+        <h1 class="ds-display ds-display-lg mt-2 text-white">设置</h1>
+        <p class="mt-1 text-[13px] text-white/60">资料、密码、外观，都在这儿</p>
       </div>
     </header>
 
-    <main class="max-w-[960px] mx-auto px-4 py-4 space-y-4">
-      <!-- 编辑资料 -->
-      <section class="ds-card p-4 space-y-4">
-        <h3 class="text-sm font-medium text-zinc-700">编辑资料</h3>
-        <!-- 头像 -->
-        <div class="flex items-center gap-3">
-          <div class="relative">
-            <div class="w-16 h-16 rounded-full bg-brand-100 overflow-hidden flex items-center justify-center">
+    <main class="max-w-[960px] mx-auto px-3 mt-3 space-y-3">
+      <!-- 01 编辑资料 -->
+      <section class="ds-card p-4 sm:p-5 space-y-4">
+        <div class="ds-section-head">
+          <span class="ds-section-head__num">01</span>
+          <h2 class="ds-title">编辑资料</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
+
+        <!-- 头像 + 账号 -->
+        <div class="flex items-center gap-3.5">
+          <div class="relative shrink-0">
+            <div
+              class="w-[64px] h-[64px] overflow-hidden flex items-center justify-center"
+              style="border: 1.5px solid var(--line); border-radius: 16px; background: var(--color-surface); box-shadow: var(--shadow-hard-sm)"
+            >
               <img v-if="profileForm.avatar" :src="profileForm.avatar" class="w-full h-full object-cover" alt="头像" />
-              <span v-else class="text-xl font-medium text-brand-600">{{ profileForm.nickname.charAt(0) || '我' }}</span>
+              <span v-else class="ds-display text-[24px]" style="color: var(--ink)">{{ profileForm.nickname.charAt(0) || '我' }}</span>
             </div>
-            <label class="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-brand-500 text-white flex items-center justify-center cursor-pointer">
-              <Loader2 v-if="uploading" class="w-3 h-3 animate-spin" />
-              <Camera v-else class="w-3 h-3" />
+            <label
+              class="absolute -bottom-1.5 -right-1.5 w-[26px] h-[26px] flex items-center justify-center cursor-pointer"
+              style="background: var(--lime); border: 1.5px solid var(--line); border-radius: 9px; box-shadow: var(--shadow-hard-sm)"
+              aria-label="更换头像"
+            >
+              <Loader2 v-if="uploading" class="w-3.5 h-3.5 animate-spin" style="color: var(--ink)" />
+              <Camera v-else class="w-3.5 h-3.5" style="color: var(--ink)" />
               <input type="file" accept="image/jpeg,image/png" class="hidden" @change="onAvatarChange" />
             </label>
           </div>
-          <span class="text-xs ds-sub">点击图标更换头像</span>
+          <div class="min-w-0">
+            <p class="text-[13.5px] font-extrabold truncate" style="color: var(--ink)">{{ profileForm.nickname || '未设置昵称' }}</p>
+            <p class="mt-0.5 text-[12px] ds-num truncate" style="color: var(--ink-mute)">
+              账号 {{ userStore.user?.studentId || '—' }} · 注册后不可修改
+            </p>
+            <p class="mt-1 text-[11.5px]" style="color: var(--ink-mute)">点击左下角相机更换头像（≤5MB）</p>
+          </div>
         </div>
-        <!-- 昵称 -->
+
         <div>
-          <label class="block text-sm text-zinc-700 mb-1.5">昵称</label>
-          <input v-model="profileForm.nickname" type="text" maxlength="20" placeholder="请输入昵称"
-            class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
+          <label for="set-nickname" class="ds-label block mb-1.5">昵称</label>
+          <input id="set-nickname" v-model="profileForm.nickname" type="text" maxlength="20" placeholder="请输入昵称" class="ds-input" />
         </div>
-        <!-- 签名 -->
+
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <label class="text-sm text-zinc-700">个性签名</label>
-            <span class="text-xs" :class="profileForm.signature.length > 100 ? 'text-red-500' : 'ds-sub'">{{ profileForm.signature.length }}/100</span>
+            <label for="set-signature" class="ds-label">个性签名</label>
+            <span class="text-[11px] ds-num" :style="{ color: profileForm.signature.length > 100 ? 'var(--coral)' : 'var(--ink-mute)' }">{{ profileForm.signature.length }}/100</span>
           </div>
-          <textarea v-model="profileForm.signature" maxlength="100" rows="2" placeholder="一句话介绍自己"
-            class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm resize-none"></textarea>
+          <textarea id="set-signature" v-model="profileForm.signature" maxlength="100" rows="2" placeholder="一句话介绍自己" class="ds-input resize-none"></textarea>
         </div>
-        <button :disabled="!profileDirty || savingProfile"
-          class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition flex items-center justify-center gap-2"
-          @click="saveProfile">
+
+        <button
+          type="button"
+          :disabled="!profileDirty || savingProfile"
+          class="ds-btn ds-btn--primary w-full !py-3"
+          @click="saveProfile"
+        >
           <Loader2 v-if="savingProfile" class="w-4 h-4 animate-spin" />
-          {{ savingProfile ? '保存中...' : '保存资料' }}
+          {{ savingProfile ? '保存中...' : (profileDirty ? '保存资料' : '资料已是最新') }}
         </button>
       </section>
 
-      <!-- 修改密码 -->
-      <section class="ds-card p-4 space-y-3">
-        <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
-          <Lock class="w-4 h-4" /> 修改密码
-        </h3>
-        <input v-model="pwdForm.oldPassword" type="password" placeholder="原密码"
-          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
-        <input v-model="pwdForm.newPassword" type="password" placeholder="新密码（至少6位）"
-          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
-        <input v-model="pwdForm.confirmPassword" type="password" placeholder="确认新密码"
-          class="w-full px-3 py-2.5 rounded-lg bg-transparent border border-zinc-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 transition text-sm" />
-        <button :disabled="savingPassword"
-          class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 disabled:bg-brand-300 text-white rounded-full text-sm font-medium transition flex items-center justify-center gap-2"
-          @click="savePassword">
+      <!-- 02 修改密码 -->
+      <section class="ds-card p-4 sm:p-5 space-y-3">
+        <div class="ds-section-head">
+          <span class="ds-section-head__num">02</span>
+          <h2 class="ds-title flex items-center gap-1.5"><Lock class="w-4 h-4" /> 修改密码</h2>
+          <span class="ds-section-head__line"></span>
+          <button
+            type="button"
+            class="shrink-0 ds-icon-btn !w-8 !h-8"
+            :aria-label="showPwd ? '隐藏密码' : '显示密码'"
+            :aria-pressed="showPwd"
+            @click="showPwd = !showPwd"
+          >
+            <Eye v-if="showPwd" class="w-4 h-4" />
+            <EyeOff v-else class="w-4 h-4" />
+          </button>
+        </div>
+        <input v-model="pwdForm.oldPassword" :type="showPwd ? 'text' : 'password'" placeholder="原密码" class="ds-input" autocomplete="current-password" />
+        <input v-model="pwdForm.newPassword" :type="showPwd ? 'text' : 'password'" placeholder="新密码（至少 6 位）" class="ds-input" autocomplete="new-password" />
+        <input v-model="pwdForm.confirmPassword" :type="showPwd ? 'text' : 'password'" placeholder="确认新密码" class="ds-input" autocomplete="new-password" />
+        <button
+          type="button"
+          :disabled="savingPassword"
+          class="ds-btn ds-btn--primary w-full !py-3"
+          @click="savePassword"
+        >
           <Loader2 v-if="savingPassword" class="w-4 h-4 animate-spin" />
           {{ savingPassword ? '提交中...' : '修改密码' }}
         </button>
       </section>
 
-      <!-- 外观设置 -->
-      <section class="ds-card p-4 space-y-3">
-        <h3 class="text-sm font-medium text-zinc-700">外观</h3>
+      <!-- 03 外观 -->
+      <section class="ds-card p-4 sm:p-5 space-y-3">
+        <div class="ds-section-head">
+          <span class="ds-section-head__num">03</span>
+          <h2 class="ds-title">外观</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
         <div class="grid grid-cols-3 gap-2">
-          <button v-for="opt in themeOptions" :key="opt.mode"
-            class="flex flex-col items-center gap-1.5 py-3 rounded-lg border text-xs transition"
-            :class="themeStore.mode === opt.mode
-              ? 'border-brand-500 bg-brand-50 text-brand-600 font-medium'
-              : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'"
-            @click="themeStore.setMode(opt.mode)">
+          <button
+            v-for="opt in themeOptions"
+            :key="opt.mode"
+            type="button"
+            class="ds-chip flex-col !py-3.5 !rounded-[12px] justify-center"
+            :class="{ 'is-active': themeStore.mode === opt.mode }"
+            :aria-pressed="themeStore.mode === opt.mode"
+            @click="themeStore.setMode(opt.mode)"
+          >
             <component :is="opt.icon" class="w-5 h-5" />
-            {{ opt.label }}
+            <span class="text-[11.5px] font-bold">{{ opt.label }}</span>
           </button>
         </div>
       </section>
 
-      <!-- 消息推送（服务端 VAPID 未配置时整块隐藏） -->
-      <section v-if="pushAvailable" class="ds-card p-4 space-y-3">
-        <h3 class="flex items-center gap-1.5 text-sm font-medium text-zinc-700">
-          <Bell class="w-4 h-4" /> 消息推送
-        </h3>
-        <div class="flex items-center justify-between">
-          <span class="text-xs ds-sub">离线时通过浏览器通知提醒新消息</span>
-          <div class="flex items-center gap-2">
-            <button :disabled="pushBusy || pushEnabled"
-              class="px-4 py-1.5 rounded-full text-xs font-medium transition"
-              :class="pushEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-brand-500 text-white hover:bg-brand-600'"
-              @click="enablePush">
-              {{ pushEnabled ? '已开启' : (pushBusy ? '开启中...' : '开启') }}
-            </button>
-            <button v-if="pushEnabled" :disabled="pushBusy"
-              class="px-3 py-1.5 rounded-full text-xs text-zinc-500 hover:text-zinc-700 transition"
-              @click="disablePush">
-              关闭
-            </button>
+      <!-- 04 通知与帮助 -->
+      <section class="ds-card p-4 sm:p-5 space-y-1">
+        <div class="ds-section-head mb-2">
+          <span class="ds-section-head__num">04</span>
+          <h2 class="ds-title">通知与帮助</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
+
+        <div v-if="pushAvailable" class="flex items-center justify-between gap-3 py-2.5">
+          <span class="flex items-center gap-2 text-[13px] font-semibold" style="color: var(--ink)">
+            <Bell class="w-4 h-4" /> 消息推送
+            <span class="text-[11px] font-normal" style="color: var(--ink-mute)">离线也能收到提醒</span>
+          </span>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              v-if="!pushEnabled"
+              type="button"
+              :disabled="pushBusy"
+              class="ds-btn ds-btn--sm"
+              @click="enablePush"
+            >{{ pushBusy ? '开启中...' : '开启' }}</button>
+            <template v-else>
+              <span class="ds-tag"><span class="ds-tag-dot" style="background: var(--lime)"></span>已开启</span>
+              <button type="button" :disabled="pushBusy" class="text-[11.5px] font-bold underline underline-offset-2" style="color: var(--ink-mute)" @click="disablePush">关闭</button>
+            </template>
           </div>
         </div>
+
+        <button type="button" class="w-full flex items-center justify-between py-3 text-left" @click="replayOnboarding">
+          <span class="flex items-center gap-2 text-[13px] font-semibold" style="color: var(--ink)">
+            <Sparkles class="w-4 h-4" /> 重新查看新手引导
+          </span>
+          <span class="ds-tag">30 秒</span>
+        </button>
       </section>
 
-      <!-- 危险操作 -->
-      <section class="ds-card p-4 space-y-1">
-        <h3 class="text-sm font-medium text-zinc-700 mb-2">危险操作</h3>
-        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-transparent transition"
-          @click="showDelete = true">
-          <span class="flex items-center gap-2 text-sm text-red-500">
+      <!-- 05 危险操作 -->
+      <section class="ds-card p-4 sm:p-5">
+        <div class="ds-section-head mb-2">
+          <span class="ds-section-head__num" style="color: var(--coral)">05</span>
+          <h2 class="ds-title" style="color: var(--coral)">危险操作</h2>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <button type="button" class="w-full flex items-center justify-between py-3 text-left" @click="showDelete = true">
+          <span class="flex items-center gap-2 text-[13px] font-semibold" style="color: var(--coral)">
             <UserX class="w-4 h-4" /> 账号注销
           </span>
-          <span class="text-xs ds-sub">7天冷静期</span>
+          <span class="text-[11.5px]" style="color: var(--ink-mute)">7 天冷静期</span>
         </button>
-        <button class="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-transparent transition"
-          @click="showLogout = true">
-          <span class="flex items-center gap-2 text-sm text-zinc-700">
+        <div class="ds-hairline"></div>
+        <button type="button" class="w-full flex items-center justify-between py-3 text-left" @click="showLogout = true">
+          <span class="flex items-center gap-2 text-[13px] font-semibold" style="color: var(--ink)">
             <LogOut class="w-4 h-4" /> 退出登录
           </span>
+          <span class="text-[11.5px]" style="color: var(--ink-mute)">当前设备</span>
         </button>
       </section>
     </main>
@@ -365,4 +438,3 @@ onMounted(() => {
       @confirm="confirmDeleteAccount" @cancel="showDelete = false" />
   </div>
 </template>
-

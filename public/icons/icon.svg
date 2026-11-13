@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- 校园墙应用图标：品牌绿底 + 白色错缝砖墙（几何构图，不依赖字体渲染） -->
-  <rect width="512" height="512" rx="112" fill="#10B981"/>
-  <g fill="#ffffff">
+  <!-- 校园墙 V4 应用图标：墨底 + 荧光砖墙 + 一块珊瑚砖（纸感海报体系） -->
+  <rect width="512" height="512" rx="112" fill="#14110F"/>
+  <g fill="#C8F04A">
     <rect x="96" y="150" width="146" height="56" rx="12"/>
     <rect x="270" y="150" width="146" height="56" rx="12"/>
     <rect x="183" y="228" width="146" height="56" rx="12"/>
     <rect x="96" y="306" width="146" height="56" rx="12"/>
     <rect x="270" y="306" width="146" height="56" rx="12"/>
   </g>
+  <rect x="364" y="306" width="52" height="56" rx="12" fill="#FF4D2E"/>
 </svg>

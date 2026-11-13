@@ -5,7 +5,7 @@
  * - /api、/uploads 永不缓存（数据实时性优先）
  * - 仅生产环境注册（见 src/main.ts）；升级换名：CACHE 版本号 +1 即可清旧缓存
  */
-const CACHE = 'campus-wall-v1';
+const CACHE = 'campus-wall-v2';
 const ASSET_RE = /\/assets\/[\w.-]+\.(js|css|woff2?|png|jpg|jpeg|webp|svg|ico)$/;
 
 self.addEventListener('install', (e) => {

@@ -26,6 +26,7 @@ import { stats as wsStats } from './ws/hub.js'
 import { buildOpenApiDocument, swaggerHtml } from './openapi/document.js'
 import { captureError } from './observability.js'
 import { cacheStats } from './utils/cache.js'
+import { spaHandler } from './utils/seo.js'
 import crypto from 'crypto'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
@@ -277,17 +278,15 @@ app.use('/api/health', (_req: Request, res: Response) => {
  */
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'dist')
+  // index:false —— 首页也交给下面的 spaHandler，保证 OG 图是绝对 URL（微信/QQ 不认相对地址）
   app.use(express.static(clientDist, {
     maxAge: '1d',
     extensions: ['html'],
+    index: false,
   }))
-  // SPA history 模式 fallback：非 /api、/uploads 路径统一返回 index.html
-  app.get(/^(?!\/api|\/uploads).*$/, (req, res, next) => {
-    if (req.method !== 'GET') return next()
-    res.sendFile(path.join(clientDist, 'index.html'), (err) => {
-      if (err) next(err)
-    })
-  })
+  // SPA history 模式 fallback：非 /api、/uploads 路径统一返回按路由注入 OG 的 index.html
+  // （微信群 / QQ 群里的裸链接靠这里出分享卡片；查库结果缓存 120s）
+  app.get(/^(?!\/api|\/uploads).*$/, spaHandler(path.join(clientDist, 'index.html')))
 }
 
 /**

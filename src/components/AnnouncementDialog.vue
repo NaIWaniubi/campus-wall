@@ -41,25 +41,31 @@ onMounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+    <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
+      <div class="absolute inset-0 bg-black/50" aria-hidden="true"></div>
       <div
-        class="relative w-full max-w-sm overflow-hidden animate-scale-in"
-        style="background: var(--card); border: 1.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow-hard-lg)"
+        class="relative w-full max-w-sm ds-card overflow-hidden animate-scale-in"
+        style="box-shadow: var(--shadow-hard-lg)"
         role="dialog"
         aria-modal="true"
         aria-labelledby="announcement-title"
       >
-        <div class="px-6 pt-6 pb-8 text-center" style="background: var(--ink)">
-          <div class="w-14 h-14 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-3">
-            <Megaphone class="w-7 h-7 text-white" />
+        <div class="px-5 pt-6 pb-7 text-center" style="background: var(--ink); color: var(--paper)">
+          <span class="ds-sticker ds-sticker--coral">NOTICE</span>
+          <div
+            class="w-14 h-14 mx-auto mt-4 mb-3 rounded-[14px] flex items-center justify-center"
+            style="background: var(--lime); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm); color: var(--ink)"
+          >
+            <Megaphone class="w-7 h-7" aria-hidden="true" />
           </div>
-          <h3 id="announcement-title" class="text-lg font-bold text-white">官方公告</h3>
+          <h3 id="announcement-title" class="ds-display text-[20px]" style="color: var(--paper)">官方公告</h3>
         </div>
-        <div class="p-6">
-          <h4 class="font-extrabold mb-2" style="color: var(--ink)">{{ announcement?.title }}</h4>
+        <div class="p-5">
+          <h4 class="ds-title mb-2" style="color: var(--ink)">{{ announcement?.title }}</h4>
           <p class="text-[13.5px] leading-relaxed whitespace-pre-wrap mb-3" style="color: var(--ink-soft)">{{ announcement?.content }}</p>
+          <div class="ds-hairline mb-3"></div>
           <p class="ds-label mb-4">{{ formatTime(announcement?.createdAt) }}</p>
-          <button class="ds-btn ds-btn--primary w-full !py-3" @click="handleAck">
+          <button type="button" class="ds-btn ds-btn--primary w-full !py-3" @click="handleAck">
             我已知晓
           </button>
         </div>
@@ -67,5 +73,3 @@ onMounted(() => {
     </div>
   </Teleport>
 </template>
-
-

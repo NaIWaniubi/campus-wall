@@ -31,7 +31,7 @@ function applyToDom(mode: ThemeMode) {
   const effective = resolve(mode)
   document.documentElement.setAttribute('data-theme', effective)
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', effective === 'dark' ? '#18181B' : '#6D3BF5')
+  if (meta) meta.setAttribute('content', effective === 'dark' ? '#0E0C0A' : '#14110F')
 }
 
 export const useThemeStore = defineStore('theme', {

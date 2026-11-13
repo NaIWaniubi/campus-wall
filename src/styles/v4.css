@@ -560,3 +560,50 @@ body {
   border: 1.5px solid var(--ink);
   box-shadow: var(--shadow-hard-sm);
 }
+
+/* ── 可访问性基线（V5） ─────────────────────────────────────────── */
+/* 键盘焦点：只在 :focus-visible 出现，鼠标点击不打扰 */
+:where(a, button, [role='button'], summary):focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+[data-theme='dark'] :where(a, button, [role='button'], summary):focus-visible {
+  outline-color: var(--lime);
+}
+/* 输入控件已有自己的 focus 态，这里只兜底没有样式的手写控件 */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 1px;
+}
+/* 跳转到主内容（屏幕阅读器/键盘用户）：默认隐藏，聚焦时出现 */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  transform: translateY(-160%);
+  background: var(--ink);
+  color: var(--lime);
+  border: 1.5px solid var(--lime);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 0.15s ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* 尊重系统「减少动态效果」：只保留必要的状态切换 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

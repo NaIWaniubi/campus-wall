@@ -5,16 +5,26 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Bell, Camera, Eye, EyeOff, Loader2, Lock, LogOut, Monitor, Moon, Sparkles, Sun, UserX } from '@lucide/vue'
+import { ArrowLeft, Bell, Camera, Download, Eye, EyeOff, Loader2, Lock, LogOut, Monitor, Moon, Sparkles, Sun, UserX } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { uploadApi, authApi, pushApi } from '@/utils/api'
 import { toast } from '@/utils/request'
+import { usePwaInstall } from '@/composables/usePwaInstall'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const { canInstall, installed: appInstalled, install: pwaInstall } = usePwaInstall()
+const installing = ref(false)
+async function onInstallApp() {
+  installing.value = true
+  const r = await pwaInstall()
+  installing.value = false
+  if (r === 'accepted') toast.success('已添加到设备，桌面图标见「校园墙」')
+  else if (r === 'dismissed') toast.info('已取消安装')
+}
 
 // ---------- 消息推送（Web Push，服务端 VAPID 未配置时入口自动隐藏） ----------
 const pushAvailable = ref(false)
@@ -370,6 +380,21 @@ function replayOnboarding() {
             <component :is="opt.icon" class="w-5 h-5" />
             <span class="text-[11.5px] font-bold">{{ opt.label }}</span>
           </button>
+        </div>
+        <!-- PWA：像原生 App 一样使用（V5） -->
+        <div class="flex items-center justify-between gap-3 ds-hairline-b" style="border-top: 1px solid var(--hairline); padding-top: 12px; border-bottom: 0">
+          <span class="flex items-center gap-2 text-[13px] font-semibold" style="color: var(--ink)">
+            <Download class="w-4 h-4" /> 安装校园墙
+            <span class="text-[11px] font-normal" style="color: var(--ink-mute)">{{ appInstalled ? '正在以应用模式运行' : '离线可看 · 桌面图标 · 全屏无地址栏' }}</span>
+          </span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span v-if="appInstalled" class="ds-tag"><span class="ds-tag-dot" style="background: var(--lime)"></span>已安装</span>
+            <button v-else-if="canInstall" type="button" class="ds-ink-btn !px-3.5 !py-1.5 text-[12px]" :disabled="installing" @click="onInstallApp">
+              <Loader2 v-if="installing" class="w-3.5 h-3.5 animate-spin" />
+              {{ installing ? '安装中…' : '一键安装' }}
+            </button>
+            <span v-else class="text-[11px]" style="color: var(--ink-mute)">浏览器菜单 → 添加到主屏幕</span>
+          </div>
         </div>
       </section>
 

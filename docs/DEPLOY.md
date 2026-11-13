@@ -100,7 +100,17 @@ node "C:/Users/chen/.zcode/cli/plugins/cache/zcode-plugins-official/zcode-site/0
 - 想重置演示数据：删掉 `$DATA_DIR/campus.db` 后重启，首启会自动重新灌种子
 - 想强制重灌：`DB_PATH=<path> node api/seed.mjs --force`（本地源码模式用 `npm run seed -- --force`）
 
-## 5. 这台机器上的已知边界
+## 5. 可选：开启 Web Push 离线推送
+
+默认不开启（用户端设置页的推送入口自动隐藏），三选一开启方式：
+
+- **本地演示**：`scripts/start-demo.ps1` 首跑自动调 `node scripts/gen-vapid.mjs` 生成密钥对到 `.zcode-site/test/data/vapid.json`（gitignored，不进仓库），并注入服务环境变量——无需手动配置
+- **源码部署**：`node scripts/gen-vapid.mjs <数据目录>/vapid.json` 生成后，把 `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`（mailto:）写进 `.env`
+- **Render**：本地跑一次 gen-vapid，把公私密钥填入 render.yaml 的对应 `sync: false` 环境变量（模板已留注释位）；密钥只存在于部署平台，永不提交
+
+开启效果：用户设置页「消息推送 → 开启」后，离线也能收到评论/私信/匹配通知（点击直达消息页）；服务端在 VAPID 未配置时对通知发送路径静默跳过，配置错误的发送失败会按 404/410 自动清理失效订阅。
+
+## 6. 这台机器上的已知边界
 
 - `cloudflared` / `localhost.run` 之类内网穿透在本机被网络策略拦（QUIC 与 7844 均不可达），无法用它临时对外发布。
 - Docker Desktop 未运行，容器镜像未在本机构建；但阶段包已在 WSL 真实 Linux 上跑通，等价于容器内运行。

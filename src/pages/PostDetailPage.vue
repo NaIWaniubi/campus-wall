@@ -4,12 +4,13 @@
  */
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star, Sparkles, ShieldAlert, ChevronDown } from '@lucide/vue'
+import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star, Sparkles, ShieldAlert, ChevronDown, ImageIcon } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
 import { postApi, commentApi, conversationApi, followApi, tradeApi, userApi, radarApi, aiApi, type RadarMatchItem } from '@/utils/api'
 import { formatTime } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import SharePosterModal from '@/components/SharePosterModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,7 @@ const commentText = ref('')
 const replyTarget = ref<any>(null) // 回复目标评论
 const expandedReplies = ref<Set<number>>(new Set())
 const showMoreMenu = ref(false)
+const showPoster = ref(false)
 const showReportSheet = ref(false)
 const showDeleteDialog = ref(false)
 const previewIndex = ref(-1)
@@ -650,6 +652,9 @@ function closeMoreMenu(e: MouseEvent) {
           <button class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--ink)" @click="share">
             <Share2 class="w-4 h-4" /> 分享
           </button>
+          <button type="button" class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--ink)" @click="showMoreMenu = false; showPoster = true">
+            <ImageIcon class="w-4 h-4" /> 生成海报
+          </button>
           <button v-if="!isAuthor" class="hover-paper w-full flex items-center gap-2 px-3 py-2 text-[13px] font-semibold rounded-[10px]" style="color: var(--ink)" @click="openReport">
             <Flag class="w-4 h-4" /> 举报
           </button>
@@ -1172,6 +1177,7 @@ function closeMoreMenu(e: MouseEvent) {
     </Teleport>
 
     <!-- 删除确认 -->
+    <SharePosterModal :visible="showPoster" :post="post" @close="showPoster = false" />
     <ConfirmDialog :visible="showDeleteDialog" content="确定删除该帖子吗？删除后不可恢复" title="删除帖子" confirm-text="删除" danger @confirm="deletePost" @cancel="showDeleteDialog = false" />
 
     <!-- 图片全屏预览 -->

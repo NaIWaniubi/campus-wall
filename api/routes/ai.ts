@@ -16,6 +16,7 @@ import {
   chatWithAI,
   chatWithAIStream,
   isAiUsable,
+  isAiEnabled,
   buildModelChain,
   type AiMessage,
   type AiCallOptions,
@@ -804,7 +805,9 @@ async function refreshDigest(): Promise<void> {
   digestRefreshing = true;
   try {
     const base = digestCache.data ?? ruleDigest();
-    if (!isAiUsable() || base.stats.posts === 0) {
+    // 后台任务：配置了 key 就尝试（无视熔断窗口）——免费推理档实测 ~35s 才出稿，
+    // 前台成稿等不起，但简报没人等；成功会复位熔断，等于持续为前台「探活」
+    if (!isAiEnabled() || base.stats.posts === 0) {
       digestCache.data = { ...base, offline: true };
       digestCache.ts = Date.now();
       return;
@@ -826,7 +829,8 @@ async function refreshDigest(): Promise<void> {
       ],
       512,
       currentModels(),
-      { budgetMs: 6_000, perModelTimeoutMs: 5_000 } satisfies AiCallOptions
+      // 后台预算放宽到 100s，允许慢但真实的大模型出稿；无视熔断窗口照常尝试
+      { budgetMs: 100_000, perModelTimeoutMs: 95_000, ignoreBreaker: true } satisfies AiCallOptions
     );
     bumpStats();
     const line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);

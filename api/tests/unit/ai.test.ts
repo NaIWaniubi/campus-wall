@@ -5,6 +5,7 @@ import {
   getAiApiKey,
   buildModelChain,
   DEFAULT_MODELS,
+  salvageJsonFromReasoning,
 } from '../../utils/ai.js';
 
 describe('AI Assistant Utilities', () => {
@@ -115,5 +116,26 @@ describe('网关级 auth 短路（V5）', () => {
     // 免费档端点全部被尝试过（4 个 :free 模型）
     const freeCalls = calls.filter((c) => c.model.endsWith(':free'));
     expect(freeCalls.length).toBe(4);
+  });
+});
+
+describe('salvageJsonFromReasoning（reasoning 模型空 content 打捞）', () => {
+  // 注意：cat >> 场景避免反引号，这里用字符串拼接构造围栏
+  const F = '`'.repeat(3);
+  it('优先取 ```json 围栏块', () => {
+    const r = `先分析一堆...${F}json\n{"title":"T","content":"C"}\n${F}\n搞定`;
+    expect(salvageJsonFromReasoning(r)).toBe('{"title":"T","content":"C"}');
+  });
+  it('无围栏时打捞首尾花括号平衡段', () => {
+    const r = 'Let me think. The answer is {"title":"标题","content":"正文","tags":["a"]} done';
+    const out = salvageJsonFromReasoning(r);
+    expect(out).toContain('"title"');
+    expect(() => JSON.parse(out!)).not.toThrow();
+  });
+  it('纯思考独白（无 JSON 形状）返回 null，不把独白当答案', () => {
+    expect(salvageJsonFromReasoning('用户想要一个帖子，我需要先分析语义，再组织语言……')).toBeNull();
+    expect(salvageJsonFromReasoning('')).toBeNull();
+    expect(salvageJsonFromReasoning(undefined)).toBeNull();
+    expect(salvageJsonFromReasoning('{}')).toBeNull(); // 太短不算草稿
   });
 });

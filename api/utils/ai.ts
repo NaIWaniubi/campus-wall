@@ -111,6 +111,8 @@ export interface AiCallOptions {
   budgetMs?: number;
   /** 单个模型的等待上限（毫秒） */
   perModelTimeoutMs?: number;
+  /** 后台任务专用：无视熔断窗口照常尝试（没人等待，成功反而复位熔断） */
+  ignoreBreaker?: boolean;
 }
 
 /**
@@ -127,6 +129,25 @@ export function buildModelChain(settingModel?: string | null): string[] {
     chain.splice(1, 0, envModel);
   }
   return Array.from(new Set(chain));
+}
+
+/**
+ * 从推理模型的 reasoning 尾巴里打捞 JSON：多数推理模型会把最终答案写在思考末尾
+ * （```json 围栏 或 最后一个平衡的 {...} 快）。只打捞「看起来是 JSON」的内容，
+ * 捞不到返回 null，让调用方按「未返回有效内容」走兜底——绝不把思考独白当答案。
+ */
+export function salvageJsonFromReasoning(reasoning?: string | null): string | null {
+  if (!reasoning || reasoning.length < 8) return null;
+  const fenced = reasoning.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced && fenced[1]!.trim().startsWith('{')) return fenced[1]!.trim();
+  const start = reasoning.indexOf('{');
+  const end = reasoning.lastIndexOf('}');
+  if (start >= 0 && end > start + 4) {
+    const slice = reasoning.slice(start, end + 1);
+    // 至少要像一份键值草稿（含引号键），避免把孤立的花括号独白当 JSON
+    if (/"[A-Za-z_\u4e00-\u9fa5]+"\s*:/.test(slice)) return slice;
+  }
+  return null;
 }
 
 async function toApiError(resp: Response): Promise<Error> {
@@ -186,6 +207,11 @@ async function requestOnce(
   const apiKey = route.key;
   const apiUrl = route.url;
 
+  // reasoning 模型（OpenRouter :free 档实测为推理型）：先把 token 烧在 reasoning 上再出 content。
+  // 实测严格 JSON 提示词下 2048 全部耗在思考里（finish=length、content=None），所以：
+  // 1) 预算翻倍到 4096；2) 提示服务端少想（reasoning.effort=low，不支持的网关会忽略）；
+  // 3) content 仍为空时，从 reasoning 尾部打捞 JSON 定界块。
+  const isFreeReasoning = model.endsWith(':free');
   try {
     const resp = await fetch(apiUrl, {
       method: 'POST',
@@ -199,10 +225,9 @@ async function requestOnce(
       body: JSON.stringify({
         model,
         messages,
-        // reasoning 模型（nemotron 系）会先输出 reasoning 再出 content，
-        // 1024 常常只够 thinking，导致 content 为空被判「未返回有效内容」而整链失败
-        max_tokens: Math.max(maxTokens, 2048),
+        max_tokens: Math.max(maxTokens, isFreeReasoning ? 4096 : 2048),
         temperature: 0.6,
+        ...(isFreeReasoning ? { reasoning: { effort: 'low' } } : {}),
         ...(onDelta ? { stream: true } : {}),
       }),
     });
@@ -211,7 +236,8 @@ async function requestOnce(
     if (!onDelta) {
       const json: any = await resp.json().catch((): null => null);
       const choice = json?.choices?.[0];
-      const content = choice?.message?.content || choice?.text;
+      const content =
+        choice?.message?.content || choice?.text || salvageJsonFromReasoning(choice?.message?.reasoning);
       if (typeof content !== 'string' || !content.trim()) throw new Error('AI 未返回有效内容');
       return content.trim();
     }
@@ -232,7 +258,7 @@ export async function chatWithAI(
   opts: AiCallOptions = {}
 ): Promise<string> {
   if (!isAiEnabled()) throw new Error('AI 未配置');
-  if (!aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
+  if (!opts.ignoreBreaker && !aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
 
   const started = Date.now();
   const budgetMs = opts.budgetMs ?? 30_000;

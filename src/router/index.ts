@@ -4,6 +4,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/request'
+import { isChunkLoadError, shouldReloadOnChunkError } from '@/utils/errorGuard'
 
 // 用户端页面（首屏相关保持静态，其余路由级懒分包）
 import HomePage from '@/pages/HomePage.vue'
@@ -101,6 +102,20 @@ router.beforeEach((to, _from, next) => {
   }
 
   next()
+})
+
+/**
+ * 路由错误兜底（V5）：
+ * - 懒加载 chunk 加载失败（典型场景：发版后用户还停在旧页面点了新路由，
+ *   旧 index.html 引用的 hash chunk 已不存在）→ 自动硬刷新拉新模板，只刷一次防死循环。
+ * - 其它导航错误：提示而非白屏。
+ */
+router.onError((err) => {
+  if (isChunkLoadError(err) && shouldReloadOnChunkError(sessionStorage)) {
+    location.reload()
+    return
+  }
+  toast.error('页面加载失败，请检查网络后重试')
 })
 
 export default router

@@ -20,6 +20,7 @@
     "pretest": "node scripts/ensure-vitest-shim.mjs",
     "check": "vue-tsc -b",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "loadtest": "tsx scripts/loadtest.mts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "docs:dev": "vitepress dev docs",

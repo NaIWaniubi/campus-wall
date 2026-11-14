@@ -16,6 +16,8 @@
 - **残余收口**：帖子点赞/收藏挂 engageLimiter（连点脚本刷计数）；改密失败进 recordAuthFailure（原密码可无限爆破）；部署产物重打包（stage/start.sh + deploy/render.yaml 泄露口令清除——R2 发现「仓库修了产物没跟上」的落地缺口）；测试脚本口令入环境变量
 - **两把假锁改真锁**（R2 反向验证：还原缺陷代码测试仍绿）：wx-login ver 锁改为走完整 handler+注入 openid+端到端 /me 200；点赞事务化锁改并发 6 请求断言响应值=库值
 - 文档数字对齐 CI 实测（perf 中位 95、压测 ~2409 req/s / p95 5ms、33 个测试文件）
+- **E2E 12→13**：新增「对回复再回复刷新后仍可见」（R1 修复的用户可见行为回归；踩坑两处：同帖 10s 防重评换帖避开、回复态需先点「回复」按钮 placeholder 才变）
+- **干净库索引顺序崩溃修复**（CI verify 红→绿）：idx_messages_dedup/inbox 依赖 related_sub_id 列须在 ALTER 后建、idx_conversations_user_b 须在 conversations 建表后建——本地 CI 等效场景（移走 data.db 跑全量）复现并验证；终态 CI 四 job 全绿：290 测试 / E2E 13 / Lighthouse 中位 95（94/95/96）/ 压测 ~2409 req/s
 
 ### R1 安全审计修复批（2026-11-14）
 - **六视角只读审计集群**（zcode-fleet swarm 并行 6 worker + 主线程视觉验收 8 实拍）回收去重 11 项真缺陷（4 P0 + 7 P1），交叉验证高置信

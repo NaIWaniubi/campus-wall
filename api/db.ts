@@ -285,14 +285,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_messages_user_read ON messages (user_id, is_read);
     CREATE INDEX IF NOT EXISTS idx_reports_status_priority ON reports (status, priority, created_at);
     CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON favorites (user_id, created_at);
-    -- R2 审计补（EXPLAIN + 基准实证）：楼中楼单查 parent_id 时 idx_comments_post_parent 前导列用不上 → 全表扫 309ms→1.3ms
+    -- 楼中楼单查 parent_id 时 idx_comments_post_parent 前导列用不上 → 全表扫（R2 基准 309ms→1.3ms）
     CREATE INDEX IF NOT EXISTS idx_comments_parent_status ON comments (parent_id, status, created_at);
-    -- 通知去重 upsert（10 处调用点每次写都跑）12305μs→15μs
-    CREATE INDEX IF NOT EXISTS idx_messages_dedup ON messages (user_id, type, related_id, related_sub_id, created_at);
-    -- 收件箱 ORDER BY is_read, created_at
-    CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages (user_id, is_read, created_at);
-    -- conversations 参与方 OR 查询 user_b 侧无索引退化全扫 3.26ms→0.60ms
-    CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations (user_b_id, last_at);
   `);
   // likes 的 (user_id, target_type, target_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
   // favorites 的 (user_id, post_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
@@ -507,6 +501,14 @@ if (!msgHasSub) {
   db.exec(`ALTER TABLE messages ADD COLUMN related_sub_id INTEGER`);
 }
 
+// messages 索引必须在 related_sub_id 列补齐之后建（干净库此列由上面的 ALTER 添加）
+db.exec(`
+  -- 通知去重 upsert（10 处调用点每次写都跑，R2 基准 12305μs→15μs）
+  CREATE INDEX IF NOT EXISTS idx_messages_dedup ON messages (user_id, type, related_id, related_sub_id, created_at);
+  -- 收件箱 ORDER BY is_read, created_at
+  CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages (user_id, is_read, created_at);
+`);
+
 // 管理端反馈列表按时间倒序分页
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback (created_at);
@@ -531,6 +533,8 @@ db.exec(`
     FOREIGN KEY (user_b_id) REFERENCES users(id)
   );
 `);
+// conversations 索引必须紧跟建表（参与方 OR 查询 user_b 侧无索引退化全扫，R2 基准 3.26→0.60ms）
+db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations (user_b_id, last_at);`);
 
 /**
  * 私信消息表：按会话存储，升序读取；is_read 供单条已读回执扩展

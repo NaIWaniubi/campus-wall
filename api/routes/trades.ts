@@ -109,14 +109,14 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
   // 未登记的第三方既不能评卖家（否则可批量扣分），也不能被卖家指定（否则可互刷信誉分）。
   const isAuthor = post.user_id === req.currentUser!.id;
 
-  // 成交买家：优先 extra_fields.soldTo，其次已接受的意向出价（撮合闭环的权威来源）
-  let buyerId = Number(extra.soldTo) || 0;
-  if (!buyerId) {
-    const accepted = db.prepare(
-      "SELECT buyer_id FROM trade_offers WHERE post_id = ? AND status IN ('accepted','completed') ORDER BY updated_at DESC LIMIT 1"
-    ).get(postId) as any;
-    buyerId = Number(accepted?.buyer_id) || 0;
-  }
+  // 成交买家：唯一权威来源是 trade_offers 的 accepted/completed 记录。
+  // extra_fields.soldTo（/complete 写入）仅作提示展示——创建路径白名单修复前的历史数据
+  // 可能被客户端预置污染，信任它等于「指定任意人扣信誉分」的刷分通道
+  let buyerId = 0;
+  const accepted = db.prepare(
+    "SELECT buyer_id FROM trade_offers WHERE post_id = ? AND status IN ('accepted','completed') ORDER BY updated_at DESC LIMIT 1"
+  ).get(postId) as any;
+  buyerId = Number(accepted?.buyer_id) || 0;
   if (!buyerId) return fail(res, '该交易未登记买家，无法评价');
   if (buyerId === post.user_id) return fail(res, '买家与卖家不能是同一人');
 

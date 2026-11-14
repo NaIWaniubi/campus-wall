@@ -10,7 +10,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { postApi, subscriptionApi, announcementApi, sectionApi, aiApi } from '@/utils/api'
-import { sectionGradient, sectionColor } from '@/utils/sections'
+import { sectionColor } from '@/utils/sections'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
@@ -360,7 +360,7 @@ watch(list, () => nextTick(updateScrollMargin))
  <span
  class="w-[7px] h-[7px] rounded-full shrink-0"
  :style="{
- background: sec.id ? sectionGradient(sec.id, sec.name) : 'currentColor',
+ background: sec.id ? sectionColor(sec.id, sec.name) : 'currentColor',
  boxShadow: 'inset 0 0 0 1px rgba(20,17,15,.45)',
  }"
  ></span>
@@ -413,9 +413,8 @@ watch(list, () => nextTick(updateScrollMargin))
  <!-- 今日校园 · AI 简报：AI 进首页主链路，一眼看完今天 -->
  <section v-if="digest" class="card-premium ai-trail rounded-[16px] p-4">
  <div class="flex items-center gap-2">
- <span class="w-7 h-7 rounded-xl flex items-center justify-center text-white flex-shrink-0"
- style="background: var(--grad-brand)">
- <Sparkles class="w-4 h-4" />
+ <span class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ds-poster">
+ <Sparkles class="w-4 h-4" style="color: var(--lime)" />
  </span>
  <div class="min-w-0">
  <h2 class="text-sm font-semibold leading-tight" style="color: var(--ink)">今日校园</h2>
@@ -549,7 +548,7 @@ watch(list, () => nextTick(updateScrollMargin))
  >
  <span
  class="w-[6px] h-[6px] rounded-full shrink-0"
- :style="{ background: sectionGradient(sec.id, sec.name) }"
+ :style="{ background: sectionColor(sec.id, sec.name) }"
  ></span>
  <span class="truncate">{{ sec.name }}</span>
  </button>

@@ -29,7 +29,8 @@ router.post('/subscribe', authRequired, (req, res) => {
 router.post('/unsubscribe', authRequired, (req, res) => {
   const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : '';
   if (!endpoint) return fail(res, '缺少 endpoint');
-  removeSubscription(endpoint);
+  // 只能退订自己的订阅：拿到他人 endpoint（日志/共享设备泄漏）不可用来摘掉别人设备
+  removeSubscription(endpoint, req.currentUser!.id);
   success(res, { subscribed: false });
 });
 

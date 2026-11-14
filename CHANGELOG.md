@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+### R1 安全审计修复批（2026-11-14）
+- **六视角只读审计集群**（zcode-fleet swarm 并行 6 worker + 主线程视觉验收 8 实拍）回收去重 10 项真缺陷（3 P0 + 7 P1），交叉验证高置信
+- **[P0] 匿名评论/回复通知实名泄露**：upsertNotification 用真实昵称写进帖主消息列表——通知署名按 anonymous 归一「匿名同学」（评论+楼中楼两条路径），与 formatComment 展示口径一致
+- **[P0] extraFields 创建路径绕过白名单**：创建侧补 sanitizeExtraFields（与编辑同口径）；soldTo/soldAt 服务端专属键被剥离；riskFlag 改独立组装；10MB 任意 JSON→FTS 触发器全量切词的 DoS 面同步关闭
+- **[P0] rate 评价买家权威来源**：不再信任库中 extra_fields.soldTo（历史可被预置污染=「指定任意人扣信誉分」通道），唯一权威是 trade_offers 的 accepted/completed 记录
+- **[P1] 回复「回复」三级嵌套静默丢评论**：服务端把 parent_id 归一化到顶层评论 id；通知锚点同归一（Web 对回复点「回复」不再产生任何接口查不回的数据）
+- **[P1] 评论列表可见性**：非 published 帖（审核中/驳回/删除）评论对游客/无关用户 404，作者/管理员可见——与帖子详情同口径；回复接口同样挂守卫
+- **[P1] wx-login 缺 ver**：改密/封禁过的账号微信静默登录后每请求 401 死循环——补 ver: token_version
+- **[P1] 管理端重置密码不吊销 token**：UPDATE 追加 token_version+1 + changes===0 判 404（被盗号应急通道真正止损）
+- **[P1] Web Push 订阅归属约束**：subscribe 的 ON CONFLICT 只在归属相同时刷新 keys（他人不可抢主截走离线通知）；unsubscribe 带 user_id（不可越权摘除他人设备）
+- **[P1] WS 重复 hello**：认证后再 hello 直接 close(4008)——修复 Conn 永久泄漏与同 socket 换 token 串投；hub.detach 清空集合
+- **[P1] 编辑状态机**：deleted 帖编辑 404、rejected 拒编辑——违规内容不再能经编辑回流审核队列
+- **[P0] 生产超管口令出仓库**：render.yaml 改 sync:false（Render 控制台注入）；提交材料/部署手册脱敏；bundle 脚本演示默认值改 demo-admin-2026
+- 回归锁 11 条新增（audit-r1-fixes.test.ts）+ push 契约测试改写锁新归属语义；V4 渐变回潮清零（PostCard 头像/标签、首页简报图标、板块色点改纯色）；测试 279→290
+
 ### V5 · 体验与落地（2026-11-13）
 - **登录重构**：通用账号注册登录（手机号/拼音/邮箱前缀，3–32 位；学号降级为旧字段别名），密码 6 位含字母数字；登录页新增「一键体验（免输入）」与「游客逛逛」；字段级内联错误 + 桌面自动聚焦
 - **全局命令面板**：`Ctrl/⌘+K` 唤起，实时搜帖子 + 板块直达 + 页面跳转 + 最近搜索；↑↓ 导航 / Enter 进入 / Esc 关闭

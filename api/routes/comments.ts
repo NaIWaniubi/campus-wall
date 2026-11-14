@@ -62,6 +62,13 @@ router.get('/posts/:id/comments', authOptional, validate({ params: commonSchemas
   const postId = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
+  // 可见性与帖子详情同口径：非 published（审核中/驳回/删除）只有作者/管理员可见，
+  // 否则被管理员删除的帖子正文 404 了，评论还能被游客整段读走（绕过审核与删除）
+  const viewer = req.currentUser;
+  const canView =
+    post.status === 'published' ||
+    (viewer && (viewer.id === post.user_id || viewer.role === 'super_admin' || viewer.role === 'section_admin'));
+  if (!canView) return fail(res, '帖子不存在', 404, 404);
 
   const currentUserId = req.currentUser?.id;
   const comments = db.prepare(`
@@ -119,10 +126,12 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
   touchActive(req.currentUser!.id);
   cacheInvalidate('posts');
 
-  // 通知作者（去重）
+  // 通知作者（去重）；匿名评论按展示口径归一，绝不把真实昵称写进消息——
+  // 否则帖主打开消息中心就能看到「张三 评论了你的帖子」，全站匿名承诺在通知链路失效
   if (post.user_id !== req.currentUser!.id) {
+    const who = anonymous ? '匿名同学' : req.currentUser!.nickname;
     upsertNotification(
-      post.user_id, 'comment', `${req.currentUser!.nickname} 评论了你的帖子「${post.title}」`, postId, Number(commentId)
+      post.user_id, 'comment', `${who} 评论了你的帖子「${post.title}」`, postId, Number(commentId)
     );
   }
 
@@ -152,23 +161,34 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
   if (riskLevel === 'reject') return fail(res, '回复包含违规内容');
 
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(parent.post_id) as any;
+  // 回复也必须挂在 published 帖上（作者/管理员回复自己待审帖除外）
+  const viewer = req.currentUser;
+  const canReply =
+    post.status === 'published' ||
+    (viewer && (viewer.id === post.user_id || viewer.role === 'super_admin' || viewer.role === 'section_admin'));
+  if (!canReply) return fail(res, '帖子不存在', 404, 404);
   const anonymous = post.is_anonymous ? 1 : (isAnonymous ? 1 : 0);
+
+  // 归一化父级：parent 可能本身是楼中楼回复（前端「回复某条回复」），
+  // 列表只展开一层——直接挂 reply 的 id 会生成三级嵌套，任何接口都查不回（静默丢评论）
+  const topParentId = parent.parent_id ?? parent.id;
 
   const result = db.prepare(`
     INSERT INTO comments (post_id, user_id, parent_id, content, is_anonymous)
     VALUES (?, ?, ?, ?, ?)
-  `).run(parent.post_id, req.currentUser!.id, commentId, content, anonymous);
+  `).run(parent.post_id, req.currentUser!.id, topParentId, content, anonymous);
 
   const replyId = result.lastInsertRowid as number;
   // 回复也计入帖子评论数：否则「12 条评论」点进去有 20 层楼，展示与实际不符
   db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(parent.post_id);
   cacheInvalidate('posts');
 
-  // 通知被回复者（去重）
+  // 通知被回复者（去重）；匿名回复同样归一署名
   if (parent.user_id !== req.currentUser!.id) {
+    const who = anonymous ? '匿名同学' : req.currentUser!.nickname;
     // 直达锚点用顶层父评论：回复嵌在楼中楼里，滚到父评论才能看见整条对话
     upsertNotification(
-      parent.user_id, 'comment', `${req.currentUser!.nickname} 回复了你的评论`, parent.post_id, commentId
+      parent.user_id, 'comment', `${who} 回复了你的评论`, parent.post_id, topParentId
     );
   }
 
@@ -205,22 +225,25 @@ router.delete('/comments/:id', authRequired, validate({ params: commonSchemas.id
   success(res, null, '删除成功');
 });
 
-// 点赞评论
+// 点赞评论（事务化：并发/连点下返回值必须与库一致，不能拿进事务前的快照算数）
 router.post('/comments/:id/like', authRequired, validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);
 
-  const exist = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(req.currentUser!.id, 'comment', id);
-  if (exist) {
-    db.prepare('DELETE FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').run(req.currentUser!.id, 'comment', id);
-    db.prepare('UPDATE comments SET like_count = MAX(0, like_count - 1) WHERE id = ?').run(id);
-    success(res, { liked: false, likeCount: comment.like_count - 1 }, '已取消点赞');
-  } else {
+  const result = db.transaction(() => {
+    const exist = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(req.currentUser!.id, 'comment', id);
+    if (exist) {
+      db.prepare('DELETE FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').run(req.currentUser!.id, 'comment', id);
+      db.prepare('UPDATE comments SET like_count = MAX(0, like_count - 1) WHERE id = ?').run(id);
+      return { liked: false, message: '已取消点赞' };
+    }
     db.prepare('INSERT INTO likes (user_id, target_type, target_id) VALUES (?, ?, ?)').run(req.currentUser!.id, 'comment', id);
     db.prepare('UPDATE comments SET like_count = like_count + 1 WHERE id = ?').run(id);
-    success(res, { liked: true, likeCount: comment.like_count + 1 }, '点赞成功');
-  }
+    return { liked: true, message: '点赞成功' };
+  })();
+  const fresh = db.prepare('SELECT like_count FROM comments WHERE id = ?').get(id) as any;
+  success(res, { liked: result.liked, likeCount: fresh.like_count }, result.message);
 });
 
 // 举报评论

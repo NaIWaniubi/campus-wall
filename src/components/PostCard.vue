@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import { MessageCircle, Heart, Eye, Bookmark } from '@lucide/vue'
 import { formatTime } from '@/utils/helpers'
 import CreditBadge from '@/components/CreditBadge.vue'
-import { sectionColor, sectionGradient } from '@/utils/sections'
+import { sectionColor } from '@/utils/sections'
 
 const props = defineProps<{
   post: any
@@ -20,9 +20,8 @@ const author = computed(() => props.post.author || {})
 const section = computed(() => props.post.section || {})
 const images = computed(() => props.post.images || [])
 const thumbs = computed(() => props.post.thumbImages || [])
-/** 分类标签配色（对齐原生小程序分类色标签） */
+/** 分类标签配色（对齐原生小程序分类色标签；V4 纯色，不再用渐变） */
 const catColor = computed(() => sectionColor(section.value?.id, section.value?.name))
-const catGradient = computed(() => sectionGradient(section.value?.id, section.value?.name))
 
 // 缩略图加载失败（旧图未生成缩略图）时回退原图
 function onThumbError(e: Event, fallback: string) {
@@ -70,7 +69,7 @@ function highlight(text: string): string {
     <!-- 作者信息 + 分类标签（右对齐，对齐原生小程序 post-card 结构） -->
     <div class="flex items-start justify-between gap-3 mb-2.5">
       <div class="flex items-center gap-2.5 min-w-0">
-        <div class="avatar-ring shrink-0" :style="{ background: catGradient }">
+        <div class="avatar-ring shrink-0">
           <span class="w-9 h-9 bg-white flex items-center justify-center overflow-hidden">
             <img v-if="author.avatar" :src="author.avatar" class="w-full h-full object-cover" loading="lazy" decoding="async" alt="头像" />
             <span v-else class="text-sm font-bold" :style="{ color: catColor }">{{ author.nickname?.charAt(0) || '匿' }}</span>
@@ -85,7 +84,7 @@ function highlight(text: string): string {
           <div class="text-[11px] mt-0.5" style="color: var(--ink-mute)">{{ formatTime(post.createdAt) }}</div>
         </div>
       </div>
-      <span v-if="section.name" class="cat-tag-grad mt-0.5" :style="{ background: catGradient }">{{ section.name }}</span>
+      <span v-if="section.name" class="cat-tag-grad mt-0.5" :style="{ background: catColor }">{{ section.name }}</span>
     </div>
 
     <!-- 标题 -->

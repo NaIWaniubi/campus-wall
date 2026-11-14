@@ -39,8 +39,10 @@ services:
         value: "1"
       - key: JWT_SECRET
         generateValue: true
+      # 超管首启口令：绝不写死在仓库（任何读到仓库的人即接管后台）。
+      # Render 控制台手动填一个强口令；不填时首启会因生产加固直接拒绝启动（这是设计）。
       - key: ADMIN_INITIAL_PASSWORD
-        value: CampusWall@2026
+        sync: false
       # 可选：Web Push 离线推送（三者齐用才生效；本地 node scripts/gen-vapid.mjs 生成后粘贴，勿提交进仓库）
       # - key: VAPID_PUBLIC_KEY
       #   sync: false

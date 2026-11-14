@@ -75,22 +75,34 @@ describe('/api/push/subscribe', () => {
     expect(subRow(endpoint)).toBeUndefined();
   });
 
-  it('VAPID 配置后：订阅落库 → 同 endpoint 换主刷新 → 退订删行', async () => {
+  it('VAPID 配置后：订阅落库 → 归属锁定（他人不可抢主）→ 本人换 keys 刷新 → 本人退订删行', async () => {
     process.env.VAPID_PUBLIC_KEY = 'BK-testpub' + TAG;
     const ok = await request(app).post('/api/push/subscribe').set('Authorization', token(userId)).send({ subscription: goodSub });
     expect(ok.body.code).toBe(200);
     expect(subRow(endpoint)?.user_id).toBe(userId);
 
-    // 同一浏览器 endpoint 被另一账号授权：按 endpoint 唯一刷新归属与 keys
+    // 同一浏览器 endpoint 被另一账号授权：归属不得改绑（审计 R1 修复9），
+    // keys 也不得被他人覆盖——否则原用户的离线通知发到攻击者可控的会话
     const moved = await request(app).post('/api/push/subscribe').set('Authorization', token(userId2)).send({
       subscription: { ...goodSub, keys: { p256dh: 'BP-new-' + TAG, auth: 'auth2-' + TAG } },
     });
     expect(moved.body.code).toBe(200);
     const row = subRow(endpoint);
-    expect(row?.user_id).toBe(userId2);
-    expect(row?.p256dh).toBe('BP-new-' + TAG);
+    expect(row?.user_id).toBe(userId);
+    expect(row?.p256dh).toBe(goodSub.keys.p256dh);
 
-    const off = await request(app).post('/api/push/unsubscribe').set('Authorization', token(userId2)).send({ endpoint });
+    // 越权退订：无效果
+    const steal = await request(app).post('/api/push/unsubscribe').set('Authorization', token(userId2)).send({ endpoint });
+    expect(steal.body.code).toBe(200);
+    expect(subRow(endpoint)).toBeTruthy();
+
+    // 本人重授权刷新 keys → 本人退订删行
+    const refresh = await request(app).post('/api/push/subscribe').set('Authorization', token(userId)).send({
+      subscription: { ...goodSub, keys: { p256dh: 'BP-owner-' + TAG, auth: 'auth1-' + TAG } },
+    });
+    expect(refresh.body.code).toBe(200);
+    expect(subRow(endpoint)?.p256dh).toBe('BP-owner-' + TAG);
+    const off = await request(app).post('/api/push/unsubscribe').set('Authorization', token(userId)).send({ endpoint });
     expect(off.body.code).toBe(200);
     expect(subRow(endpoint)).toBeUndefined();
   });

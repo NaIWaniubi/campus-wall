@@ -400,12 +400,15 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
   }
 
   const imgs = Array.isArray(images) ? images.slice(0, 9) : [];
-  const extra = (extraFields && typeof extraFields === 'object' && !Array.isArray(extraFields))
-    ? { ...extraFields }
-    : {};
-  // 中风险标记（最小侵入：写入 extra_fields，前端 PostCard 无需改动）
+  // 白名单清洗（与编辑路径同口径）：防 10MB 任意 JSON 入库 + FTS 触发器全量切词卡死同步写；
+  // soldAt/soldTo 是服务端专属键（交易完成时由 /trades/:id/complete 写入），
+  // 客户端预置即可在 /rate 伪造交易对手扣任意人信誉分——必须剥离
+  const extra = sanitizeExtraFields(extraFields);
+  // 中风险标记（最小侵入：写入 extra_fields，前端 PostCard 无需改动）；
+  // riskFlag 是服务端专属键，与白名单字段分开组装落库
+  const finalExtra: Record<string, unknown> = { ...extra };
   if (risk.level === 'warn') {
-    extra.riskFlag = { level: 'warn', hits: risk.hits };
+    finalExtra.riskFlag = { level: 'warn', hits: risk.hits };
   }
 
   const result = db.prepare(`
@@ -419,7 +422,7 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
     JSON.stringify(imgs),
     isAnonymous ? 1 : 0,
     status,
-    JSON.stringify(extra)
+    JSON.stringify(finalExtra)
   );
 
   const postId = result.lastInsertRowid as number;
@@ -483,6 +486,10 @@ router.put('/:id', authRequired, validate({ params: commonSchemas.id, body: post
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
   if (post.user_id !== req.currentUser!.id) return forbidden(res, '只能编辑自己的帖子');
+  // 状态机守卫：deleted（含管理端举报处置删除）与 rejected 不可经编辑复活——
+  // 否则作者对被删帖发一次编辑就把它送回审核队列，违规内容回流
+  if (post.status === 'deleted') return fail(res, '帖子不存在', 404, 404);
+  if (post.status === 'rejected') return fail(res, '该帖子未通过审核，不可编辑');
 
   const hoursDiff = (Date.now() - new Date(post.created_at).getTime()) / (1000 * 60 * 60);
   if (hoursDiff > 24) return fail(res, '发布超过24小时，不可编辑');

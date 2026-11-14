@@ -8,7 +8,7 @@ import { useRouter } from 'vue-router'
 import { ChevronRight } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { postApi } from '@/utils/api'
-import { sectionGradient, sectionDesc } from '@/utils/sections'
+import { sectionColor, sectionDesc } from '@/utils/sections'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -64,7 +64,7 @@ onMounted(async () => {
         <span
           class="ds-tag-dot shrink-0"
           style="margin-top: 9px"
-          :style="{ background: sectionGradient(s.id, s.name) }"
+          :style="{ background: sectionColor(s.id, s.name) }"
           aria-hidden="true"
         ></span>
         <div class="flex-1 min-w-0">

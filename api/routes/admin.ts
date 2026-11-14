@@ -137,7 +137,9 @@ router.put('/users/:id/reset-password', superOnly, (req, res) => {
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) return fail(res, '密码至少6位');
   const hashed = bcrypt.hashSync(newPassword, 10);
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, id);
+  // token_version 同步 +1：重置密码是盗号应急手段，不吊销旧 token 等于没止损（改密/封禁同口径）
+  const result = db.prepare('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?').run(hashed, id);
+  if (result.changes === 0) return fail(res, '用户不存在', 404, 404);
   // 审计（不存明文密码，仅记长度作为行为证据）
   db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
     req.currentUser!.id, 'reset_password', 'user', id, JSON.stringify({ newLength: newPassword.length })

@@ -30,7 +30,7 @@ cd E:\校园墙
 bash .zcode-site/stage/start.sh      # 默认 3000 端口；Windows 上无 linux sharp 会自动降级为原图
 ```
 
-演示账号：`23770001 / demo1234`（学生） · `admin / CampusWall@2026`（超管，后台 `/admin`）
+演示账号：`23770001 / demo1234`（学生） · `admin / admin123`（超管，仅本地演示库；线上口令经 ADMIN_INITIAL_PASSWORD 环境变量注入，不进仓库）
 
 V3 三个 AI 入口的自测顺序（都无需真模型）：
 
@@ -63,7 +63,7 @@ Render 免费实例：0.5 vCPU / 512 MB，磁盘为临时盘（实例重启会�
 | `WS_ENABLED` | `1` |
 | `LOG_TO_FILE` | `0` |
 | `JWT_SECRET` | Render 生成的随机值 |
-| `ADMIN_INITIAL_PASSWORD` | `CampusWall@2026` |
+| `ADMIN_INITIAL_PASSWORD` | 自设强口令（Render 控制台 / .env 注入） |
 
 构建命令：`npm install --omit=dev --no-audit --no-fund --os=linux --cpu=x64 --libc=glibc`
 启动命令：`bash start.sh` · 健康检查路径：`/`

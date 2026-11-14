@@ -82,6 +82,13 @@ export function attachWebSocket(server: Server): WebSocketServer {
       }
 
       if (parsed.type === 'hello') {
+        // 重复 hello 防护：认证后再次 hello 会再 attach 一个 Conn 且旧 Conn 永不 detach
+        // （连接泄漏 + 同 socket 换 token 时把旧身份的推送串投给新身份）
+        if (conn || userId !== null) {
+          ws.send(JSON.stringify({ type: 'error', code: 'BAD_REQUEST', message: 'already authenticated' }));
+          try { ws.close(4008, 'duplicate hello'); } catch { /* noop */ }
+          return;
+        }
         try {
           const u = authJwt(parsed.token);
           userId = u.id;

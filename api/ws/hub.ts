@@ -27,7 +27,10 @@ export function attach(ws: WebSocket, userId: number): Conn {
 }
 
 export function detach(c: Conn): void {
-  conns.get(c.userId)?.delete(c);
+  const set = conns.get(c.userId);
+  set?.delete(c);
+  // 空集合一并清掉：否则离线用户的空 Set 常驻，stats().users 与遍历成本缓慢膨胀
+  if (set && set.size === 0) conns.delete(c.userId);
   for (const conv of c.subscribedConvs) convSubs.get(conv)?.delete(c);
   for (const t of c.topics) topicSubs.get(t)?.delete(c);
 }

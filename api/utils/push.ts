@@ -48,17 +48,25 @@ export function getPublicKey(): string | null {
   return isVapidConfigured() ? process.env.VAPID_PUBLIC_KEY!.trim() : null;
 }
 
-/** 落库/刷新一条订阅（endpoint 唯一，重复授权刷新 keys） */
+/** 落库/刷新一条订阅（endpoint 唯一；归属只能换到「同一用户重新授权」，
+ *  绝不允许把他人 endpoint 改绑到自己名下——否则可截走原用户的离线通知） */
 export function saveSubscription(userId: number, endpoint: string, p256dh: string, auth: string): void {
   db.prepare(`
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
     VALUES (?, ?, ?, ?)
-    ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth
+    ON CONFLICT(endpoint) DO UPDATE SET
+      p256dh = excluded.p256dh, auth = excluded.auth
+    WHERE push_subscriptions.user_id = excluded.user_id
   `).run(userId, endpoint, p256dh, auth);
 }
 
-export function removeSubscription(endpoint: string): void {
-  db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+/** 按 endpoint + 归属删除；跨用户调用不产生任何效果（防越权退订他人设备） */
+export function removeSubscription(endpoint: string, userId?: number): void {
+  if (userId !== undefined) {
+    db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').run(endpoint, userId);
+  } else {
+    db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+  }
 }
 
 /** 向一个用户的所有订阅端点发推送；失效端点（404/410）自动清理。内部吞错，永不向上抛 */

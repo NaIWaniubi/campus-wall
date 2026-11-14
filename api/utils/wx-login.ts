@@ -74,7 +74,8 @@ export async function wxLoginHandler(req: Request, res: Response) {
         403
       );
     }
-    const token = generateToken({ id: bound.id, studentId: bound.student_id, role: bound.role });
+    // ver 必须带 token_version：改密/封禁会 +1，缺省 0 会让这类账号 wx 登录后每个请求都 401（登录死循环）
+    const token = generateToken({ id: bound.id, studentId: bound.student_id, role: bound.role, ver: Number(bound.token_version ?? 0) });
     return success(res, { token, user: toCamel(bound), isNewUser: false }, '登录成功');
   }
 
@@ -91,7 +92,7 @@ export async function wxLoginHandler(req: Request, res: Response) {
 
   const userId = Number(result.lastInsertRowid);
   const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(userId) as any;
-  const token = generateToken({ id: userId, studentId: placeholderStudentId, role: 'user' });
+  const token = generateToken({ id: userId, studentId: placeholderStudentId, role: 'user', ver: 0 });
 
   logger.info('wx-login new user', { userId });
   success(res, { token, user: toCamel(user), isNewUser: true }, '登录成功');

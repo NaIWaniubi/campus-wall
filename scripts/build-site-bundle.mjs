@@ -48,7 +48,8 @@ export BACKUP_DIR="$DATA_DIR/backups"
 
 # 演示站固定密钥（非生产机密；正式环境请改成自己的值）
 export JWT_SECRET="\${JWT_SECRET:-campus-wall-zcode-sites-demo-secret-2026-rotate-me}"
-export ADMIN_INITIAL_PASSWORD="\${ADMIN_INITIAL_PASSWORD:-CampusWall@2026}"
+# 超管首启口令：演示包用演示值开箱即用；正式部署必须经环境变量覆盖为强口令
+export ADMIN_INITIAL_PASSWORD="\${ADMIN_INITIAL_PASSWORD:-demo-admin-2026}"
 
 # 平台在前面终止 TLS 并转发，信任一层代理才能拿到真实客户端 IP
 export TRUST_PROXY=1

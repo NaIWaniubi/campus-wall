@@ -44,14 +44,16 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // 子表先行（FK 约束）：评论/点赞/通知/推送/评价/出价 → 帖子 → 用户
+  // 子表先行（FK 约束）：评论/点赞/通知/推送/评价/出价/事件 → 帖子 → 用户
   db.prepare('DELETE FROM likes WHERE target_type = ? AND target_id IN (SELECT id FROM comments WHERE post_id IN (?, ?))').run('comment', postId, pendingPostId);
   db.prepare('DELETE FROM comments WHERE post_id IN (?, ?)').run(postId, pendingPostId);
-  db.prepare('DELETE FROM messages WHERE user_id = ?').run(ownerId);
+  db.prepare('DELETE FROM messages WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE ?)').run(`${TAG}%`);
   db.prepare('DELETE FROM push_subscriptions WHERE endpoint LIKE ?').run(`%${TAG}%`);
   db.prepare('DELETE FROM admin_logs WHERE target_type = ? AND target_id IN (SELECT id FROM users WHERE student_id LIKE ?)').run('user', `${TAG}%`);
   db.prepare('DELETE FROM trade_ratings WHERE post_id IN (SELECT id FROM posts WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE ?))').run(`${TAG}%`);
   db.prepare('DELETE FROM trade_offers WHERE post_id IN (SELECT id FROM posts WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE ?))').run(`${TAG}%`);
+  // touchActive/trackEvent 写的 events：不清理会挡 users 删除（FK）
+  db.prepare('DELETE FROM events WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE ?)').run(`${TAG}%`);
   db.prepare('DELETE FROM posts WHERE user_id IN (SELECT id FROM users WHERE student_id LIKE ?)').run(`${TAG}%`);
   db.prepare('DELETE FROM users WHERE student_id LIKE ?').run(`${TAG}%`);
 });

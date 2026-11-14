@@ -40,10 +40,11 @@ test('可发表评论并立即上楼', async ({ page }) => {
 
 test('对回复再回复仍可见（R1 修复：parent_id 服务端归一顶层）', async ({ page }) => {
   await login(page)
+  // 换一帖：评论有 10s 防重评（同帖），上一条用例刚在同帖发过评论会被拦
   await page.goto('/search')
-  await page.getByPlaceholder('搜索帖子').fill('捡到一张校园卡')
+  await page.getByPlaceholder('搜索帖子').fill('丢失校园卡急寻')
   await page.getByPlaceholder('搜索帖子').press('Enter')
-  await page.getByText('捡到一张校园卡').first().click()
+  await page.getByText('丢失校园卡急寻').first().click()
   await expect(page).toHaveURL(/\/post\/\d+/)
 
   // 先发顶层评论
@@ -51,8 +52,9 @@ test('对回复再回复仍可见（R1 修复：parent_id 服务端归一顶层�
   await page.getByPlaceholder('写下你的评论...').fill(topContent)
   await page.getByPlaceholder('写下你的评论...').press('Enter')
   await expect(page.getByText(topContent)).toBeVisible({ timeout: 8_000 })
-  // 对这条顶层评论的「回复」按钮再点回复——若服务端把二级回复归一顶层，
-  // 刷新后它必须仍然出现在该评论的 replies 列表里
+  // 点该评论的「回复」进入回复态（placeholder 变「写下你的回复...」）
+  await page.locator('button.act-link', { hasText: '回复' }).first().click()
+  // 服务端把回复归一顶层父级，刷新后必须仍在该评论 replies 里
   const replyContent = `E2E 回复的回复 ${Date.now()}`
   await page.getByPlaceholder('写下你的回复...').fill(replyContent)
   await page.getByPlaceholder('写下你的回复...').press('Enter')

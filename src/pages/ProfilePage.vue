@@ -135,6 +135,7 @@ async function onAvatarChange(e: Event) {
   uploading.value = true
   try {
     const res: any = await uploadApi.upload(file)
+    // 入库相对路径（/uploads/...，防换域名历史图失效；schema 已接受该形态）
     await userStore.updateProfile({ avatar: res.data.url })
     toast.success('头像已更新')
   } catch {

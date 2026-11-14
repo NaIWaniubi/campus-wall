@@ -243,7 +243,8 @@ export const userSchemas = {
   // 早期白名单误写成 bio 并默认 strip，导致保存签名静默失败（返回「无更新内容」）。
   updateProfile: z.object({
     nickname: z.string().min(1).max(20).optional(),
-    avatar: z.string().url().optional(),
+    // 头像：本地上传返回相对路径 /uploads/<file>（防换域名历史图失效），外链是完整 URL——两种都收
+    avatar: z.union([z.string().url(), z.string().regex(/^\/uploads\/[\w.-]+$/)]).optional(),
     signature: z.string().max(100, '签名最多 100 字').optional(),
     bio: z.string().max(200).optional(),
     college: z.string().max(50).optional(),

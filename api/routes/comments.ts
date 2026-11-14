@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
-import { commentLimiter } from '../middleware/rateLimit.js';
+import { commentLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
 import { trackEvent, trackFirstEvent, touchActive } from '../utils/events.js';
@@ -15,7 +15,8 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-function formatComment(comment: any, currentUserId?: number): any {
+/** 单条评论 → 展示结构。likedIds 提供时批量判点赞（列表路径），否则单查（详情/发帖后回显路径） */
+function formatComment(comment: any, currentUserId?: number, likedIds?: Set<number>): any {
   let author: any;
   if (comment.is_anonymous) {
     author = { id: 0, nickname: '匿名用户', avatar: '' };
@@ -27,20 +28,8 @@ function formatComment(comment: any, currentUserId?: number): any {
     };
   }
 
-  let liked = false;
-  if (currentUserId) {
-    const like = db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(currentUserId, 'comment', comment.id);
-    liked = !!like;
-  }
-
-  // 获取子回复
-  const replies = db.prepare(`
-    SELECT c.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar
-    FROM comments c
-    LEFT JOIN users u ON c.user_id = u.id
-    WHERE c.parent_id = ? AND c.status = 'active'
-    ORDER BY c.created_at ASC
-  `).all(comment.id) as any[];
+  // 批量路径（likedIds 传入）零额外查询；单条路径才发一次 likes 查询
+  const liked = likedIds ? likedIds.has(comment.id) : (!!currentUserId && !!db.prepare('SELECT id FROM likes WHERE user_id = ? AND target_type = ? AND target_id = ?').get(currentUserId, 'comment', comment.id));
 
   return {
     id: comment.id,
@@ -51,10 +40,62 @@ function formatComment(comment: any, currentUserId?: number): any {
     author,
     // 当前用户是否为评论作者（匿名评论也能正确判断，前端据此显示删除按钮）
     isMine: !!currentUserId && comment.user_id === currentUserId,
-    replies: replies.map((r) => formatComment(r, currentUserId)),
-    replyCount: replies.length,
+    replies: [],
+    replyCount: comment.reply_count ?? 0,
     createdAt: comment.created_at ? new Date(comment.created_at).toISOString() : comment.created_at,
   };
+}
+
+/**
+ * 评论列表组装（R2 性能修复）：原为「每条评论 2 次查询」的 N+1（likes 单查 + replies 递归），
+ * 50 条评论一次请求 ≈ 100+ 条 SQL 且回复查询全表扫。固定 3 查询：
+ * 顶层 + 全部回复一次 IN 批量（idx_comments_parent_status 命中）+ 点赞一次 IN 批量。
+ */
+function loadCommentsFor(postId: number, currentUserId?: number): any[] {
+  const tops = db.prepare(`
+    SELECT c.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar
+    FROM comments c LEFT JOIN users u ON c.user_id = u.id
+    WHERE c.post_id = ? AND c.parent_id IS NULL AND c.status = 'active'
+    ORDER BY c.like_count DESC, c.created_at DESC
+  `).all(postId) as any[];
+  const topIds = tops.map((c) => c.id);
+  if (!topIds.length) return [];
+
+  // 全部回复一次批量取（idx_comments_parent_status 命中，替代每条一查的全表扫）
+  const placeholders = topIds.map(() => '?').join(',');
+  const replies = db.prepare(`
+    SELECT c.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar
+    FROM comments c LEFT JOIN users u ON c.user_id = u.id
+    WHERE c.parent_id IN (${placeholders}) AND c.status = 'active'
+    ORDER BY c.created_at ASC
+  `).all(...topIds) as any[];
+
+  const all = [...tops, ...replies];
+  const allIds = all.map((c) => c.id);
+  const likedIds = new Set<number>();
+  if (currentUserId && allIds.length) {
+    const ph = allIds.map(() => '?').join(',');
+    const likedRows = db.prepare(`SELECT target_id FROM likes WHERE user_id = ? AND target_type = 'comment' AND target_id IN (${ph})`).all(currentUserId, ...allIds) as any[];
+    for (const r of likedRows) likedIds.add(r.target_id);
+  }
+  const nodes = all.map((c) => formatComment(c, currentUserId, likedIds));
+  // 复用 buildCommentTree 的组树逻辑但避免重复 formatComment：直接在这里组
+  const byId = new Map<number, { row: any; node: any; replies: any[] }>();
+  all.forEach((row, i) => byId.set(row.id, { row, node: nodes[i], replies: [] }));
+  const roots: any[] = [];
+  for (const { row, node, replies } of byId.values()) {
+    const parent = row.parent_id ? byId.get(row.parent_id) : null;
+    if (parent) parent.replies.push(node);
+    else roots.push(node);
+    void replies;
+  }
+  for (const { node, replies } of byId.values()) {
+    if (replies.length) {
+      node.replies = replies;
+      node.replyCount = replies.length;
+    }
+  }
+  return roots;
 }
 
 // 评论列表
@@ -71,15 +112,7 @@ router.get('/posts/:id/comments', authOptional, validate({ params: commonSchemas
   if (!canView) return fail(res, '帖子不存在', 404, 404);
 
   const currentUserId = req.currentUser?.id;
-  const comments = db.prepare(`
-    SELECT c.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar
-    FROM comments c
-    LEFT JOIN users u ON c.user_id = u.id
-    WHERE c.post_id = ? AND c.parent_id IS NULL AND c.status = 'active'
-    ORDER BY c.like_count DESC, c.created_at DESC
-  `).all(postId) as any[];
-
-  const list = comments.map((c) => formatComment(c, currentUserId));
+  const list = loadCommentsFor(postId, currentUserId);
   success(res, list);
 });
 
@@ -169,9 +202,15 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
   if (!canReply) return fail(res, '帖子不存在', 404, 404);
   const anonymous = post.is_anonymous ? 1 : (isAnonymous ? 1 : 0);
 
-  // 归一化父级：parent 可能本身是楼中楼回复（前端「回复某条回复」），
-  // 列表只展开一层——直接挂 reply 的 id 会生成三级嵌套，任何接口都查不回（静默丢评论）
-  const topParentId = parent.parent_id ?? parent.id;
+  // 归一化父级到根：parent 可能本身是楼中楼回复（前端「回复某条回复」），历史数据还可能
+  // 是三级嵌套链——沿 parent_id 循环上溯（带深度上限防环），列表只展开一层，任何中间层
+  // parent 都会让新回复不可见（静默丢评论）
+  let topParentId = parent.id;
+  for (let depth = 0; depth < 8; depth++) {
+    const p: any = db.prepare('SELECT parent_id FROM comments WHERE id = ?').get(topParentId);
+    if (!p?.parent_id) break;
+    topParentId = p.parent_id;
+  }
 
   const result = db.prepare(`
     INSERT INTO comments (post_id, user_id, parent_id, content, is_anonymous)
@@ -225,8 +264,8 @@ router.delete('/comments/:id', authRequired, validate({ params: commonSchemas.id
   success(res, null, '删除成功');
 });
 
-// 点赞评论（事务化：并发/连点下返回值必须与库一致，不能拿进事务前的快照算数）
-router.post('/comments/:id/like', authRequired, validate({ params: commonSchemas.id }), (req, res) => {
+// 点赞评论（事务化：并发/连点下返回值必须与库一致，不能拿进事务前的快照算数；engageLimiter 防连点脚本刷计数）
+router.post('/comments/:id/like', authRequired, engageLimiter, validate({ params: commonSchemas.id }), (req, res) => {
   const id = Number(req.params.id);
   const comment = db.prepare("SELECT * FROM comments WHERE id = ? AND status = 'active'").get(id) as any;
   if (!comment) return fail(res, '评论不存在', 404, 404);

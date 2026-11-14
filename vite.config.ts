@@ -37,18 +37,19 @@ export default defineConfig({
     // 端口被占用时直接报错，避免自动漂移导致访问错端口
     strictPort: true,
     proxy: {
+      // E2E_PORT：本机 3001 被其它服务占用时，E2E_PORT=3301 npm run e2e 一起改（默认行为不变）
       '/api': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.E2E_PORT || 3001}`,
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.E2E_PORT || 3001}`,
         changeOrigin: true,
       },
       // WS 实时连接（私信/通知）走同源 /ws，代理到后端并启用 ws 协议转发
       '/ws': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.E2E_PORT || 3001}`,
         ws: true,
         changeOrigin: true,
       },

@@ -43,8 +43,9 @@ export default defineConfig({
   webServer: [
     {
       // 单入口：重置隔离库 → 灌种子 → 起服务（顺序保证无文件锁冲突）
+      // E2E_PORT：本机 3001 被其它服务占用时换端口（与 vite proxy、e2e-backend.mjs 同名变量）
       command: 'node scripts/e2e-backend.mjs',
-      url: 'http://localhost:3001/api/health',
+      url: `http://localhost:${process.env.E2E_PORT || 3001}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },

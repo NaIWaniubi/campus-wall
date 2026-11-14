@@ -115,6 +115,12 @@ Page({
       unreadCount: Math.max(0, this.data.unreadCount - 1)
     })
     put('/messages/read/' + id, {}, false).catch(() => {})
+    // 私信通知：related_id 是会话 id（后端已单列 conversationId），进聊天页——
+    // 此前拿它当帖子 id 打开无关详情页或「帖子不存在」
+    if (e.currentTarget.dataset.conversationid) {
+      wx.navigateTo({ url: `/pages/message/chat/chat?conversationId=${e.currentTarget.dataset.conversationid}` })
+      return
+    }
     if (postid) {
       // 评论/回复通知直达具体楼层（detail 页 scroll-into-view cmt-{id}）
       const sub = commentid ? `&comment=${commentid}` : ''

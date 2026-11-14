@@ -123,8 +123,8 @@ router.get('/me', authRequired, (req, res) => {
   }));
 });
 
-// 修改密码
-router.put('/password', authRequired, (req, res) => {
+// 修改密码（authRateLimit：旧密码可被持有 token 者无限爆破，与登录同一防线）
+router.put('/password', authRequired, authRateLimit, (req, res) => {
   const { oldPassword, newPassword } = req.body;
   if (!oldPassword || !newPassword) {
     return fail(res, '原密码和新密码为必填项');
@@ -135,6 +135,8 @@ router.put('/password', authRequired, (req, res) => {
 
   const user = db.prepare('SELECT password FROM users WHERE id = ?').get(req.currentUser!.id) as any;
   if (!bcrypt.compareSync(oldPassword, user.password)) {
+    // 与登录共用失败计数：原密码可被持有 token 者无限爆破的口子（R2 审计）
+    recordAuthFailure(req);
     return fail(res, '原密码错误');
   }
 

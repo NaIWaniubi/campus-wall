@@ -52,7 +52,10 @@ Object.keys(CATEGORY_TO_SECTION).forEach(function (k) {
 const MESSAGE_TYPES = {
   match: { name: '匹配提醒', icon: '🔍' },
   digest: { name: '每日摘要', icon: '📊' },
-  system: { name: '系统通知', icon: '📢' }
+  system: { name: '系统通知', icon: '📢' },
+  comment: { name: '评论', icon: '💬' },
+  like: { name: '点赞', icon: '❤️' },
+  chat: { name: '私信', icon: '📨' }
 }
 
 function getMessageTypeMeta(type) {

@@ -238,6 +238,11 @@ router.put('/posts/:id/audit', sectionAllowed, (req, res) => {
   const { action, reason } = req.body;
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
   if (!post) return fail(res, '帖子不存在', 404, 404);
+  // 状态机守卫：审核只作用于待审队列。deleted（举报处置删除）不可被 approve 复活；
+  // published/rejected 重审无意义且会污染 audited_at 统计
+  if (!['pending', 'pending_review'].includes(post.status)) {
+    return fail(res, `当前状态（${post.status}）不在审核队列，无法审核`);
+  }
 
   if (action === 'approve') {
     // 记录审核完成时间，用于统计审核时效（提交→过审）

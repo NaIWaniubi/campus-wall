@@ -16,10 +16,10 @@ V3 起它不再是「又一个绿白校园墙」：视觉换成**紫→品红→
 
 ## 3. 工程数据（可复现）
 
-- 测试：`npm test` → **290/290 通过**（32 个文件；含 Web Push 7 条、分享卡 13 条、SEO 24+5 条、AI 兜底链 25 条）
+- 测试：`npm test` → **290/290 通过**（33 个文件；含 Web Push 7 条、分享卡 13 条、SEO 24+5 条、AI 兜底链 25 条）
 - 浏览器门：`npx playwright test` → **12/12 通过**（浏览/搜索/登录/发帖/点赞/评论/管理审核全流程真 Chromium，隔离库自动重灌种子）
 - 类型：`npm run check` → 0 错误；`npm run lint` → 0 错误
-- CI 六道门（GitHub Actions，master 常绿）：静态门（含文档死链）→ 雷达算法门 → 构建 + 体积 gzip 预算门 → 契约压测门（24 并发零 5xx、p95<800ms，实测 ~1566 req/s）→ 浏览器 E2E 门（12/12）→ Lighthouse 门（移动端 3 次中位数 perf 79/a11y 95/bp 100/seo 100）
+- CI 六道门（GitHub Actions，master 常绿）：静态门（含文档死链）→ 雷达算法门 → 构建 + 体积 gzip 预算门 → 契约压测门（24 并发零 5xx、p95<800ms，实测 ~2409 req/s / p95 5ms）→ 浏览器 E2E 门（12/12）→ Lighthouse 门（移动端 3 次中位数 perf 95/a11y 95/bp 100/seo 100）
 - 前端产物：Vue3 + Vite 打包，含 ECharts 图表懒加载、虚拟列表（`@tanstack/vue-virtual`）
 - 后端：Express 5 + SQLite（FTS5 中文二元分词全文检索）+ WebSocket 实时私信
 - 部署：单进程 Node 服务，`bash start.sh` 即可跑；**空数据目录冷启动 → 自动建库灌种子 → 登录 / 发帖 / 雷达 / 缩略图 / 今日简报 / AI 成稿 / AI 划重点** 全链路在 Ubuntu 24.04.1 + Node 24.22.2 复验 0 个 5xx（`scripts/verify-stage-wsl.sh`）
@@ -102,7 +102,7 @@ V3 的「渐变 + 玻璃」在多轮打磨后仍显廉价，V4 直接换设计�
 | **传播面** | `/post/:id` 服务端 OG 分享卡片（微信/QQ 裸链出图）+ JSON-LD 结构化数据 + `robots.txt`/`sitemap.xml`/`/rss.xml` 订阅输出 | SEO 29 条单测 + demo curl 实证（19 条 feed=published 全量、匿名逐 item 归一） |
 | **Web Push 离线推送** | 设置页一键开启/关闭；VAPID 未配置入口自动隐藏；`gen-vapid.mjs` 首跑生成（密钥不进仓库） | demo 真机闭环：订阅拿真实 FCM endpoint 落库→评论触发 VAPID 签名真发→退订删行；路由 7 条集成测 |
 | **AI 分轨** | 前台三个入口只走快网关（慢免费档剔除），慢但免费的真模型专职后台简报；网关 auth 失败端点级短路 | 失败路径实测 15.3s→1.56s；断网时离线套版仍产出「【失物招领】校园卡」级成稿 |
-| **性能** | 三处列表虚拟滚动；单图帖固定图带消灭 CLS；chunk 体积 gzip 预算门 | 契约压测 1566 req/s p95 12ms（CI 门） |
+| **性能** | 三处列表虚拟滚动；单图帖固定图带消灭 CLS；chunk 体积 gzip 预算门 | 契约压测 ~2409 req/s p95 5ms（CI 门） |
 | **可信度基建** | CI 六道门（静态/雷达/体积/压测/浏览器 E2E/Lighthouse）；E2E 复活 12/12 并进 CI——防「演示流只在我机器上能跑」 | 每次 push 全链路自动复验 |
 
 ## 8. 截图与录屏素材

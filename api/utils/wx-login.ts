@@ -27,8 +27,9 @@ export function isWxLoginEnabled(): boolean {
   return !!(wxAppId() && wxSecret());
 }
 
-/** 用 code 换取 openid（jscode2session） */
+/** 用 code 换取 openid（jscode2session）。测试可注入替身（code2SessionOverride），生产恒为真实实现 */
 async function code2Session(code: string): Promise<{ openid: string }> {
+  if (code2SessionOverride) return code2SessionOverride(code);
   const url =
     'https://api.weixin.qq.com/sns/jscode2session' +
     `?appid=${encodeURIComponent(wxAppId())}` +
@@ -43,6 +44,12 @@ async function code2Session(code: string): Promise<{ openid: string }> {
     throw new Error(`jscode2session errcode=${data.errcode ?? 'unknown'} ${data.errmsg ?? ''}`.trim());
   }
   return { openid: String(data.openid) };
+}
+
+/** 测试注入点（null = 走真实 jscode2session）；仅测试代码可写 */
+export let code2SessionOverride: ((code: string) => Promise<{ openid: string }>) | null = null;
+export function setCode2SessionOverride(fn: ((code: string) => Promise<{ openid: string }>) | null): void {
+  code2SessionOverride = fn;
 }
 
 export async function wxLoginHandler(req: Request, res: Response) {

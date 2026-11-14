@@ -190,3 +190,5 @@ export const ackLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: '
 export const draftLimiter = createRateLimiter({ windowMs: 60_000, max: 30, name: 'draft' });
 /** 读端点（列表类 GET）：1 分钟 300 次，防爬虫 */
 export const readLimiter = createRateLimiter({ windowMs: 60_000, max: 300, name: 'read' });
+/** 互动类轻写（评论点赞/收藏/公告 ack 等）：1 分钟 120 次——防连点脚本刷计数，正常用户无感 */
+export const engageLimiter = createRateLimiter({ windowMs: 60_000, max: 120, name: 'engage' });

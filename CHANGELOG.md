@@ -6,8 +6,19 @@
 
 ## [Unreleased]
 
+### R2 复审计修复批（2026-11-14）
+- **五视角复审计集群**（修复验证/数据层/小程序契约/测试文档/真机冒烟全回收）+ 主线程视觉验收 8 实拍
+- **数据层（EXPLAIN+基准实证）**：评论列表 N+1×2（likes 单查 + 回复递归全表扫 309ms/请求）→ 固定 3 查询批量组树（1.3ms）；补 4 索引——comments(parent_id,status,created_at)、messages 去重(upsert 12305μs→15μs)与收件箱、conversations(user_b_id,last_at)（3.26ms→0.60ms）
+- **真机闭环验证 R1 四修复**（重建 bundle 后逐项复现原攻击路径）：匿名评论通知署名「匿名同学」PASS / deleted 帖评论 404 PASS / 重置密码吊销旧 token PASS / 回复归一顶层 PASS
+- **历史三级评论一次性迁移**：parent_id 循环上溯到根重挂（幂等 _migrations 标记），修复 reply 归一只处理一层的残留（对历史三级链再回复仍会静默丢失）
+- **小程序五修**：「全部已读」PUT /notifications/read-all → /messages/read-all（此前 404 功能整体失效）；私信通知点击跳聊天页（此前拿会话 id 当帖子 id 打开无关详情页）+ comment/like/chat 类型元数据补齐；会话超 100 条后新消息永久不可见 → 首屏 tail 尾窗 + 轮询 afterId 增量；头像链路端到端通（schema 收相对路径 + normalizeUser/Comment absUrl——库内 146 个非空 avatar 全是断链佐证）；uploadFile 401 走全局 handleUnauthorized（此前失效 token 无限打转）
+- **Web 侧**：详情页 404 后短路后续四类请求（消 /NaN/radar 噪声）；回复 maxlength 150 与后端对齐；chat 通知单列 conversationId
+- **残余收口**：帖子点赞/收藏挂 engageLimiter（连点脚本刷计数）；改密失败进 recordAuthFailure（原密码可无限爆破）；部署产物重打包（stage/start.sh + deploy/render.yaml 泄露口令清除——R2 发现「仓库修了产物没跟上」的落地缺口）；测试脚本口令入环境变量
+- **两把假锁改真锁**（R2 反向验证：还原缺陷代码测试仍绿）：wx-login ver 锁改为走完整 handler+注入 openid+端到端 /me 200；点赞事务化锁改并发 6 请求断言响应值=库值
+- 文档数字对齐 CI 实测（perf 中位 95、压测 ~2409 req/s / p95 5ms、33 个测试文件）
+
 ### R1 安全审计修复批（2026-11-14）
-- **六视角只读审计集群**（zcode-fleet swarm 并行 6 worker + 主线程视觉验收 8 实拍）回收去重 10 项真缺陷（3 P0 + 7 P1），交叉验证高置信
+- **六视角只读审计集群**（zcode-fleet swarm 并行 6 worker + 主线程视觉验收 8 实拍）回收去重 11 项真缺陷（4 P0 + 7 P1），交叉验证高置信
 - **[P0] 匿名评论/回复通知实名泄露**：upsertNotification 用真实昵称写进帖主消息列表——通知署名按 anonymous 归一「匿名同学」（评论+楼中楼两条路径），与 formatComment 展示口径一致
 - **[P0] extraFields 创建路径绕过白名单**：创建侧补 sanitizeExtraFields（与编辑同口径）；soldTo/soldAt 服务端专属键被剥离；riskFlag 改独立组装；10MB 任意 JSON→FTS 触发器全量切词的 DoS 面同步关闭
 - **[P0] rate 评价买家权威来源**：不再信任库中 extra_fields.soldTo（历史可被预置污染=「指定任意人扣信誉分」通道），唯一权威是 trade_offers 的 accepted/completed 记录

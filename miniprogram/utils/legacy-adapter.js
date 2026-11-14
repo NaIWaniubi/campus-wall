@@ -40,6 +40,9 @@ function resolvePath(oldUrl, method, data) {
   // --- PUT ---
   if (method === 'PUT') {
     if (oldUrl === '/user/info') return '/users/profile'
+    // R2 修复：POST /notifications/read-all 改写成 PUT 后原样透传，打到不存在的
+    // /api/notifications/*（404「接口不存在」），真正的端点是 PUT /messages/read-all
+    if (oldUrl === '/notifications/read-all') return '/messages/read-all'
   }
 
   return oldUrl
@@ -153,7 +156,9 @@ function normalizeUser(u) {
   return Object.assign({}, u, {
     studentId: u.studentId != null ? u.studentId : u.student_id,
     creditScore: u.creditScore != null ? u.creditScore : u.credit_score,
-    createdAt: u.createdAt != null ? u.createdAt : u.created_at
+    createdAt: u.createdAt != null ? u.createdAt : u.created_at,
+    // 头像相对路径转绝对（R2 修复：库中 /uploads/... 在小程序 <image> 里按包内路径解析成空白）
+    avatar: absUrl(u.avatar ?? u.avatar_url) || ''
   })
 }
 
@@ -190,7 +195,7 @@ function normalizePost(p) {
 function normalizeComment(c) {
   if (!c || typeof c !== 'object') return c
   return Object.assign({}, c, {
-    author: Object.assign({ isAnonymous: !!c.isAnonymous }, c.author),
+    author: Object.assign({ isAnonymous: !!c.isAnonymous }, c.author, { avatar: absUrl(c.author && c.author.avatar) || '' }),
     isLiked: !!c.liked,
     likes: c.likeCount || 0,
     time: toMs(c.createdAt),

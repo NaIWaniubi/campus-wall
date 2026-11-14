@@ -285,6 +285,14 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_messages_user_read ON messages (user_id, is_read);
     CREATE INDEX IF NOT EXISTS idx_reports_status_priority ON reports (status, priority, created_at);
     CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON favorites (user_id, created_at);
+    -- R2 审计补（EXPLAIN + 基准实证）：楼中楼单查 parent_id 时 idx_comments_post_parent 前导列用不上 → 全表扫 309ms→1.3ms
+    CREATE INDEX IF NOT EXISTS idx_comments_parent_status ON comments (parent_id, status, created_at);
+    -- 通知去重 upsert（10 处调用点每次写都跑）12305μs→15μs
+    CREATE INDEX IF NOT EXISTS idx_messages_dedup ON messages (user_id, type, related_id, related_sub_id, created_at);
+    -- 收件箱 ORDER BY is_read, created_at
+    CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages (user_id, is_read, created_at);
+    -- conversations 参与方 OR 查询 user_b 侧无索引退化全扫 3.26ms→0.60ms
+    CREATE INDEX IF NOT EXISTS idx_conversations_user_b ON conversations (user_b_id, last_at);
   `);
   // likes 的 (user_id, target_type, target_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
   // favorites 的 (user_id, post_id) 已被 UNIQUE 约束隐式覆盖，无需单独建索引
@@ -657,3 +665,27 @@ db.exec(`
   );
 `);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions (user_id);`);
+
+// ── 一次性数据迁移（R2 审计）：历史三级评论 parent_id 指向中间回复 → 查不回。
+// 循环上溯到根并重挂；幂等（已归一的数据零改动）。IF NOT EXISTS 标记表防重复跑全表。
+db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+const _mig = db.prepare('SELECT 1 FROM _migrations WHERE name = ?').get('comment_parent_flatten_v1');
+if (!_mig) {
+  const tx = db.transaction(() => {
+    const rows = db.prepare("SELECT id, parent_id FROM comments WHERE parent_id IS NOT NULL AND status = 'active'").all() as any[];
+    const byId = new Map<number, number>();
+    for (const r of rows) byId.set(r.id, r.parent_id);
+    const updates: { id: number; root: number }[] = [];
+    for (const r of rows) {
+      let cur = r.parent_id;
+      for (let d = 0; d < 8 && byId.has(cur); d++) cur = byId.get(cur)!;
+      if (cur !== r.parent_id) updates.push({ id: r.id, root: cur });
+    }
+    const upd = db.prepare('UPDATE comments SET parent_id = ? WHERE id = ?');
+    for (const u of updates) upd.run(u.root, u.id);
+    db.prepare("INSERT INTO _migrations (name) VALUES ('comment_parent_flatten_v1')").run();
+    return updates.length;
+  });
+  const changed = tx();
+  if (changed > 0) console.log(`[migrate] comment_parent_flatten_v1: re-parented ${changed} nested comments`);
+}

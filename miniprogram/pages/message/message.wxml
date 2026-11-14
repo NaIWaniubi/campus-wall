@@ -21,7 +21,7 @@
 
   <view class="message-list" wx:else>
     <skeleton wx:if="{{loading && !notifications.length}}" type="post" count="{{4}}" />
-    <view class="message-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}" data-commentid="{{item.relatedSubId}}">
+    <view class="message-item card {{item.isRead ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="onTapNotification" data-id="{{item.id}}" data-postid="{{item.postId}}" data-commentid="{{item.relatedSubId}}" data-conversationid="{{item.conversationId}}">
       <view class="message-icon-wrap">
         <text class="message-icon">{{item.iconText}}</text>
         <view class="unread-dot" wx:if="{{!item.isRead}}"></view>

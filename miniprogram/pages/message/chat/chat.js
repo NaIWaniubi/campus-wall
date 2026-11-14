@@ -104,11 +104,25 @@ Page({
   async loadMessages(scrollToBottom) {
     if (!this.data.conversationId) return
     try {
-      const res = await api.get(`/conversations/${this.data.conversationId}/messages`, { page: 1, pageSize: PAGE_SIZE }, false)
-      const list = (res && res.list) || []
-      const prevCount = this.data.messages.length
-      this.setData({ messages: list, loading: false, needLogin: false, loadError: '' })
-      if (scrollToBottom || list.length !== prevCount) this.scrollToBottom(list)
+      if (scrollToBottom || !this.data.messages.length) {
+        // 首屏/主动刷新：取最新一页再反转——原实现 ORDER BY id ASC LIMIT 100 固定返回
+        // 最旧 100 条，会话超过 PAGE_SIZE 后新消息永远拉不到（R2 修复）
+        const res = await api.get(`/conversations/${this.data.conversationId}/messages`, { page: 1, pageSize: PAGE_SIZE, tail: 1 }, false)
+        const list = ((res && res.list) || []).slice().reverse()
+        this.setData({ messages: list, loading: false, needLogin: false, loadError: '' })
+        if (list.length) this.scrollToBottom(list)
+      } else {
+        // 轮询增量：afterId=本地最大 id（后端原生支持），只拉新消息
+        const last = this.data.messages[this.data.messages.length - 1]
+        if (!last) return
+        const res = await api.get(`/conversations/${this.data.conversationId}/messages`, { afterId: last.id }, false)
+        const fresh = (res && res.list) || []
+        if (fresh.length) {
+          const merged = this.data.messages.concat(fresh)
+          this.setData({ messages: merged })
+          this.scrollToBottom(merged)
+        }
+      }
     } catch (e) {
       console.error('加载消息失败', e)
       this.setData({ loading: false })

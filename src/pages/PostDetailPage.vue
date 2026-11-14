@@ -473,8 +473,10 @@ async function submitComment() {
     if (replyTarget.value) {
       // 始终以顶级评论ID作为parent_id，保证后端能正确查询到该回复
       // 后端 formatComment 只查 parent_id = 顶级评论ID 的回复，
-      // 若以回复ID作为parent_id，新回复会丢失
-      const topComment = comments.value.find((c) => c.id === replyTarget.value.id) || replyTarget.value
+      // 若以回复ID作为parent_id，新回复会丢失（服务端现在也会归一，这里保持 UI 层同口径）
+      const topComment = comments.value.find((c) => c.id === replyTarget.value.id)
+        ?? comments.value.find((c) => c.replies?.some((r: any) => r.id === replyTarget.value.id))
+        ?? replyTarget.value
       const targetId = topComment.id
       const res: any = await commentApi.reply(targetId, { content: text })
       if (!topComment.replies) topComment.replies = []
@@ -598,6 +600,11 @@ function share() {
 
 onMounted(async () => {
   await fetchPost()
+  // 帖子不存在/加载失败时短路：后续四类请求只会产生无意义的 404 与 /NaN 噪声（R2 真机审计）
+  if (!post.value) {
+    document.addEventListener('click', closeMoreMenu)
+    return
+  }
   fetchComments()
   await fetchMatches()
   await fetchRadar()
@@ -1110,7 +1117,7 @@ function closeMoreMenu(e: MouseEvent) {
           ref="commentInputRef"
           v-model="commentText"
           type="text"
-          maxlength="200"
+          :maxlength="replyTarget ? 150 : 200"
           :disabled="isPending"
           :placeholder="!userStore.isLoggedIn ? '请先登录后评论' : (isPending ? '帖子审核中，暂不可评论' : (replyTarget ? '写下你的回复...' : '写下你的评论...'))"
           class="ds-input flex-1 min-w-0"

@@ -187,6 +187,11 @@ const uploadFile = (filePath, name = 'file') => {
             previewUrl: absUrl(data.data.url),
             previewThumbUrl: absUrl(data.data.thumbUrl)
           })
+        } else if (data.code === 401) {
+          // 与 rawRequest 同口径：过期 token 走全局处理（清 token + reLaunch 登录），
+          // 否则用户在失效 token 上无限「发布失败」打转
+          require('./request').handleUnauthorized()
+          reject(data)
         } else {
           showToast(data.message || '上传失败')
           reject(data)

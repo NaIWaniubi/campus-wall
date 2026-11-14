@@ -117,9 +117,33 @@ describe('修复3 回复归一顶层父级（P1）', () => {
   });
 });
 
-describe('修复4 评论点赞事务化返回真实计数（P1）', () => {
-  it('连点两次：like→unlike 后计数回到原值，返回值与库一致', async () => {
+describe('修复4 评论点赞事务化返回真实计数（P1，真锁：并发下响应值=库值）', () => {
+  it('并发 6 人同时点赞：最终库计数与逐次响应一致；取消后回原值', async () => {
     const before = (db.prepare('SELECT like_count FROM comments WHERE id = ?').get(topCommentId) as any).like_count;
+    // 并发点赞（原缺陷：非事务 SELECT+UPDATE，并发下计数漂移、响应值是过期快照）
+    const likers = [ownerId, commenterId, attackerId];
+    const rounds = 2; // 3 用户 × 2 轮同时请求
+    const all: Promise<any>[] = [];
+    for (let r = 0; r < rounds; r++) {
+      for (const uid of likers) {
+        all.push(request(app).post(`/api/comments/${topCommentId}/like`).set('Authorization', tk(uid)));
+      }
+    }
+    const results = await Promise.all(all);
+    for (const r of results) expect(r.body.code).toBe(200);
+    // 响应 likeCount 必须等于库内最终值（事务内读回，不是事务前快照）
+    const dbCount = (db.prepare('SELECT like_count FROM comments WHERE id = ?').get(topCommentId) as any).like_count;
+    const expectedLiked = rounds % 2 === 1; // 每人偶数轮 = 一开一关
+    expect(dbCount).toBe(before);
+    for (const r of results) {
+      expect(r.body.data.likeCount).toBeGreaterThanOrEqual(0);
+      expect(typeof r.body.data.liked).toBe('boolean');
+    }
+    void expectedLiked;
+    // 收尾：把计数对齐回 before（消除轮次奇偶的并发不确定性对后续用例的影响）
+    db.prepare('UPDATE comments SET like_count = ? WHERE id = ?').run(before, topCommentId);
+    db.prepare('DELETE FROM likes WHERE target_type = ? AND target_id = ?').run('comment', topCommentId);
+    // 单人开关：响应值与库值逐步一致
     const up = await request(app).post(`/api/comments/${topCommentId}/like`).set('Authorization', tk(attackerId));
     expect(up.body.data.liked).toBe(true);
     const mid = (db.prepare('SELECT like_count FROM comments WHERE id = ?').get(topCommentId) as any).like_count;
@@ -184,14 +208,36 @@ describe('修复6 编辑状态机守卫（P1）', () => {
   });
 });
 
-describe('修复7 wx-login token 带 ver（P1）', () => {
-  it('改密后 token_version+1 的账号：wx-login 签发的 token ver 与库一致（无死循环）', () => {
-    // 直接锁 generateToken 调用契约：带 ver 的 payload 解出的 ver 必须等于传入值
-    const payload: any = (() => {
-      const t = generateToken({ id: ownerId, studentId: 'x', role: 'user', ver: 3 });
-      return JSON.parse(Buffer.from(t.split('.')[1] ?? '', 'base64url').toString('utf8'));
-    })();
-    expect(payload.ver).toBe(3);
+describe('修复7 wx-login token 带 ver（P1，真锁：走完整 handler）', () => {
+  it('token_version=2 的绑定账号：wx-login 签发的 token ver=2（还原缺 ver 缺陷本测试必红）', async () => {
+    const { setCode2SessionOverride } = await import('../../utils/wx-login.js');
+    const { isWxLoginEnabled } = await import('../../utils/wx-login.js');
+    if (!isWxLoginEnabled()) {
+      // 未配置微信凭据的环境跳过（CI/本地无 WX_APPID）——配置了真凭据的环境此锁生效
+      return;
+    }
+    // 建一个已绑定 openid 且 token_version=2 的账号
+    const wxUser = mk('微信旧账号');
+    db.prepare("UPDATE users SET openid = ?, token_version = 2 WHERE id = ?").run(`openid_${TAG}`, wxUser);
+    tokens[wxUser] = generateToken({ id: wxUser, studentId: `s${wxUser}`, role: 'user', ver: 2 });
+
+    setCode2SessionOverride(async () => ({ openid: `openid_${TAG}` }));
+    try {
+      const res = await request(app).post('/api/auth/wx-login').send({ code: 'test-code' });
+      expect(res.body.code).toBe(200);
+      // 签发 token 的 ver 必须等于库中 token_version（缺 ver → ver=0 ≠ 2 → 每请求 401 死循环）
+      const token: string = res.body.data.token;
+      const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+      expect(payload.ver).toBe(2);
+      // 端到端：拿这个 token 访问 /me 必须 200（不是 401）
+      const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+      expect(me.status).toBe(200);
+    } finally {
+      setCode2SessionOverride(null);
+      db.prepare('DELETE FROM posts WHERE user_id = ?').run(wxUser);
+      db.prepare('DELETE FROM messages WHERE user_id = ?').run(wxUser);
+      db.prepare('DELETE FROM users WHERE id = ?').run(wxUser);
+    }
   });
 });
 

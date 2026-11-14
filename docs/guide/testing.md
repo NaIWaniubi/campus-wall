@@ -4,17 +4,17 @@
 
 | 门 | 内容 | 本地复现 |
 |---|---|---|
-| 静态门 | ESLint + vue-tsc + **279 单测/集成**（干净库，无需 seed）+ 文档站死链检查 | `npm run lint && npm run check && npm test && npm run docs:build` |
+| 静态门 | ESLint + vue-tsc + **290 单测/集成**（干净库，无需 seed）+ 文档站死链检查 | `npm run lint && npm run check && npm test && npm run docs:build` |
 | 雷达算法门 | 失物雷达标注集：召回/误报/P@1 跌破阈值即失败 | `npm run eval:radar -- --gate` |
 | 体积预算门 | gzip：vendor-echarts≤210K / 框架≤75K / 主包≤100K / 懒加载块≤60K | `npm run build && npm run check:bundle` |
 | 契约压测门 | 24 并发×20s：零 5xx、零连接错误、8 端点状态码契约全命中、p95<800ms | `npm run loadtest`（需 `RATE_LIMIT_ENABLED=0` 实例） |
 | 浏览器门 | Playwright 12 条核心流真 Chromium（隔离库自动重灌种子） | `npx playwright test` |
-| Lighthouse 门 | 移动端模拟 3 次中位数：perf≥72 / a11y≥90 / bp≥90 / seo≥90（实测 79/95/100/100） | `node scripts/lighthouse-gate.mjs` |
+| Lighthouse 门 | 移动端模拟 3 次中位数：perf≥72 / a11y≥90 / bp≥90 / seo≥90（CI 实测 95/95/100/100） | `node scripts/lighthouse-gate.mjs` |
 
 ## 压测门的契约语义
 
 与「跑分」不同，守的是交付承诺：鉴权守卫匿名必须 401、404 语义不许漂移、
-限流 429 单独统计（防线在工作，不算失败）。实测 ~1566 req/s、p95 12ms。
+限流 429 单独统计（防线在工作，不算失败）。CI 实测 ~2409 req/s、p95 5ms。
 
 ## 浏览器门的防腐设计
 

@@ -39,7 +39,10 @@ router.get('/', authRequired, (req, res) => {
     userId: m.user_id,
     type: m.type,
     content: m.content,
-    postId: m.related_id,
+    // chat 通知的 related_id 是会话 id（不是帖子）——单列 conversationId，
+    // 端上据此跳聊天页而不是拿会话 id 当帖子 id 打开无关详情页
+    postId: m.type === 'chat' ? null : m.related_id,
+    conversationId: m.type === 'chat' ? m.related_id : null,
     relatedSubId: m.related_sub_id ?? null,
     isRead: !!m.is_read,
     createdAt: m.created_at ? new Date(m.created_at).toISOString() : m.created_at,

@@ -83,6 +83,10 @@ async function onItemClick(msg: any) {
   }
   // digest：不跳转，展开/收起全文
   if (msg.type === 'digest') return toggleDigest(msg.id)
+  // chat：related_id 是会话 id，进聊天页（此前会当帖子 id 打开无关详情页）
+  if (msg.type === 'chat' && (msg as any).conversationId) {
+    return router.push(`/message?tab=chat&conversationId=${(msg as any).conversationId}`)
+  }
   if ((msg.type === 'comment' || msg.type === 'like') && msg.postId) {
     // 评论/回复通知带 relatedSubId → 直达那一条并高亮
     return router.push(msg.relatedSubId ? `/post/${msg.postId}?comment=${msg.relatedSubId}` : `/post/${msg.postId}`)

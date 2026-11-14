@@ -6,7 +6,7 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { assessRisk } from '../utils/sensitive.js';
-import { postLimiter, readLimiter } from '../middleware/rateLimit.js';
+import { postLimiter, readLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
 import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/matching.js';
@@ -565,7 +565,7 @@ router.delete('/:id', authRequired, (req, res) => {
 });
 
 // 点赞/取消点赞（事务化：likes 表 INSERT/DELETE + posts.like_count UPDATE 原子完成，避免计数漂移）
-router.post('/:id/like', authRequired, (req, res) => {
+router.post('/:id/like', authRequired, engageLimiter, (req, res) => {
   const id = Number(req.params.id);
   const userId = req.currentUser!.id;
   const result = db.transaction(() => {
@@ -598,7 +598,7 @@ router.post('/:id/like', authRequired, (req, res) => {
 });
 
 // 收藏/取消收藏（事务化：favorites 表 INSERT/DELETE + posts.favorite_count UPDATE 原子完成）
-router.post('/:id/favorite', authRequired, (req, res) => {
+router.post('/:id/favorite', authRequired, engageLimiter, (req, res) => {
   const id = Number(req.params.id);
   const userId = req.currentUser!.id;
   const result = db.transaction(() => {

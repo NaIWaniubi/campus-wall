@@ -101,6 +101,13 @@ router.get('/:id/messages', authRequired, (req, res) => {
       .prepare('SELECT * FROM chat_messages WHERE conversation_id = ? AND id > ? ORDER BY id ASC LIMIT 50')
       .all(convId, afterId) as any[];
     hasMore = rows.length === 50;
+  } else if (req.query.tail === '1') {
+    // 尾窗模式：取最新 pageSize 条再按 id 升序返回——客户端首屏要的是最近对话，
+    // 旧行为（ASC LIMIT offset 0）固定返回最旧一页，会话超页后新消息永远不可见
+    rows = db
+      .prepare('SELECT * FROM (SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC')
+      .all(convId, pageSize) as any[];
+    hasMore = total > pageSize;
   } else {
     const offset = (page - 1) * pageSize;
     rows = db

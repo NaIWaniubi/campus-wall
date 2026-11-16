@@ -39,6 +39,7 @@ import adminRoutes from './routes/admin.js'
 import draftRoutes from './routes/drafts.js'
 import announcementRoutes from './routes/announcements.js'
 import aiRoutes from './routes/ai.js'
+import agentRoutes from './routes/agent.js'
 import adminAiRoutes from './routes/adminAi.js'
 import subscriptionRoutes from './routes/subscriptions.js'
 import tradeRoutes from './routes/trades.js'
@@ -170,6 +171,7 @@ app.use('/api/announcements', announcementRoutes)
 app.use('/api/admin/ai', adminAiRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/agent', agentRoutes)
 app.use('/api/subscriptions', subscriptionRoutes)
 app.use('/api', tradeRoutes)
 app.use('/api/feedback', feedbackRoutes)

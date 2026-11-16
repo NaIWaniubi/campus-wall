@@ -21,6 +21,35 @@ import {
   type AiMessage,
   type AiCallOptions,
 } from '../utils/ai.js';
+import { retrieve, type RagSource } from '../rag/retrieve.js';
+import { inspectInput, sanitizeOutput, REJECT_TEMPLATE, type GuardMeta } from '../ai/guard.js';
+
+/** RAG 检索（失败静默回退为空 → 走原有知识库口径，不阻塞对话） */
+async function safeRetrieve(message: string): Promise<RagSource[]> {
+  try {
+    return await retrieve(message);
+  } catch (err: any) {
+    logger.warn('RAG 检索失败，回退知识库模式', { error: err?.message });
+    return [];
+  }
+}
+
+/** 护栏输入检查（助手对话入口共用）：high 直接拒答，medium 用剥离文本继续 */
+function guardInput(message: string): { blocked: boolean; text: string; meta: GuardMeta } {
+  const v = inspectInput(message);
+  const meta: GuardMeta = { inputLevel: v.level, rewritten: false, redactedCount: 0 };
+  if (v.level === 'high') return { blocked: true, text: message, meta };
+  return { blocked: false, text: v.level === 'medium' ? v.sanitized.trim() : message, meta };
+}
+
+/** 护栏输出净化：风险改写 + 幻觉红线（validRefs 来自 RAG 引用编号） */
+function guardOutput(reply: string, ragSources: RagSource[], meta: GuardMeta): string {
+  const validRefs = ragSources.map((s) => s.ref);
+  const v = sanitizeOutput(reply, validRefs.length ? { validRefs } : {});
+  meta.rewritten = v.rewritten;
+  meta.redactedCount = v.redactedCount;
+  return v.text;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -244,19 +273,31 @@ function localRetrievalAnswer(message: string, knowledge: string, forums: ForumS
 }
 
 /** 组装对话消息（系统提示 + 最近历史 + 当前问题） */
-function buildMessages(message: string, history: AiMessage[], knowledge: string, forums: ForumSource[]): AiMessage[] {
+function buildMessages(message: string, history: AiMessage[], knowledge: string, forums: ForumSource[], ragSources: RagSource[] = []): AiMessage[] {
   const forumContext = forums
     .map((f, i) => `${i + 1}. [论坛${i + 1}]【${f.type === 'comment' ? '评论' : '帖子'}·${f.section}】${f.title}：${f.excerpt}`)
     .join('\n');
 
+  // RAG 检索资料块：有命中时以「仅基于资料 + 引用 [n]」口径替换弱知识库上下文
+  const ragBlock = ragSources.length
+    ? ragSources
+        .map((s) => `[${s.ref}]【${s.title}】${s.snippet}`)
+        .join('\n')
+    : '';
+
+  const ragRules = ragSources.length
+    ? `1. 严格基于下方【检索资料】回答，每个关键结论在句末标注引用编号，格式 [1]、[2]，编号必须与资料列表一致。
+2. 检索资料未涵盖的问题：如实说明"这个问题我在校园资料里没有找到，建议在互助问答板块发帖求助"，不要编造。`
+    : `1. 平台规则、板块功能、使用方法类问题：严格依据下方【官网内容】回答，不要编造官网内容里没有的信息。
+2. 引用下方【相关论坛讨论】的内容时，在对应句子末尾标注引用编号，格式如 [论坛1]、[论坛3]，编号必须与列表一致。
+3. 官网内容与论坛讨论都没有覆盖的问题：如实说明"这个问题我在官网资料里没有找到，建议在互助问答板块发帖求助"。`;
+
   const systemPrompt = `你是"校园墙"平台的 AI 助手，面向本校学生答疑。
 
 回答规则：
-1. 平台规则、板块功能、使用方法类问题：严格依据下方【官网内容】回答，不要编造官网内容里没有的信息。
-2. 引用下方【相关论坛讨论】的内容时，在对应句子末尾标注引用编号，格式如 [论坛1]、[论坛3]，编号必须与列表一致。
-3. 官网内容与论坛讨论都没有覆盖的问题：如实说明"这个问题我在官网资料里没有找到，建议在互助问答板块发帖求助"。
-4. 用简体中文回答，简洁友好，不超过 300 字。
-
+${ragRules}
+${ragSources.length ? '3.' : '4.'} 用简体中文回答，简洁友好，不超过 300 字。
+${ragSources.length ? `\n【检索资料】\n${ragBlock}\n` : ''}
 【官网内容】
 ${knowledge || '（暂无官网内容）'}
 
@@ -306,24 +347,42 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
   if (!limited.ok) return fail(res, limited.msg!);
 
   const forums = searchForumSources(message);
+  const ragSources = await safeRetrieve(message);
+
+  // 护栏输入检查：高危注入/敏感词直接拒答，不调 LLM
+  const g = guardInput(message);
+  if (g.blocked) {
+    return success(res, {
+      reply: REJECT_TEMPLATE,
+      forums,
+      sources: ragSources,
+      guard: g.meta,
+    });
+  }
+  const cleanMessage = g.text;
 
   if (!isAiUsable()) {
     return success(res, {
-      reply: localRetrievalAnswer(message, loadKnowledge(), forums),
+      reply: localRetrievalAnswer(cleanMessage, loadKnowledge(), forums),
       forums,
+      sources: ragSources,
+      guard: g.meta,
     });
   }
 
   try {
-    const messages = buildMessages(message, history, loadKnowledge(), forums);
-    const reply = await chatWithAI(messages, 1024, currentModels(true));
+    const messages = buildMessages(cleanMessage, history, loadKnowledge(), forums, ragSources);
+    const rawReply = await chatWithAI(messages, 1024, currentModels(true));
     bumpStats();
-    return success(res, { reply, forums });
+    const reply = guardOutput(rawReply, ragSources, g.meta);
+    return success(res, { reply, forums, sources: ragSources, guard: g.meta });
   } catch (err: any) {
     logger.error('AI 对话失败', { error: err?.message });
     return success(res, {
-      reply: localRetrievalAnswer(message, loadKnowledge(), forums),
+      reply: localRetrievalAnswer(cleanMessage, loadKnowledge(), forums),
       forums,
+      sources: ragSources,
+      guard: g.meta,
     });
   }
 });
@@ -341,6 +400,11 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
   if (!limited.ok) return fail(res, limited.msg!);
 
   const forums = searchForumSources(message);
+  const ragSources = await safeRetrieve(message);
+
+  // 护栏输入检查：高危直接走拒答模板流（不调 LLM），medium 剥离后继续
+  const g = guardInput(message);
+  const cleanMessage = g.text;
 
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
@@ -354,26 +418,43 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
 
   // 论坛卡片先送达，前端可立即渲染
   send('forums', forums);
+  // RAG 引用资料：前端渲染「引用来源」chips，回答中的 [n] 与之对应
+  send('sources', { sources: ragSources });
+  // 护栏 meta：前端可解释性展示（内容安全：已过滤 n 处）
+  send('meta', { guard: g.meta });
+
+  // 高危注入：拒答模板直出
+  if (g.blocked) {
+    send('delta', { t: REJECT_TEMPLATE });
+    send('done', { ok: true });
+    return res.end();
+  }
 
   // 在线模型不可用时用站内检索兜底（与 /chat 的 catch 行为一致），不丢上下文
-  const fallbackReply = localRetrievalAnswer(message, loadKnowledge(), forums);
+  const fallbackReply = localRetrievalAnswer(cleanMessage, loadKnowledge(), forums);
 
   if (!isAiUsable()) {
-    send('delta', { t: localRetrievalAnswer(message, loadKnowledge(), forums) });
+    send('delta', { t: fallbackReply });
     send('done', { ok: true });
     return res.end();
   }
 
   try {
-    const messages = buildMessages(message, history, loadKnowledge(), forums);
+    const messages = buildMessages(cleanMessage, history, loadKnowledge(), forums, ragSources);
+    // 流式输出需要整体缓冲后过护栏（幻觉红线与风险改写按句处理，流式逐字改写会造成前后矛盾）
+    let full = '';
     await chatWithAIStream(
       messages,
-      (t) => send('delta', { t }),
+      (t) => {
+        full += t;
+      },
       1024,
       currentModels(true)
     );
     bumpStats();
-    send('done', { ok: true });
+    const reply = guardOutput(full, ragSources, g.meta);
+    send('delta', { t: reply });
+    send('done', { ok: true, guard: g.meta });
   } catch (err: any) {
     logger.error('AI 流式对话失败', { error: err?.message });
     send('error', { message: fallbackReply });

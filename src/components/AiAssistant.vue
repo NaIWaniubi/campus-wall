@@ -14,7 +14,24 @@ interface ChatMessage {
  role: 'user' | 'assistant'
  content: string
  forums?: AiForumItem[]
+ sources?: RagSourceItem[] // RAG 引用资料（回答中 [n] 对应）
+ guard?: GuardMetaItem // 护栏可解释性（rewritten/redactedCount>0 时展示）
  streaming?: boolean // 正在流式输出中（按纯文本渲染）
+}
+
+/** RAG 引用来源（sources SSE 事件载荷） */
+interface RagSourceItem {
+ ref: number
+ title: string
+ sourceType: 'kb' | 'post' | 'announcement'
+ sourceId: number
+}
+
+/** 护栏可解释性元数据（meta SSE 事件载荷） */
+interface GuardMetaItem {
+ inputLevel: 'high' | 'medium' | 'low'
+ rewritten: boolean
+ redactedCount: number
 }
 
 const route = useRoute()
@@ -156,7 +173,7 @@ async function send(text?: string) {
  confirmClear.value = false
 
  messages.value.push({ role: 'user', content })
- const reply = reactive({ role: 'assistant', content: '', streaming: true, forums: [] }) as ChatMessage
+ const reply = reactive({ role: 'assistant', content: '', streaming: true, forums: [], sources: [] }) as ChatMessage
  messages.value.push(reply)
  loading.value = true
  scrollToBottom()
@@ -200,6 +217,18 @@ async function send(text?: string) {
  if (event === 'forums') {
  reply.forums = data || []
  scrollToBottom()
+ } else if (event === 'sources') {
+ // RAG 引用资料：先于 answer 到达，立即渲染「引用来源」区
+ reply.sources = (data?.sources || []).map((s: any) => ({
+ ref: s.ref,
+ title: s.title,
+ sourceType: s.sourceType,
+ sourceId: s.sourceId,
+ }))
+ scrollToBottom()
+ } else if (event === 'meta') {
+ // 护栏可解释性元数据
+ if (data?.guard) reply.guard = data.guard
  } else if (event === 'delta') {
  gotDelta = true
  reply.content += data.t || ''
@@ -238,6 +267,7 @@ async function send(text?: string) {
  const data = res.data || res
  reply.content = data.reply
  reply.forums = data.forums || []
+ reply.sources = data.sources || []
  ok = true
  } catch {
  /* 落到统一兜底文案 */
@@ -364,6 +394,30 @@ function goPost(id: number) {
  </span>
  </div>
  </button>
+ </div>
+
+ <!-- RAG 引用来源 chips：[n] 与回答中的引用编号对应 -->
+ <div v-if="msg.sources && msg.sources.length" class="flex flex-wrap gap-1.5 pt-1 pl-1">
+ <span class="w-full text-[11px]" style="color: var(--ink-mute)">引用来源</span>
+ <button
+ v-for="s in msg.sources"
+ :key="s.ref"
+ class="ds-chip !text-[11px] !py-1 !px-2"
+ :title="s.title"
+ @click="s.sourceType === 'post' && goPost(s.sourceId)"
+ >
+ <span class="font-semibold" style="color: var(--violet)">[{{ s.ref }}]</span>
+ <span class="line-clamp-1 max-w-[160px]">{{ s.title }}</span>
+ </button>
+ </div>
+
+ <!-- 护栏可解释性：有过滤动作时展示 -->
+ <div
+ v-if="msg.guard && (msg.guard.rewritten || msg.guard.redactedCount > 0)"
+ class="pl-1 pt-1 text-[11px]"
+ style="color: var(--ink-mute)"
+ >
+ 内容安全：已过滤 {{ msg.guard.redactedCount + (msg.guard.rewritten ? 1 : 0) }} 处
  </div>
  </div>
  </div>

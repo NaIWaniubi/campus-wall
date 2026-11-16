@@ -28,6 +28,7 @@
     "docs:preview": "vitepress preview docs",
     "test:coverage": "vitest --run --coverage",
     "eval:radar": "tsx scripts/eval-radar.ts",
+    "eval:ai": "tsx scripts/eval-ai.ts",
     "bench": "node scripts/bench.mjs"
   },
   "engines": {

@@ -63,6 +63,12 @@ const server = app.listen(Number(PORT), '0.0.0.0', () => {
   logger.info('服务器启动成功', { port: PORT, env: process.env.NODE_ENV });
 });
 
+// RAG 索引增量刷新：异步后台跑一次（hash 未变的块自动跳过），失败仅记日志不阻塞启动
+import { refreshIndex } from './rag/retrieve.js';
+refreshIndex()
+  .then((r) => logger.info('RAG 索引刷新完成', r))
+  .catch((e: any) => logger.warn('RAG 索引刷新失败（不影响服务）', { error: e?.message }));
+
 // 挂 WebSocket（路径 /ws）；REST 路由不受影响
 let wss: ReturnType<typeof attachWebSocket> | null = null;
 if (process.env.WS_ENABLED !== '0') {

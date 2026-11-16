@@ -27,6 +27,15 @@
 
 模型链带**总预算 + 单模型超时 + 网关级 auth 短路 + 5 分钟熔断**：自建网关密钥失效时不再逐个空试同网关模型，直接切免费档；全挂时 6–15 秒内拿到套版/规则结果，熔断期内 0 网络直返。
 
+### AI 深度子系统（传智杯 AI WEB 赛道冲刺）
+
+| 子系统 | 能力 | 离线兜底 |
+|---|---|---|
+| **RAG 检索增强问答**（`api/rag/`） | 向量（网关 embeddings → 本地 256 维哈希嵌入降级）+ 关键词混合检索（0.6/0.4），回答带 [n] 引用编号与「引用来源」chips，启动增量索引（hash 未变自动跳过） | 空召回回退 official.md 全文模式 |
+| **校园助手 Agent**（`api/agent/`） | planner-executor：LLM 规划工具调用计划（≤4 步防失控）→ 逐步执行 searchPosts / queryPost / getCampusStats / matchLostFound → 带事实合成回答；前端时间线 UI | LLM 不可用→规则 planner（意图→确定性工具序列），SSE 标注「规则模式」 |
+| **AI 输出护栏**（`api/ai/guard.ts`） | 输入：15 条中英注入模式分级（high 拒答不调 LLM / medium 剥离放行）；输出：风险话术整句改写、幻觉红线（引用外 [n] 句剔除）、长度截断；SSE meta 事件 + 前端「内容安全：已过滤 n 处」可解释性 | 评估记分卡 `npm run eval:ai` → docs/ai-eval-report.md（24 用例 100%） |
+| **多模态**（`api/multimodal/` + `src/composables/useSpeech.ts`） | 帖子图片理解（视觉模型严格 JSON → sharp 主色调/构图启发式降级，标签 chips + 标签云筛选）、语音输入发帖（SpeechRecognition）、帖子朗读（speechSynthesis）、AI 三态可视化组件（思考呼吸点/流式光标/降级徽标） | 无网关→启发式「离线解析」标签；无浏览器 API→入口自动隐藏 |
+
 ### 用户端
 - **账号体系**：通用账号注册登录（手机号/拼音/邮箱前缀均可，学号仅作旧字段兼容）、个人中心、信誉分体系（0-120 分级权限）
 - **内容发布**：发帖、草稿箱（自动保存）、24 小时内编辑、敏感词实时检测

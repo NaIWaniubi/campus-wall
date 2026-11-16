@@ -15,6 +15,7 @@ interface ChatMessage {
  content: string
  forums?: AiForumItem[]
  sources?: RagSourceItem[] // RAG 引用资料（回答中 [n] 对应）
+ guard?: GuardMetaItem // 护栏可解释性（rewritten/redactedCount>0 时展示）
  streaming?: boolean // 正在流式输出中（按纯文本渲染）
 }
 
@@ -24,6 +25,13 @@ interface RagSourceItem {
  title: string
  sourceType: 'kb' | 'post' | 'announcement'
  sourceId: number
+}
+
+/** 护栏可解释性元数据（meta SSE 事件载荷） */
+interface GuardMetaItem {
+ inputLevel: 'high' | 'medium' | 'low'
+ rewritten: boolean
+ redactedCount: number
 }
 
 const route = useRoute()
@@ -218,6 +226,9 @@ async function send(text?: string) {
  sourceId: s.sourceId,
  }))
  scrollToBottom()
+ } else if (event === 'meta') {
+ // 护栏可解释性元数据
+ if (data?.guard) reply.guard = data.guard
  } else if (event === 'delta') {
  gotDelta = true
  reply.content += data.t || ''
@@ -398,6 +409,15 @@ function goPost(id: number) {
  <span class="font-semibold" style="color: var(--violet)">[{{ s.ref }}]</span>
  <span class="line-clamp-1 max-w-[160px]">{{ s.title }}</span>
  </button>
+ </div>
+
+ <!-- 护栏可解释性：有过滤动作时展示 -->
+ <div
+ v-if="msg.guard && (msg.guard.rewritten || msg.guard.redactedCount > 0)"
+ class="pl-1 pt-1 text-[11px]"
+ style="color: var(--ink-mute)"
+ >
+ 内容安全：已过滤 {{ msg.guard.redactedCount + (msg.guard.rewritten ? 1 : 0) }} 处
  </div>
  </div>
  </div>

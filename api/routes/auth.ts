@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
-import { generateToken } from '../utils/jwt.js';
+import { generateToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
 import { authRequired, liftExpiredBan } from '../middleware/auth.js';
 import { authRateLimit, recordAuthFailure, clearAuthFailures } from '../middleware/rateLimit.js';
 import { success, fail, toCamel } from '../utils/response.js';
@@ -41,6 +41,7 @@ router.post('/register', authRateLimit, validate({ body: userSchemas.register })
 
   const userId = result.lastInsertRowid as number;
   const token = generateToken({ id: userId, studentId, role: 'user' });
+  const refreshToken = generateRefreshToken({ id: userId, studentId, role: 'user' });
   clearAuthFailures(req);
 
   const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(userId) as any;
@@ -48,7 +49,7 @@ router.post('/register', authRateLimit, validate({ body: userSchemas.register })
   trackEvent(userId, 'register', userId, { studentId });
   touchActive(userId);
   logger.info('User registered', { userId, studentId });
-  success(res, { token, user: toCamel(user) }, '注册成功');
+  success(res, { token, refreshToken, user: toCamel(user) }, '注册成功');
 });
 
 // 登录
@@ -83,11 +84,17 @@ router.post('/login', authRateLimit, validate({ body: userSchemas.login }), (req
     role: user.role,
     ver: Number(user.token_version ?? 0),
   });
+  const refreshToken = generateRefreshToken({
+    id: user.id,
+    studentId: user.student_id,
+    role: user.role,
+    ver: Number(user.token_version ?? 0),
+  });
   // 显式剥离 password 字段（白名单已不含，但此处仍防御性 toCamel 之前 drop）
   const { password: _pw, ...safeUser } = user;
   trackEvent(user.id, 'login', null, {});
   touchActive(user.id);
-  success(res, { token, user: toCamel(safeUser) }, '登录成功');
+  success(res, { token, refreshToken, user: toCamel(safeUser) }, '登录成功');
 });
 
 // 微信静默登录（小程序 wx.login code → jscode2session → JWT）
@@ -153,6 +160,46 @@ router.put('/password', authRequired, authRateLimit, (req, res) => {
     ver: Number(row?.token_version ?? 0),
   });
   success(res, { token: newToken }, '密码修改成功，其他设备需重新登录');
+});
+
+// 静默续期：用 refresh token 换发新的 access token + refresh token（轮换）
+// 改密/封禁后 token_version 不匹配，旧 refresh token 立即失效
+router.post('/refresh', authRateLimit, (req, res) => {
+  const refreshToken = String(
+    req.body?.refreshToken ?? req.headers['x-refresh-token'] ?? ''
+  );
+  if (!refreshToken) {
+    return fail(res, '缺少 refresh token', 401, 401);
+  }
+  const decoded = verifyToken(refreshToken);
+  if (!decoded || decoded.type !== 'refresh') {
+    return fail(res, 'refresh token 无效或已过期', 401, 401);
+  }
+  const user = db
+    .prepare(`SELECT ${SAFE_USER_COLS}, token_version FROM users WHERE id = ?`)
+    .get(decoded.id) as any;
+  if (!user) {
+    return fail(res, '用户不存在', 404, 404);
+  }
+  if (user.status === 'banned') {
+    return fail(res, '账号已被封禁，请联系管理员', 403, 403);
+  }
+  if (Number(user.token_version ?? 0) !== decoded.ver) {
+    return fail(res, '登录状态已失效，请重新登录', 401, 401);
+  }
+  const token = generateToken({
+    id: user.id,
+    studentId: user.student_id,
+    role: user.role,
+    ver: decoded.ver,
+  });
+  const newRefresh = generateRefreshToken({
+    id: user.id,
+    studentId: user.student_id,
+    role: user.role,
+    ver: decoded.ver,
+  });
+  success(res, { token, refreshToken: newRefresh }, '续期成功');
 });
 
 // 退出登录（客户端清除本地 token 即可；此处仅作幂等确认）

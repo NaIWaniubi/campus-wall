@@ -12,6 +12,8 @@ export interface CurrentUser {
   nickname: string;
   creditScore: number;
   status: string;
+  /** 微信 openid：小程序登录用户才有，用于 msgSecCheck；Web 用户为空 */
+  openid?: string | null;
 }
 
 declare global {

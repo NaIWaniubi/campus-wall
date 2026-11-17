@@ -30,16 +30,29 @@ if (isProduction) {
   }
 }
 
-const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
+const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 /**
- * 生成 token。ver 为账号当前的 token_version：
- * 改密/封禁会 +1，使所有旧 token 立即失效（token 吊销能力）。
+ * 生成 access token（默认 2h）。携带 type 标记以便与 refresh token 区分。
  */
 export function generateToken(payload: { id: number; studentId: string; role: string; ver?: number }): string {
   const options: SignOptions = { expiresIn: EXPIRES_IN as any };
   return jwt.sign(
-    { id: payload.id, studentId: payload.studentId, role: payload.role, ver: payload.ver ?? 0 },
+    { id: payload.id, studentId: payload.studentId, role: payload.role, ver: payload.ver ?? 0, type: 'access' },
+    SECRET,
+    options
+  );
+}
+
+/**
+ * 生成 refresh token（默认 7d）：用于无感续期。
+ * 与 access token 同密钥签名，通过 type 字段区分用途。
+ */
+export function generateRefreshToken(payload: { id: number; studentId: string; role: string; ver?: number }): string {
+  const options: SignOptions = { expiresIn: REFRESH_EXPIRES as any };
+  return jwt.sign(
+    { id: payload.id, studentId: payload.studentId, role: payload.role, ver: payload.ver ?? 0, type: 'refresh' },
     SECRET,
     options
   );
@@ -47,7 +60,7 @@ export function generateToken(payload: { id: number; studentId: string; role: st
 
 export function verifyToken(
   token: string
-): { id: number; studentId: string; role: string; ver: number } | null {
+): { id: number; studentId: string; role: string; ver: number; type: string } | null {
   try {
     const raw = jwt.verify(token, SECRET) as any;
     return {
@@ -56,6 +69,8 @@ export function verifyToken(
       role: raw.role,
       // 兼容升级前签发的旧 token（无 ver 字段）：视为 0
       ver: Number(raw.ver ?? 0),
+      // 兼容升级前签发的旧 token（无 type 字段）：视为 access
+      type: raw.type || 'access',
     };
   } catch {
     return null;

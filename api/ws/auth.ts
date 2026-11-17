@@ -10,7 +10,8 @@ import { liftExpiredBan } from '../middleware/auth.js';
 
 export function authJwt(token: string): { id: number; studentId: string; role: string } {
   const payload = verifyToken(token);
-  if (!payload) throw new Error('invalid token');
+  // 只接受 access token：refresh token（7 天）不得用于建立 WS 长连接
+  if (!payload || payload.type !== 'access') throw new Error('invalid token');
 
   const user = db
     .prepare('SELECT id, student_id, role, status, ban_reason, ban_until, token_version FROM users WHERE id = ?')

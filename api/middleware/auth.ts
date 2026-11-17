@@ -48,10 +48,12 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
     return unauthorized(res);
   }
   const payload = verifyToken(token);
-  if (!payload) {
+  // type 必须为 access：refresh token（7 天）只允许在 /auth/refresh 使用，
+  // 否则被盗的 refresh 等同于长寿命 access token
+  if (!payload || payload.type !== 'access') {
     return unauthorized(res);
   }
-  const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version FROM users WHERE id = ?').get(payload.id) as any;
+  const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version, openid FROM users WHERE id = ?').get(payload.id) as any;
   if (!user) {
     return unauthorized(res, '用户不存在');
   }
@@ -72,6 +74,7 @@ export function authRequired(req: Request, res: Response, next: NextFunction) {
     nickname: user.nickname,
     creditScore: user.credit_score,
     status: user.status,
+    openid: user.openid ?? null,
   };
   next();
 }
@@ -83,8 +86,9 @@ export function authOptional(req: Request, _res: Response, next: NextFunction) {
   const token = extractToken(req);
   if (token) {
     const payload = verifyToken(token);
-    if (payload) {
-      const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version FROM users WHERE id = ?').get(payload.id) as any;
+    // refresh token 不作为业务身份凭据（同 authRequired 的约束）
+    if (payload && payload.type === 'access') {
+      const user = db.prepare('SELECT id, student_id, nickname, role, credit_score, status, ban_until, token_version, openid FROM users WHERE id = ?').get(payload.id) as any;
       if (user && Number(user.token_version ?? 0) === payload.ver) {
         if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
         if (user.status !== 'banned') {
@@ -95,6 +99,7 @@ export function authOptional(req: Request, _res: Response, next: NextFunction) {
             nickname: user.nickname,
             creditScore: user.credit_score,
             status: user.status,
+            openid: user.openid ?? null,
           };
         }
       }

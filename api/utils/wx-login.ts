@@ -14,7 +14,7 @@
 import type { Request, Response } from 'express';
 import { db } from '../db.js';
 import { success, fail, toCamel } from '../utils/response.js';
-import { generateToken } from '../utils/jwt.js';
+import { generateToken, generateRefreshToken } from '../utils/jwt.js';
 import { logger } from '../utils/logger.js';
 
 export const SAFE_USER_COLS = `id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, ban_reason, ban_until, openid, token_version, created_at`;
@@ -83,7 +83,8 @@ export async function wxLoginHandler(req: Request, res: Response) {
     }
     // ver 必须带 token_version：改密/封禁会 +1，缺省 0 会让这类账号 wx 登录后每个请求都 401（登录死循环）
     const token = generateToken({ id: bound.id, studentId: bound.student_id, role: bound.role, ver: Number(bound.token_version ?? 0) });
-    return success(res, { token, user: toCamel(bound), isNewUser: false }, '登录成功');
+    const refreshToken = generateRefreshToken({ id: bound.id, studentId: bound.student_id, role: bound.role, ver: Number(bound.token_version ?? 0) });
+    return success(res, { token, refreshToken, user: toCamel(bound), isNewUser: false }, '登录成功');
   }
 
   // 未绑定：创建占位账号。student_id 由 openid 派生，保证唯一且不能拿来猜他人学号
@@ -100,7 +101,8 @@ export async function wxLoginHandler(req: Request, res: Response) {
   const userId = Number(result.lastInsertRowid);
   const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(userId) as any;
   const token = generateToken({ id: userId, studentId: placeholderStudentId, role: 'user', ver: 0 });
+  const refreshToken = generateRefreshToken({ id: userId, studentId: placeholderStudentId, role: 'user', ver: 0 });
 
   logger.info('wx-login new user', { userId });
-  success(res, { token, user: toCamel(user), isNewUser: true }, '登录成功');
+  success(res, { token, refreshToken, user: toCamel(user), isNewUser: true }, '登录成功');
 }

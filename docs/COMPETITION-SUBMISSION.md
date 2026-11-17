@@ -16,10 +16,10 @@ V3 起它不再是「又一个绿白校园墙」：视觉换成**紫→品红→
 
 ## 3. 工程数据（可复现）
 
-- 测试：`npm test` → **400/400 通过**（42 个文件；含 Web Push 7 条、分享卡 13 条、SEO 24+5 条、AI 兜底链 25 条）
-- 浏览器门：`npx playwright test` → **12/12 通过**（浏览/搜索/登录/发帖/点赞/评论/管理审核全流程真 Chromium，隔离库自动重灌种子）
+- 测试：`npm test` → **407/407 通过**（43 个文件；含 Web Push 7 条、分享卡 13 条、SEO 24+5 条、AI 兜底链 25 条、401 续期 7 条、微信内容安全 12 条、组件级 9 条）
+- 浏览器门：`npx playwright test` → **15/15 通过**（浏览/搜索/登录/发帖/点赞/评论/管理审核/法律页全流程真 Chromium，隔离库自动重灌种子；含冷启动预热与新手引导隔离的稳定性改造）
 - 类型：`npm run check` → 0 错误；`npm run lint` → 0 错误
-- CI 六道门（GitHub Actions，master 常绿）：静态门（含文档死链）→ 雷达算法门 → 构建 + 体积 gzip 预算门 → 契约压测门（24 并发零 5xx、p95<800ms，实测 ~2409 req/s / p95 5ms）→ 浏览器 E2E 门（13/13）→ Lighthouse 门（移动端 3 次中位数 perf 95/a11y 95/bp 100/seo 100）
+- CI 六道门（GitHub Actions，master 常绿）：静态门（含文档死链）→ 雷达算法门 → 构建 + 体积 gzip 预算门 → 契约压测门（24 并发零 5xx、p95<800ms，实测 ~2409 req/s / p95 5ms）→ 浏览器 E2E 门（15/15）→ Lighthouse 门（移动端 3 次中位数 perf 95/a11y 95/bp 100/seo 100）
 - 前端产物：Vue3 + Vite 打包，含 ECharts 图表懒加载、虚拟列表（`@tanstack/vue-virtual`）
 - 后端：Express 5 + SQLite（FTS5 中文二元分词全文检索）+ WebSocket 实时私信
 - 部署：单进程 Node 服务，`bash start.sh` 即可跑；**空数据目录冷启动 → 自动建库灌种子 → 登录 / 发帖 / 雷达 / 缩略图 / 今日简报 / AI 成稿 / AI 划重点** 全链路在 Ubuntu 24.04.1 + Node 24.22.2 复验 0 个 5xx（`scripts/verify-stage-wsl.sh`）
@@ -103,17 +103,76 @@ V3 的「渐变 + 玻璃」在多轮打磨后仍显廉价，V4 直接换设计�
 | **Web Push 离线推送** | 设置页一键开启/关闭；VAPID 未配置入口自动隐藏；`gen-vapid.mjs` 首跑生成（密钥不进仓库） | demo 真机闭环：订阅拿真实 FCM endpoint 落库→评论触发 VAPID 签名真发→退订删行；路由 7 条集成测 |
 | **AI 分轨** | 前台三个入口只走快网关（慢免费档剔除），慢但免费的真模型专职后台简报；网关 auth 失败端点级短路 | 失败路径实测 15.3s→1.56s；断网时离线套版仍产出「【失物招领】校园卡」级成稿 |
 | **性能** | 三处列表虚拟滚动；单图帖固定图带消灭 CLS；chunk 体积 gzip 预算门 | 契约压测 ~2409 req/s p95 5ms（CI 门） |
-| **可信度基建** | CI 六道门（静态/雷达/体积/压测/浏览器 E2E/Lighthouse）；E2E 复活并进 CI（现 13/13）——防「演示流只在我机器上能跑」 | 每次 push 全链路自动复验 |
+| **可信度基建** | CI 六道门（静态/雷达/体积/压测/浏览器 E2E/Lighthouse）；E2E 进 CI（现 15/15）——防「演示流只在我机器上能跑」 | 每次 push 全链路自动复验 |
 
 ## 8. 截图与录屏素材
 
+- **V6 合规与新增页**：`captures/v6/`（隐私政策/用户协议/注册协议勾选，手机 3 张 + 桌面 1 张，0 console 报错）
 - **V4 视觉验收**：`captures/v4/`（手机 10 张：登录/首页/话题/板块/详情/详情-AI 划重点/发布/消息/个人/搜索/注册；桌面 4 张：首页/话题/详情/发布）——`node scripts/capture-v4.mjs` 一键复现，0 console 报错
 - **V3 视觉验收**：`captures/v3/`（手机 8 张 + 桌面 3 张，历史版本留档）
 - 桌面 + 移动端实拍图：`captures/deploy/`（首页桌面/移动、登录、板块页、帖子详情、我的、消息、后台总览共 8 张）
 - 原始采集图：`captures/`（8 张 Web 窄屏）
 - 建议补录：90 秒真机小程序视频（28 页里挑首页/详情/发布/消息/我的/雷达 6 页）
 
-## 9. 答辩预设 Q&A
+## 9. AI 深度四子系统（AI 技术深度 35% 的证据链）
+
+评审维度里「AI 技术深度」权重最高，这一节逐项给出代码位置与可复现命令，不靠形容词。
+
+### 9.1 RAG 检索增强（api/rag/，4 文件）
+
+| 环节 | 实现 | 证据 |
+|---|---|---|
+| 切块 | 标题分节 + 内容哈希去重（`contentHash`） | `api/rag/chunker.ts:43-123` |
+| 向量 | **双路径**：网关 `/v1/embeddings` 优先，未配置时本地 256 维哈希嵌入兜底（字符 2-gram + FNV-1a + TF 加权 + L2 归一化） | `api/rag/embedder.ts:1-40` |
+| 检索 | 向量相似度 + FTS5 关键词的混合排序，命中可溯源 | `api/rag/retrieve.ts:52` |
+| 引用 | 返回 `RagSource`（文档/标题/片段/分数），前端渲染引用编号 | AiAssistant 引用列表 |
+| 增量索引 | 按内容哈希跳过未变块，启动后后台刷新一次 | `refreshIndex()` 实测 inserted/skipped 日志 |
+
+**断网可演示**：本地嵌入无需任何外部依赖，`refreshIndex` 启动即建索引（CI 里 RAG 单测全绿）。
+
+### 9.2 Agent 工作流（api/agent/，921 行）
+
+| 环节 | 实现 | 证据 |
+|---|---|---|
+| 规划 | Planner：LLM 规划失败回落规则规划（`planMode: llm / rule`） | `api/agent/planner.ts:1-165` |
+| 工具 | 工具注册表（搜帖/失物匹配/统计/知识库…），入参 schema 校验 | `api/agent/tools.ts:1-451` |
+| 执行 | 逐步执行 + SSE 事件流（plan → tool_call×N → answer → end） | `api/agent/executor.ts`、`api/routes/agent.ts:31` |
+| 呈现 | 前端时间线 UI：每一步工具调用可见（不黑箱） | `src/composables/useAgentStream.ts` + Agent 时间线组件 |
+
+### 9.3 AI 护栏（api/ai/guard.ts，225 行 + 评估记分卡）
+
+| 能力 | 实现 | 证据 |
+|---|---|---|
+| 注入分级 | 中英双语注入模式库（"忽略以上指令"/"ignore previous"/角色重置…），high 直接拒答（返回 `REJECT_TEMPLATE`，**不调 LLM**），medium 剥离后继续 | `api/ai/guard.ts:17-110` |
+| 输出净化 | 风险改写 + 幻觉红线（回复里的引用编号必须来自 RAG 命中集） | `guard.ts:117` |
+| JSON 校验 | 模型输出宽容解析 + schema 校验，坏 JSON 不炸 | `guard.ts:198` |
+| 评估 | 24 条样本记分卡，全离线纯函数，一键复现 | `npx tsx scripts/eval-ai.ts` → `docs/ai-eval-report.md`（24/24，平均 0.5ms/条） |
+
+### 9.4 多模态（api/multimodal/，274 行）
+
+| 环节 | 实现 | 证据 |
+|---|---|---|
+| 图片理解 | 视觉网关优先 → 启发式兜底（尺寸/主色调/明暗 → 描述 + 猜测分类） | `api/multimodal/vision.ts:129-171` |
+| 元数据 | 分析结果落库（标签/描述/安全标记），列表按标签聚合 | `api/multimodal/store.ts` |
+| 失败语义 | 双重失败返回 `safe:false` 占位，不阻塞发帖 | `vision.ts:155-171` |
+| 端侧 | 小程序发帖图片理解 + 语音交互入口 | `miniprogram/` 发布页 |
+
+**演示话术**：四子系统全部"有模型走模型、没模型有确定性兜底"，断网也能讲完整故事。
+
+## 10. 安全与合规加固（本轮新增，逐条可验）
+
+| 项 | 内容 | 验证 |
+|---|---|---|
+| 双 token | access 2h + refresh 7d；access **只在内存**（不落 localStorage），启动静默续期 | `src/stores/user.ts` persist pick |
+| refresh 单次消费 | jti 登记 + 重放即拒（旧串换发后再用 → 401） | `api/utils/refresh-jti.ts`、`used_refresh_jti` 表、`auth-refresh.test` 9 条 |
+| 401 双入口续期 | 后端真实 HTTP 401 与 body.code=401 都触发"续期→重放"；SSE 流式接口独立 `fetchWithAuth` | `src/utils/request.ts`、`request-refresh.test` 7 条 |
+| type 隔离 | 业务接口与 WS 只认 `type=access`，被盗 refresh 不能当长寿命凭证 | `api/middleware/auth.ts`、`api/ws/auth.ts` |
+| 内容安全 | 本地敏感词三级 + 微信 `msgSecCheck`（risky 拒/review 转人工）+ `mediaCheckAsync` 图片异步送审；接口异常默认 fail-open，`WX_CONTENT_FAIL_CLOSED=1` 可切拒绝 | `api/utils/wx-content.ts`、`wx-content.test` 12 条 |
+| 注销与吊销 | 改密/封禁递增 `token_version`，REST 与 WS 双通道旧 token 立即失效 | `token-revoke.test` |
+| 合规文本 | 用户协议/隐私政策双端同源（`gen-legal-web.mjs` 从小程序 wxml 确定性提取），注册强制勾选 | `/legal/:doc`、`m-legal-*.png` |
+| 安全文档 | `SECURITY.md` 支持范围表 + 响应承诺 + 上线检查单（`TRUST_PROXY`/密钥注入等） | 仓库根 |
+
+## 11. 答辩预设 Q&A
 
 **Q：有真实用户吗？**
 A：目前是单校冷启动阶段，演示库为 5 个演示账号 + 20 帖，覆盖 8 个板块与全部闭环路径；我们有 30 天单校地推日历与北极星指标（每日有效连接 ≥80/日），可直接展示增长台账。
@@ -125,7 +184,7 @@ A：评测集是 21 组 query / 63 个候选的人工标注集，基线是纯关
 A：四道锁——列表接口对非本人强制 `is_anonymous = 0`（不能按作者反查）、编辑不传 `isAnonymous` 时保留原值、缓存 key 带查看者可见性维度（游客结果不会命中作者结果）、改密/封禁递增 `token_version` 让旧 token 立即失效。
 
 **Q：为什么不用现成的框架/低代码？**
-A：项目本身就是用 TRAE 从 PRD 到代码一路做出来的（`.trae/documents/` 保留 PRD 与技术架构文档），400 个测试 + 13 条浏览器 E2E、OpenAPI 3.1、CI 六道门与严格类型都是在这条链路里长出来的。
+A：项目本身就是用 TRAE 从 PRD 到代码一路做出来的（`.trae/documents/` 保留 PRD 与技术架构文档），407 个测试 + 15 条浏览器 E2E、OpenAPI 3.1、CI 六道门与严格类型都是在这条链路里长出来的。
 
 **Q：为什么说「颠覆以往校园墙」？**
 A：两处硬差异。①视觉：校园墙长期被「绿白 + 信息流堆卡片」框住，我们把主色换成青春紫、八板块八色相，并把 AI 卡片做成首屏第一块内容；②产品：传统校园墙的 AI 是角落里的客服，我们的 AI 在发布、阅读、浏览三条主路径上都有明确产出（成稿/划重点/简报），且每个产出都有规则兜底——评委断网也能看到完整效果。

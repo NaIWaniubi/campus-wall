@@ -256,6 +256,14 @@ npm run dev
 
 ---
 
+## 🏆 参赛
+
+传智杯 AI WEB 赛道提交材料（2026-11-18 截止）：
+- 作品说明：[docs/COMPETITION-SUBMISSION.md](docs/COMPETITION-SUBMISSION.md)
+- 速贴版（表单用）：[docs/SUBMISSION-ONEPAGE.md](docs/SUBMISSION-ONEPAGE.md)
+- 90 秒录屏分镜：[docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md)
+- 提交检查清单：[docs/SUBMISSION-CHECKLIST.md](docs/SUBMISSION-CHECKLIST.md)
+
 ## 🌐 部署
 
 ### 方式一：自托管（推荐用于校内服务器 / VPS）

@@ -223,6 +223,22 @@ sudo -u campus pm2 reload campus-wall      # 零停机重载（先起新进程�
 - 异地备份（强烈建议）：`rsync -a /var/lib/campus-wall/backups/ backup-host:/backup/campus-wall/`（cron 每日）
 - 恢复：`pm2 stop campus-wall && cp <备份文件> /var/lib/campus-wall/campus.db && pm2 start campus-wall`
 
+### 3.9 试点运营数据导出（实效验证）
+
+真运营/试点（如 50 人 × 2 周）跑完后，一条命令导出可引用的数据报告（规模 / 活跃 / 留存 / 审核时效 / 交易闭环）：
+
+```bash
+cd /opt/campus-wall
+DB_PATH=/var/lib/campus-wall/campus.db npm run report:pilot              # Markdown（直接贴材料/周报）
+DB_PATH=/var/lib/campus-wall/campus.db npm run report:pilot -- --json    # JSON（看板/表格引用）
+DB_PATH=/var/lib/campus-wall/campus.db npm run report:pilot -- --days 30 # 改窗口（默认 14 天）
+```
+
+- 只读打开数据库（`readonly`），不迁移、不写表，可对生产库直接执行
+- 口径：D1/D7 留存 = 注册日 D 的用户在 D+N 当天有任意埋点行为（分母排除注册不足 N+1 天的用户）；
+  激活 = 注册 24h 内有发帖/评论；审核时效 = `audit_approve` 审计日志与帖子创建时间的差（分钟）
+- 注意：本地 `api/data.db` 会被集成测试写入假用户/假事件，**真实试点数字必须用生产库**
+
 ## 4. ZCode Sites 上线（需等配额）
 
 2026-11-11 实测：免费版站点配额 `1/1` 已满（唯一站点「晚安营地」），新建站点被 `3605 Account quota exceeded` 拦下；

@@ -28,7 +28,11 @@ const chromiumExecutable = resolveChromium()
 
 export default defineConfig({
   testDir: path.join(root, 'tests', 'e2e'),
-  timeout: 30_000,
+  // 预热 vite 按需编译（admin/publish 等重型 chunk 冷编译可超 60s，预热后 <2s）
+  globalSetup: path.join(root, 'tests', 'e2e', 'global-setup.ts'),
+  // Windows 中文路径 + 冷启 vite 首次编译 chunk 实测可超 30s（预热后 <8s），
+  // 用例级超时给足余量，避免把「编译慢」误判成「功能坏」
+  timeout: 60_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,
@@ -50,10 +54,12 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'npx vite --port 5173',
+      // 用本地二进制：npx 会去 registry 拉最新小版本，代理行为可能与锁文件版本不同
+      command: 'node node_modules/vite/bin/vite.js --port 5173',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      // Windows 冷启 vite（依赖预构建 + 中文路径）实测可达 40s+，30s 会假红
+      timeout: 90_000,
     },
   ],
 })

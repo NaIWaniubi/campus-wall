@@ -6,7 +6,7 @@
  * 独立组件配套（AgentTimeline.vue），不与 AiAssistant.vue 耦合（那是 RAG agent 的地盘）。
  */
 import { ref, computed } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { fetchWithAuth } from '@/utils/request'
 
 /** 一次工具调用的时间线条目（与后端 tool_call 事件字段一致） */
 export interface AgentToolCall {
@@ -27,7 +27,6 @@ export interface AgentPlanStep {
 export type AgentPhase = 'idle' | 'planning' | 'running' | 'answering' | 'done' | 'error'
 
 export function useAgentStream() {
-  const userStore = useUserStore()
 
   const phase = ref<AgentPhase>('idle')
   const planSteps = ref<AgentPlanStep[]>([])
@@ -65,11 +64,10 @@ export function useAgentStream() {
     phase.value = 'planning'
 
     try {
-      const resp = await fetch('/api/agent/assist/stream', {
+      const resp = await fetchWithAuth('/api/agent/assist/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: userStore.token ? `Bearer ${userStore.token}` : '',
         },
         body: JSON.stringify({ question }),
       })

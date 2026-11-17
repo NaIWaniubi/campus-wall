@@ -1,0 +1,18 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ executablePath: process.env.PW_EXE });
+const p = await b.newPage();
+const errs = [];
+p.on('console', m => { if (m.type() === 'error') errs.push(m.text().slice(0,200)); });
+p.on('pageerror', e => errs.push('PAGEERROR: ' + e.message.slice(0,200)));
+p.on('response', r => { if (r.status() >= 400) errs.push(`HTTP ${r.status()} ${r.url().slice(0,120)}`); });
+await p.goto('http://localhost:5173/login');
+await p.getByPlaceholder(/账号|学号/).fill('23770001');
+await p.getByPlaceholder('请输入密码').fill('demo1234');
+await p.getByRole('button', { name: '登录', exact: true }).click();
+await p.waitForTimeout(4000);
+console.log('URL after login:', p.url());
+console.log('--- errors/failed responses ---');
+console.log(errs.slice(0,14).join('\n') || '(none)');
+const store = await p.evaluate(() => ({ token: !!(window.__P__) , ls: (localStorage.getItem('campus-wall-user')||'').slice(0,80) }));
+console.log('storage:', JSON.stringify(store));
+await b.close();

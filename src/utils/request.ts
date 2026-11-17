@@ -22,6 +22,46 @@ function tryRefreshOnce(): Promise<boolean> {
   return refreshPromise
 }
 
+/**
+ * 401 统一处理（HTTP 200 + body.code=401 与真实 HTTP 401 两个入口共用）：
+ * 1. 先尝试静默续期一次（单飞），成功则重放原请求；
+ * 2. 续期失败/已重试过：快照回跳位置 → 清登录态 → 跳对应登录页。
+ *
+ * 为什么两个入口都要接：后端 unauthorized() 发的是真实 HTTP 401（response.ts），
+ * axios 对非 2xx 直接走 error 拦截器——只在 response 拦截器处理 body.code，
+ * 会让「access 2h 到期后的任何请求」直接报「服务器错误」并掉登录，静默续期形同虚设。
+ */
+async function handleUnauthorized(config: any, message?: string): Promise<any> {
+  const userStore = useUserStore()
+  if (config && !config.__skipAuthRefresh && !config.__retriedAfterRefresh) {
+    config.__retriedAfterRefresh = true
+    const ok = await tryRefreshOnce()
+    if (ok) return request(config)
+  }
+  // 在清空登录态之前，先快照原始位置（pathname + search + hash），便于登录后回跳
+  const rawLocation =
+    (typeof window !== 'undefined'
+      ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+      : '') || router.currentRoute.value.fullPath
+  const currentPath = rawLocation
+  const wasAdmin = userStore.isAdmin
+  // 将回跳路径暂存到 sessionStorage，登录页可读取
+  try {
+    sessionStorage.setItem('auth:redirect-after-login', currentPath)
+  } catch {
+    /* sessionStorage 不可用时忽略 */
+  }
+  // 清空登录状态
+  userStore.logout()
+  // 后台路由跳后台登录页，前台跳前台登录页（保留 redirect 便于回跳）
+  const target = wasAdmin ? '/admin/login' : '/login'
+  if (currentPath !== target) {
+    router.push({ path: target, query: { redirect: currentPath } })
+  }
+  showToast(message || (wasAdmin ? '登录已过期，请重新登录' : '请先登录'), 'error')
+  return Promise.reject(new Error(message || '请先登录'))
+}
+
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
@@ -48,37 +88,7 @@ request.interceptors.response.use(
     }
     // 401：未登录或Token过期 —— 先尝试静默续期一次，成功则重放原请求
     if (res.code === 401) {
-      const userStore = useUserStore()
-      const cfg = response.config as any
-      if (!cfg.__skipAuthRefresh && !cfg.__retriedAfterRefresh) {
-        cfg.__retriedAfterRefresh = true
-        const ok = await tryRefreshOnce()
-        if (ok) {
-          return request(cfg)
-        }
-      }
-      // 在清空登录态之前，先快照原始位置（pathname + search + hash），便于登录后回跳
-      const rawLocation =
-        (typeof window !== 'undefined'
-          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-          : '') || router.currentRoute.value.fullPath
-      const currentPath = rawLocation
-      const wasAdmin = userStore.isAdmin
-      // 将回跳路径暂存到 sessionStorage，登录页可读取
-      try {
-        sessionStorage.setItem('auth:redirect-after-login', currentPath)
-      } catch {
-        /* sessionStorage 不可用时忽略 */
-      }
-      // 清空登录状态
-      userStore.logout()
-      // 后台路由跳后台登录页，前台跳前台登录页（保留 redirect 便于回跳）
-      const target = wasAdmin ? '/admin/login' : '/login'
-      if (currentPath !== target) {
-        router.push({ path: target, query: { redirect: currentPath } })
-      }
-      showToast(res.message || (wasAdmin ? '登录已过期，请重新登录' : '请先登录'), 'error')
-      return Promise.reject(new Error(res.message || '请先登录'))
+      return handleUnauthorized(response.config as any, res.message)
     }
     // 403：无权限
     if (res.code === 403) {
@@ -90,7 +100,14 @@ request.interceptors.response.use(
     return Promise.reject(new Error(res.message || '请求失败'))
   },
   (error) => {
-    if (error.response?.status === 404) {
+    // 真实 HTTP 401（后端 unauthorized/forbidden 系列发的是真状态码）：
+    // 与 body.code=401 共用同一套续期+重放逻辑，否则过期 token 会直接掉登录
+    if (error.response?.status === 401) {
+      return handleUnauthorized(error.config, error.response.data?.message)
+    }
+    if (error.response?.status === 403) {
+      showToast(error.response.data?.message || '无权限访问', 'error')
+    } else if (error.response?.status === 404) {
       showToast('请求的资源不存在', 'error')
     } else if (error.code === 'ECONNABORTED') {
       showToast('请求超时，请重试', 'error')
@@ -166,6 +183,23 @@ export function safeRedirect(input: unknown, fallback = '/'): string {
   if (s.startsWith('//') || s.startsWith('/\\')) return fallback
   if (/[\r\n\t]/.test(s)) return fallback
   return s
+}
+
+/**
+ * 带鉴权的 fetch（专供 SSE / 流式接口——它们绕不开 axios 拦截器）：
+ * 401 时静默续期一次并用新 token 重发；续期失败原样返回 401 响应，由调用方处理。
+ * 两处流式调用（AI 助手 / Agent 助手）共用，避免过期 token 时流式功能直接失效。
+ */
+export async function fetchWithAuth(input: string, init: RequestInit = {}, retry = true): Promise<Response> {
+  const userStore = useUserStore()
+  const headers: Record<string, string> = { ...((init.headers as Record<string, string>) || {}) }
+  if (userStore.token) headers.Authorization = `Bearer ${userStore.token}`
+  const resp = await fetch(input, { ...init, headers })
+  if (resp.status === 401 && retry && userStore.refreshToken) {
+    const ok = await tryRefreshOnce()
+    if (ok) return fetchWithAuth(input, init, false)
+  }
+  return resp
 }
 
 export default request

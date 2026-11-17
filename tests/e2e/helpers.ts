@@ -14,6 +14,11 @@ export const test = base.extend({
         body: JSON.stringify({ code: 200, message: 'ok', data: null }),
       })
     )
+    // 新手引导：首次访问首页 0.8s 后自动弹模态框（OnboardingGuide），
+    // 会遮罩全页导致后续点击超时——这是给新用户的真实功能，测试里预置「已看过」。
+    await page.addInitScript(() => {
+      try { localStorage.setItem('onboarding:v1', 'done') } catch { /* 隐私模式忽略 */ }
+    })
     await use(page)
   },
 })

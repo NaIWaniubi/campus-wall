@@ -7,7 +7,7 @@ import { ref, reactive, nextTick, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bot, X, Send, Loader2, MessagesSquare, ChevronRight, Trash2 } from '@lucide/vue'
 import { aiApi, type AiForumItem } from '@/utils/api'
-import { toast } from '@/utils/request'
+import { toast, fetchWithAuth } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
 interface ChatMessage {
@@ -183,11 +183,10 @@ async function send(text?: string) {
  let httpStatus = 0
  let networkFail = false
  try {
- const resp = await fetch('/api/ai/chat/stream', {
+ const resp = await fetchWithAuth('/api/ai/chat/stream', {
  method: 'POST',
  headers: {
  'Content-Type': 'application/json',
- Authorization: userStore.token ? `Bearer ${userStore.token}` : '',
  },
  body: JSON.stringify({ message: content, history: buildRequestMessages().slice(0, -1) }),
  })

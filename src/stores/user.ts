@@ -20,6 +20,8 @@ interface User {
 
 // 静默续期单飞句柄：并发只发一次 /auth/refresh（见 refreshAccessToken 注释）
 let refreshInFlight: Promise<boolean> | null = null
+// 会话代际：logout/重新登录时递增，用于丢弃在飞的旧续期响应（防止退出被"复活"）
+let sessionEpoch = 0
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -106,9 +108,14 @@ export const useUserStore = defineStore('user', {
     async refreshAccessToken() {
       if (!this.refreshToken) return false
       if (refreshInFlight) return refreshInFlight
+      // 会话代际：本次刷新发起时记下 epoch；若期间发生 logout（或重新登录），
+      // 响应回来时必须丢弃——否则「点退出 → 在飞的 refresh 返回」会把会话复活，
+      // 并把新的 refreshToken 重新写进 localStorage（等于用户退出失败）。
+      const epochAtStart = sessionEpoch
       const run = (async () => {
         try {
         const res: any = await request.post('/auth/refresh', { refreshToken: this.refreshToken })
+          if (epochAtStart !== sessionEpoch) return false
           if (res?.data?.token) {
             this.token = res.data.token
             if (res.data.refreshToken) this.refreshToken = res.data.refreshToken
@@ -127,6 +134,8 @@ export const useUserStore = defineStore('user', {
       }
     },
     logout() {
+      // 递增代际：作废所有在飞的续期响应（见 refreshAccessToken 注释）
+      sessionEpoch += 1
       // 彻底清空登录态，避免残留数据导致权限判断错误
       this.token = ''
       this.refreshToken = ''

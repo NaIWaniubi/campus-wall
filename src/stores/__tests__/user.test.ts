@@ -160,6 +160,28 @@ describe('useUserStore', () => {
     expect(store.user).toBeNull()
   })
 
+  it('登出期间在飞的 refresh 返回后不得复活会话（会话代际）', async () => {
+    const store = useUserStore()
+    store.refreshToken = 'rt-live'
+    // refresh 请求挂起，模拟慢网络
+    let release!: (v: any) => void
+    refreshMock.mockImplementation(() => new Promise((r) => { release = r }))
+
+    const inflight = store.refreshAccessToken()
+    // 用户在请求飞行中点退出
+    store.logout()
+    expect(store.token).toBe('')
+    expect(store.refreshToken).toBe('')
+
+    // refresh 此时才返回成功
+    release({ data: { token: 'zombie-access', refreshToken: 'zombie-refresh' } })
+    const ok = await inflight
+
+    expect(ok).toBe(false)
+    expect(store.token).toBe('')        // 不得写回
+    expect(store.refreshToken).toBe('') // 不得把新 refresh 写回 storage
+  })
+
   it('ensureSession：已有 token 时不再打续期接口（避免多余往返）', async () => {
     const store = useUserStore()
     store.token = 'live-acc'

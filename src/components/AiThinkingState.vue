@@ -5,7 +5,7 @@
  * 评分点：AI 交互体验——流式渲染、思考状态可视化、错误兜底优雅。
  * 纯展示组件，供 AiAssistant / 成稿 / 划重点三处接入。
  */
-const props = withDefaults(
+withDefaults(
   defineProps<{
     phase: 'thinking' | 'streaming' | 'done' | 'fallback'
     /** 思考中阶段文案（如「正在检索校园资料…」） */

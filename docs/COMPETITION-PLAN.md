@@ -262,7 +262,7 @@ FROM posts WHERE section_id = 1 AND status != 'deleted';
 7. **`section_admin` 权限边界在哪？** 已收归：AI 知识库/模型配置改为 `superAdminRequired`。
 8. **单条 SQLite 的 QPS 上限？** 读走 LRU + FTS5，写单线程 WAL；演示规模足够，横向扩展需改 PostgreSQL（已有脚手架但业务未接入）。
 9. **401/403 为何返回 200？** 已修为真实状态码；`body.code` 保留业务码供前端区分。
-10. **30 词敏感词库如何覆盖谐音/图片？** 手写词表只是前置快筛，计划接 `msgSecCheck`；图片审核走微信接口。
+10. **30 词敏感词库如何覆盖谐音/图片？** 手写词表只是前置快筛；`msgSecCheck` 文本机审 + `mediaCheckAsync` 图片异步送审已接入（2026-11-17），未配置微信凭据时自动降级为纯词表。
 
 补充两条高频追问：
 11. **封禁用户还能用旧 token 发消息吗？** REST 侧已拦；WS 侧本轮补上（`authJwt` 回查 `users.status`，角色也以库为准）。改密后旧 token 仍有效是已知缺口。
@@ -310,8 +310,7 @@ FROM posts WHERE section_id = 1 AND status != 'deleted';
 - FTS 写放大：浏览更新 0.17ms → 0.009ms
 
 **未做 / 明确缺口：**
-- `msgSecCheck` 未接入：词库已扩到 49 词 + 14 条变体规则（覆盖全角/分隔符/谐音），
-  但图片、语音、拼音首字母组合仍需官方机审兜底
+- ~~`msgSecCheck` 未接入~~ **已接入（2026-11-17）**：文本同步机审（risky 拒绝 / review 转人工队列）+ 图片异步送审（`mediaCheckAsync`，需 `PUBLIC_BASE_URL`），词表保留做前置快筛、未配置微信凭据时自动降级；语音与拼音首字母组合仍依赖官方能力，尚未覆盖
 - 微信登录需配置真实 `WX_APPID/WX_SECRET` 才能端到端验证（当前仅验证 501 降级路径）
 - 雷达标注集为 21 组/63 候选（内置构造），尚未用真实运营数据扩充到 200 对
 - 可访问性只覆盖了对比度、键盘可达、表单标签、弹窗语义与 toast 播报；

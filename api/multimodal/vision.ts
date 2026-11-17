@@ -155,10 +155,10 @@ export async function heuristicVision(imagePath: string): Promise<VisionMeta> {
 export async function analyzeImage(imagePath: string): Promise<VisionMeta> {
   try {
     return await gatewayVision(imagePath);
-  } catch (err: any) {
+  } catch {
     try {
       return await heuristicVision(imagePath);
-    } catch (err2: any) {
+    } catch {
       return {
         labels: ['图片'],
         summary: '图片解析暂时不可用。',

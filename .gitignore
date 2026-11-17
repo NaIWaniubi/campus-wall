@@ -94,3 +94,6 @@ coverage/
 # 部署打包产物（由 scripts/build-site-bundle.mjs 生成，不入库）
 api/server.bundle.mjs
 api/seed.bundle.mjs
+
+# ZCode Tower worktrees（集群编排残留，不入库不参与 lint）
+.tower/

@@ -4,7 +4,7 @@
 
 # 校园墙 Campus Wall
 
-[![CI](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/NaIWaniubi/campus-wall/actions/workflows/ci.yml?query=branch:master)
+> CI：`.github/workflows/ci.yml` 六道门（lint / typecheck / 383 测试 / 雷达门 / 构建体积 / 文档死链 + 契约压测 + Browser E2E + Lighthouse）。仓库为私有，徽章仅协作者可见，故以文字说明替代。
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
 > **V5 · 纸感海报**：墨线硬影设计语言 + AI 主链路（成稿/划重点/简报，全部带离线套版兜底）+ Web Push 离线推送 + 传播面全装（OG/JSON-LD/sitemap/RSS/小程序服务端分享卡）+ CI 六道门常绿。
@@ -68,7 +68,7 @@
 - **AI 助手配置**：官方知识库维护、模型与开关设置
 
 ### 微信小程序端
-- **原生实现**：`miniprogram/` 目录，29 个页面，与 Web 共用同一套后端契约
+- **原生实现**：`miniprogram/` 目录，34 个页面，与 Web 共用同一套后端契约
 - **五大 Tab**：首页 / 话题（八板块分类页）/ 发布 / 消息 / 我的（自定义 TabBar）
 - **登录双通道**：账号密码 JWT；wx.login 静默登录（服务端未配置 `WX_APPID`/`WX_SECRET` 时自动回退表单登录）
 - **V5 体验层**：登录页一键体验/游客逛逛、全局命令面板 `Ctrl/⌘+K`、新手三步引导、路由进度条、深色模式一键切换、`/post/:id` 服务端 OG 分享卡片、发布页粘贴/拖拽传图 + 发布前预览、评论通知直达定位闪烁、一键生成分享海报、模态 inert 焦点陷阱、PWA 一键安装、全局实时通知（未读徽标 + toast）、Web Push 离线推送（设置页一键开启，VAPID 未配置时入口自动隐藏）、`robots.txt` + 动态 `sitemap.xml` + JSON-LD 结构化数据 + `/rss.xml` 订阅输出、旧 chunk 失效自动硬刷新兜底、小程序端「✨ 一句话成稿」
@@ -85,6 +85,8 @@
 - **匿名信任层**：匿名帖不可按 `authorId` 反查、详情不返回作者、编辑不脱匿名；四路反查有回归测试
 - **失物匹配质控**：方向必须相反 + 品类不同即排除，避免「捡到校园卡」配到「捡到钥匙」
 - **Token 吊销**：改密/封禁递增 `token_version`，旧 token 立即失效（REST 与 WS 双通道校验）
+- **双 token 静默续期**：access 2h + refresh 7d 轮换；refresh 只允许在 `/api/auth/refresh` 使用，业务接口与 WS 均校验 `type=access`，被盗 refresh 不可当长寿命凭证
+- **内容安全双保险**：本地敏感词三级评定 + 微信 `msgSecCheck`（文本同步）/ `mediaCheckAsync`（图片异步送审，结果回调对账）；接口抖动默认 fail-open，`WX_CONTENT_FAIL_CLOSED=1` 可切为拒绝
 - 频控：发帖每日上限、评论 10s 频控、举报 24h 频控
 - 软删除机制，数据可追溯
 
@@ -97,7 +99,7 @@
 - **运营埋点**：`events` 表记录注册/登录/首帖/首评/成交等转化事件；看板展示今日活跃、7 日活跃、激活率、成交闭环、审核时效
 - **管理审计**：封禁/解封/改信誉/重置密码/内容审核/删评/举报处理全部写 `admin_logs`，且仅在真实状态变更时记录
 - **算法回归门**：`npm run eval:radar -- --gate` 对失物雷达跑标注集，召回/误报/P@1 跌破阈值即 CI 失败
-- **CI 六道门**：静态（lint/typecheck/290 测试/雷达门/构建/体积预算 gzip/文档死链）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms（实测 ~2409 req/s））→ 浏览器 E2E（13 条核心用户流真 Chromium）→ Lighthouse（移动端 3 次中位数 perf≥72/a11y≥90/bp≥90/seo≥90，CI 实测 95/95/100/100）——任一失守即红
+- **CI 六道门**：静态（lint/typecheck/383 测试/雷达门/构建/体积预算 gzip/文档死链）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms（实测 ~2409 req/s））→ 浏览器 E2E（13 条核心用户流真 Chromium）→ Lighthouse（移动端 3 次中位数 perf≥72/a11y≥90/bp≥90/seo≥90，CI 实测 95/95/100/100）——任一失守即红
 - **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
 - 图片上传压缩管线：大图重编码 + WebP 缩略图；解码像素上限 5000 万（防解压炸弹），失败即拒绝而非回落原图
 - **数据库**：WAL + `busy_timeout` + 预编译语句缓存；FTS 触发器按列触发（浏览/点赞不再重建索引，实测快约 19 倍）
@@ -166,7 +168,7 @@
 │   ├── utils/              # 工具（api/request/helpers）
 │   ├── App.vue
 │   └── main.ts
-├── miniprogram/              # 微信小程序端（原生，29 页）
+├── miniprogram/              # 微信小程序端（原生，34 页）
 │   ├── app.json              # 页面注册 + 自定义 TabBar
 │   ├── pages/                # 五大 Tab + 八板块分类页 + 我的子页 + 审核/协议页
 │   ├── components/           # post-card / comment-item / conversation-item / user-row / announce-dialog / skeleton / empty-state / load-more / subscribe-btn 共 9 组件
@@ -272,10 +274,12 @@ npm run start
 
 生产模式下，后端会同时托管 `dist/` 下的前端产物，访问 `http://your-server:3001` 即可使用。
 
-建议配合 **nginx 反向代理** + **PM2 进程守护**：
+真运营请按 **[docs/DEPLOY.md](docs/DEPLOY.md) §3「VPS 运营级部署」** 执行：代码/数据分盘、PM2 守护、Caddy 自动 HTTPS + WebSocket、`BACKUP_DIR` 每日热备、升级/回滚/自检命令全部给出。最小形态：
+
 ```bash
+npm ci && npm run build
 npm install -g pm2
-pm2 start "npm run start" --name campus-wall
+pm2 start ecosystem.config.cjs   # 或 npm run start:pm2
 pm2 save && pm2 startup
 ```
 
@@ -298,7 +302,8 @@ pm2 save && pm2 startup
 | `METRICS_TOKEN` | 配置后 `/metrics` 需请求头 `x-metrics-token` 才返回全量指标（选填） | 空 |
 | `RATE_LIMIT_ENABLED` | 设为 `0` 关闭全部限流，**仅供离线压测**使用 | 启用 |
 | `JWT_SECRET` | JWT 签名密钥（生产环境**必须**修改） | `campus-wall-dev-secret-key-2026` |
-| `JWT_EXPIRES_IN` | JWT 过期时间 | `7d` |
+| `JWT_EXPIRES_IN` | Access token 过期时间（前端到期前静默续期） | `2h` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token 过期时间（改密/封禁即失效） | `7d` |
 | `DB_PATH` | SQLite 数据库文件路径 | `api/data.db` |
 | `NODE_ENV` | 运行环境 | `development` |
 | `ADMIN_INITIAL_PASSWORD` | 首次启动创建超管的口令。**生产环境必填**，缺失则拒绝启动；开发/测试默认 `admin123` | 空 |

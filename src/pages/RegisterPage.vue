@@ -45,8 +45,9 @@ const canSubmit = computed(() =>
   form.agreement
 )
 
-function showAgreement() {
-  toast.info('用户协议与隐私政策正在完善中')
+function showAgreement(kind: 'terms' | 'privacy') {
+  // 跳真实文本页（内容同源小程序 legal），不再用「正在完善中」占位提示
+  router.push(`/legal/${kind === 'terms' ? 'userAgreement' : 'privacyPolicy'}`)
 }
 
 async function handleSubmit() {
@@ -174,7 +175,7 @@ async function handleSubmit() {
 
         <label class="flex items-start gap-2 cursor-pointer" style="color: var(--ink-soft)">
           <input v-model="form.agreement" type="checkbox" class="mt-0.5 w-4 h-4 shrink-0" style="accent-color: var(--coral)" />
-          <span class="text-[12.5px] leading-relaxed">我已阅读并同意 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement">《用户协议》</a> 和 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement">《隐私政策》</a></span>
+          <span class="text-[12.5px] leading-relaxed">我已阅读并同意 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement('terms')">《用户协议》</a> 和 <a class="cursor-pointer font-bold underline underline-offset-2" style="color: var(--violet)" @click.prevent="showAgreement('privacy')">《隐私政策》</a></span>
         </label>
 
         <button

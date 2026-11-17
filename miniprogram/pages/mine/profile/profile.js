@@ -25,6 +25,7 @@ Page({
     nickname: '',
     college: '',
     authLoading: false,
+    agreed: false,
     pendingRedirect: '' // 登录/注册成功后回跳的页面路径
   },
 
@@ -154,13 +155,27 @@ Page({
     this.setData({ [field]: e.detail.value })
   },
 
+  /** 勾选/取消协议同意 */
+  onToggleAgree() {
+    this.setData({ agreed: !this.data.agreed })
+  },
+
+  /** 打开法律文本页（与 Web /legal 同源） */
+  onOpenLegal(e) {
+    const page = e.currentTarget.dataset.page // privacyPolicy | userAgreement
+    wx.navigateTo({ url: '/pages/legal/' + page })
+  },
   /** 账号 + 密码 JWT 登录 / 注册（POST /auth/login | /auth/register） */
   async onAuthSubmit() {
     if (this.data.authLoading) return
-    const { authMode, studentId, password, nickname, college } = this.data
+    const { authMode, studentId, password, nickname, college, agreed } = this.data
     if (!studentId.trim()) { showToast('请输入账号'); return }
     if (!password) { showToast('请输入密码'); return }
     if (authMode === 'register' && !nickname.trim()) { showToast('请输入昵称'); return }
+    if (authMode === 'register' && !agreed) {
+      showToast('请先阅读并勾选同意《用户协议》和《隐私政策》')
+      return
+    }
 
     this.setData({ authLoading: true })
     try {

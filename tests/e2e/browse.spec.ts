@@ -32,3 +32,17 @@ test('游客可打开匿名帖详情（作者脱敏展示）', async ({ page }) 
   // 该帖 seed 里 anonymous:1 —— 详情页必须显示归一署名而非真实昵称
   await expect(page.getByText(/匿名用户|匿名同学/).first()).toBeVisible()
 })
+
+test('法律文本页可达且渲染隐私政策正文（注册流协议入口）', async ({ page }) => {
+  await page.goto('/legal/privacyPolicy')
+  await expect(page.getByText('校园墙隐私政策')).toBeVisible()
+  // 与小程序同源的关键章节标题应出现
+  await expect(page.getByText('一、我们如何收集和使用您的个人信息')).toBeVisible()
+  await expect(page.getByText('四、您的权利')).toBeVisible()
+})
+
+test('用户协议页同源可达', async ({ page }) => {
+  await page.goto('/legal/userAgreement')
+  await expect(page.getByText('校园墙用户服务协议')).toBeVisible()
+  await expect(page.getByText('一、总则')).toBeVisible()
+})

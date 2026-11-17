@@ -46,6 +46,14 @@
       <input class="auth-input" placeholder="昵称" value="{{nickname}}" bindinput="onAuthInput" data-field="nickname" />
       <input class="auth-input" placeholder="学院（选填）" value="{{college}}" bindinput="onAuthInput" data-field="college" />
     </block>
+    <view class="auth-agree" wx:if="{{authMode === 'register'}}">
+      <checkbox class="auth-agree-box" value="1" checked="{{agreed}}" bindtap="onToggleAgree" />
+      <text class="auth-agree-text">我已阅读并同意
+        <text class="auth-agree-link" catchtap="onOpenLegal" data-page="userAgreement">《用户协议》</text>
+        和
+        <text class="auth-agree-link" catchtap="onOpenLegal" data-page="privacyPolicy">《隐私政策》</text>
+      </text>
+    </view>
     <button class="btn-primary login-btn" loading="{{authLoading}}" bindtap="onAuthSubmit">
       {{authMode === 'login' ? '登录' : '注册并登录'}}
     </button>

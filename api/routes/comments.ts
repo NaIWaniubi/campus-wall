@@ -7,6 +7,7 @@ import { authRequired, authOptional } from '../middleware/auth.js';
 import { commentLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { isWxContentEnabled, checkText, shouldRejectOnCheckError } from '../utils/wx-content.js';
 import { trackEvent, trackFirstEvent, touchActive } from '../utils/events.js';
 import { upsertNotification } from '../utils/notification.js';
 import { cacheInvalidate } from '../utils/cache.js';
@@ -120,7 +121,7 @@ router.get('/posts/:id/comments', authOptional, validate({ params: commonSchemas
 router.post('/posts/:id/comments', authRequired, commentLimiter, validate({ 
   params: commonSchemas.id, 
   body: commentSchemas.create 
-}), (req, res) => {
+}), async (req, res) => {
   const postId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 
@@ -140,6 +141,15 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
   // 敏感词检测
   const riskLevel = getRiskLevel(content);
   if (riskLevel === 'reject') return fail(res, '评论包含违规内容');
+
+  // 微信内容安全（小程序用户；未配置凭据时跳过）
+  if (isWxContentEnabled()) {
+    const wx = await checkText(req.currentUser!.openid, content);
+    if (wx.verdict === 'risky') return fail(res, '评论包含违规内容');
+    if (wx.verdict === 'error' && shouldRejectOnCheckError()) {
+      return fail(res, '内容安全检查暂不可用，请稍后重试');
+    }
+  }
 
   // 匿名跟随帖子
   const anonymous = post.is_anonymous ? 1 : (isAnonymous ? 1 : 0);
@@ -181,7 +191,7 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
 router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
   params: commonSchemas.id,
   body: commentSchemas.reply
-}), (req, res) => {
+}), async (req, res) => {
   const commentId = Number(req.params.id);
   const { content, isAnonymous } = req.body;
 
@@ -192,6 +202,15 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
 
   const riskLevel = getRiskLevel(content);
   if (riskLevel === 'reject') return fail(res, '回复包含违规内容');
+
+  // 微信内容安全（小程序用户；未配置凭据时跳过）
+  if (isWxContentEnabled()) {
+    const wx = await checkText(req.currentUser!.openid, content);
+    if (wx.verdict === 'risky') return fail(res, '回复包含违规内容');
+    if (wx.verdict === 'error' && shouldRejectOnCheckError()) {
+      return fail(res, '内容安全检查暂不可用，请稍后重试');
+    }
+  }
 
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(parent.post_id) as any;
   // 回复也必须挂在 published 帖上（作者/管理员回复自己待审帖除外）

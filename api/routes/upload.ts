@@ -18,6 +18,7 @@ import { uploadLimiter } from '../middleware/rateLimit.js';
 import { success, fail } from '../utils/response.js';
 import { getStorage } from '../storage/factory.js';
 import { logger } from '../utils/logger.js';
+import { isWxContentEnabled, submitImageCheck } from '../utils/wx-content.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -215,6 +216,15 @@ router.post('/', authRequired, uploadLimiter, upload.single('file'), async (req,
   }
 
   const url = storageIface.publicUrl(key);
+
+  // 异步提交微信图片检测（仅小程序用户 + 配置了公网基址时；不阻塞上传，结果由微信回调）
+  if (isWxContentEnabled() && req.currentUser?.openid) {
+    const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+    if (base) {
+      void submitImageCheck(req.currentUser.openid, `${base}${url}`);
+    }
+  }
+
   success(res, { url, thumbUrl: thumbBuf ? storageIface.publicUrl(thumbKey) : url }, '上传成功');
 });
 

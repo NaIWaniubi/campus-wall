@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { authRequired, authOptional } from '../middleware/auth.js';
 import { success, fail, forbidden } from '../utils/response.js';
 import { assessRisk } from '../utils/sensitive.js';
+import { isWxContentEnabled, checkText, shouldRejectOnCheckError } from '../utils/wx-content.js';
 import { postLimiter, readLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
@@ -369,7 +370,7 @@ router.get('/:id', authOptional, (req, res) => {
 });
 
 // 发布帖子
-router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create }), (req, res) => {
+router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create }), async (req, res) => {
   const { sectionId, title, content, images, isAnonymous, extraFields } = req.body;
 
   const section = db.prepare('SELECT * FROM sections WHERE id = ? AND is_active = 1').get(sectionId) as any;
@@ -392,6 +393,21 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
 
   // 敏感词风险分级：review→人工审核队列(pending_review)；warn→放行但标记 risk_flag；pass→直接过
   const risk = assessRisk(title, content);
+
+  // 微信内容安全（仅小程序用户有 openid 时生效；未配置凭据时静默跳过）
+  // risky→直接拒绝；review→进人工审核队列；接口异常默认放行（WX_CONTENT_FAIL_CLOSED=1 可改为拒绝）
+  if (risk.level !== 'review' && isWxContentEnabled()) {
+    const wx = await checkText(req.currentUser!.openid, `${title}\n${content}`);
+    if (wx.verdict === 'risky') {
+      return fail(res, '内容包含违规信息，请修改后重试');
+    }
+    if (wx.verdict === 'review') {
+      risk.level = 'review';
+    } else if (wx.verdict === 'error' && shouldRejectOnCheckError()) {
+      return fail(res, '内容安全检查暂不可用，请稍后重试');
+    }
+  }
+
   let status = 'published';
   if (risk.level === 'review') {
     status = 'pending_review';

@@ -670,6 +670,22 @@ db.exec(`
 `);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions (user_id);`);
 
+/**
+ * refresh token 单次消费表（jti 重用检测）：
+ * - /auth/refresh 每成功换发一次，就把旧 jti 记进来；同一 jti 二次使用直接拒。
+ * - 无本表时"轮换"只是客户端换了新串，旧 refresh 仍可继续用满 7 天；
+ *   泄漏的 refresh 被攻击者先用过一次后，用户端反而静默失效——那是不可接受的状态。
+ * - 过期记录随每次消费顺手清理（expires_at < now），表大小 ≈ 7 天内活跃会话数。
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS used_refresh_jti (
+    jti TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_used_jti_exp ON used_refresh_jti (expires_at);`);
+
 // ── 一次性数据迁移（R2 审计）：历史三级评论 parent_id 指向中间回复 → 查不回。
 // 循环上溯到根并重挂；幂等（已归一的数据零改动）。IF NOT EXISTS 标记表防重复跑全表。
 db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);

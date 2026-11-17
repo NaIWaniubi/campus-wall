@@ -5,6 +5,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
 import { generateToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
+import { consumeRefreshJti } from '../utils/refresh-jti.js';
 import { authRequired, liftExpiredBan } from '../middleware/auth.js';
 import { authRateLimit, recordAuthFailure, clearAuthFailures } from '../middleware/rateLimit.js';
 import { success, fail, toCamel } from '../utils/response.js';
@@ -185,6 +186,10 @@ router.post('/refresh', authRateLimit, (req, res) => {
     return fail(res, '账号已被封禁，请联系管理员', 403, 403);
   }
   if (Number(user.token_version ?? 0) !== decoded.ver) {
+    return fail(res, '登录状态已失效，请重新登录', 401, 401);
+  }
+  // 单次消费：同一 refresh 只能换发一次。二次出现按泄漏重放处理（旧 token 无 jti 则跳过，7 天内自然过期）
+  if (decoded.jti && !consumeRefreshJti(decoded.jti, user.id, decoded.exp)) {
     return fail(res, '登录状态已失效，请重新登录', 401, 401);
   }
   const token = generateToken({

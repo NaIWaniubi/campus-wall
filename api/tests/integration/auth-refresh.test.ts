@@ -73,6 +73,8 @@ describe('双 token 静默续期', () => {
     expect(res.body.data.token).toBeTruthy();
     expect(res.body.data.refreshToken).toBeTruthy();
     expect(res.body.data.token).not.toBe(res.body.data.refreshToken);
+    // 真正的轮换：换发的 refresh 与旧的不同（jti 保证同秒也不同）
+    expect(res.body.data.refreshToken).not.toBe(oldRefresh);
 
     // 新 access 可访问业务接口
     const me = await request(app)
@@ -93,6 +95,24 @@ describe('双 token 静默续期', () => {
     const res = await request(app).post('/api/auth/refresh').send({ refreshToken: access });
     expect(res.status).toBe(401);
     expect(res.body.code).toBe(401);
+  });
+
+  it('旧 refresh 换发后再次使用被拒（jti 单次消费 / 重放检测）', async () => {
+    const refresh = generateRefreshToken({ id: uid, studentId: SID, role: 'user', ver: 0 });
+
+    const first = await request(app).post('/api/auth/refresh').send({ refreshToken: refresh });
+    expect(first.body.code).toBe(200);
+
+    // 同一 refresh 再用一次：视为泄漏重放，必须拒绝
+    const replay = await request(app).post('/api/auth/refresh').send({ refreshToken: refresh });
+    expect(replay.status).toBe(401);
+    expect(replay.body.code).toBe(401);
+
+    // 但这次换发出的新 refresh 仍可用（正常链条不被打断）
+    const next = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: first.body.data.refreshToken });
+    expect(next.body.code).toBe(200);
   });
 
   it('缺失 / 伪造 refresh → 401', async () => {

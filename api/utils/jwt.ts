@@ -3,6 +3,7 @@
  */
 // 本模块在顶层读取 NODE_ENV / JWT_SECRET，先确保 .env 已加载，避免密钥取错
 import '../env.js';
+import { randomUUID } from 'node:crypto';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { logger } from './logger.js';
 
@@ -48,19 +49,38 @@ export function generateToken(payload: { id: number; studentId: string; role: st
 /**
  * 生成 refresh token（默认 7d）：用于无感续期。
  * 与 access token 同密钥签名，通过 type 字段区分用途。
+ * 带 jti（随机 id）：续期时换发的新 refresh 与旧的不同（真正的轮换，
+ * 同秒同载荷若不带 jti 会签出完全相同的串），也为将来接服务端吊销名单留出抓手。
  */
 export function generateRefreshToken(payload: { id: number; studentId: string; role: string; ver?: number }): string {
   const options: SignOptions = { expiresIn: REFRESH_EXPIRES as any };
   return jwt.sign(
-    { id: payload.id, studentId: payload.studentId, role: payload.role, ver: payload.ver ?? 0, type: 'refresh' },
+    {
+      id: payload.id,
+      studentId: payload.studentId,
+      role: payload.role,
+      ver: payload.ver ?? 0,
+      type: 'refresh',
+      jti: randomUUID(),
+    },
     SECRET,
     options
   );
 }
 
-export function verifyToken(
-  token: string
-): { id: number; studentId: string; role: string; ver: number; type: string } | null {
+export interface TokenPayload {
+  id: number;
+  studentId: string;
+  role: string;
+  ver: number;
+  type: string;
+  /** refresh token 的一次性 id（单次消费/重用检测用）；旧 token 无此字段 */
+  jti?: string;
+  /** 过期时间（秒，JWT 标准），用于 jti 记录的过期清理 */
+  exp?: number;
+}
+
+export function verifyToken(token: string): TokenPayload | null {
   try {
     const raw = jwt.verify(token, SECRET) as any;
     return {
@@ -71,6 +91,8 @@ export function verifyToken(
       ver: Number(raw.ver ?? 0),
       // 兼容升级前签发的旧 token（无 type 字段）：视为 access
       type: raw.type || 'access',
+      jti: typeof raw.jti === 'string' ? raw.jti : undefined,
+      exp: typeof raw.exp === 'number' ? raw.exp : undefined,
     };
   } catch {
     return null;

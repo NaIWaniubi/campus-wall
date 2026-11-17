@@ -5,13 +5,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   guessSectionId,
-  extractTags,
-  extractPrice,
   extractiveSummary,
   detectRisk,
   parseJsonLoose,
   ruleDraft,
 } from '../../routes/ai.js';
+import { extractTags, extractPrice } from '../../routes/ai/text.js';
 
 describe('AI V3 · 板块判定', () => {
   it('二手交易：出/价/元 关键词命中', () => {

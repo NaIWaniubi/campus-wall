@@ -145,4 +145,56 @@ describe('wx-content 已配置凭据（mock fetch）', () => {
     expect(r.verdict).toBe('disabled');
     expect(calls).toHaveLength(0);
   });
+
+  // —— 微信真实 errcode 分支：上线前必须分清「内容问题」与「接口故障」——
+  it('token 接口失败（40013 无效 appid）按 error 处理而非误报 risky', async () => {
+    mockFetchSequence([{ json: { errcode: 40013, errmsg: 'invalid appid' } }]);
+    const mod = await freshModule();
+    const r = await mod.checkText('openid-x', '正常内容');
+    expect(r.verdict).toBe('error');
+    // 具体 errcode 在 logger.warn 的异常消息里（可观测性足够，不进响应载荷）
+  });
+
+  it('msgSecCheck 返回 40164（IP 白名单未配）→ error，默认 fail-open 不拒绝发布', async () => {
+    mockFetchSequence([
+      { json: TOKEN_RESP },
+      { json: { errcode: 40164, errmsg: 'ip not in whitelist' } },
+    ]);
+    const mod = await freshModule();
+    const r = await mod.checkText('openid-x', '内容');
+    expect(r.verdict).toBe('error');
+    expect(mod.shouldRejectOnCheckError()).toBe(false);
+  });
+
+  it('msgSecCheck 返回 40001（access_token 失效）与 -1（系统繁忙）均按 error 处理', async () => {
+    for (const code of [40001, -1]) {
+      mockFetchSequence([
+        { json: TOKEN_RESP },
+        { json: { errcode: code, errmsg: code === 40001 ? 'invalid access_token' : 'system busy' } },
+      ]);
+      const mod = await freshModule();
+      expect((await mod.checkText('openid-x', '内容')).verdict).toBe('error');
+    }
+  });
+
+  it('mediaCheckAsync 成功返回 trace_id；失败或网络异常均返回 ok:false（不阻塞上传）', async () => {
+      mockFetchSequence([
+        { json: TOKEN_RESP },
+        { json: { errcode: 0, trace_id: 'trace-abc-123' } },
+      ]);
+      const modOk = await freshModule();
+      const okRes = await modOk.submitImageCheck('openid-x', 'https://example.com/a.jpg');
+      expect(okRes).toEqual({ ok: true, traceId: 'trace-abc-123' });
+
+      mockFetchSequence([
+        { json: TOKEN_RESP },
+        { json: { errcode: 43102, errmsg: 'submit fail' } },
+      ]);
+      const modFail = await freshModule();
+      expect((await modFail.submitImageCheck('openid-x', 'https://example.com/b.jpg')).ok).toBe(false);
+
+      mockFetchSequence([new Error('ETIMEDOUT')]);
+      const modNet = await freshModule();
+      expect((await modNet.submitImageCheck('openid-x', 'https://example.com/c.jpg')).ok).toBe(false);
+  });
 });

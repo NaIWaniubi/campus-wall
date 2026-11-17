@@ -3,6 +3,8 @@
  * 支持非流式 /chat 与 SSE 流式 /chat/stream，带频控与敏感词拦截
  */
 import { Router, type Request, type Response } from 'express';
+import { bumpStats, checkRateLimit } from './ai/usage.js';
+import { extractTags, extractPrice } from './ai/text.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -78,44 +80,6 @@ function loadKnowledge(): string {
   }
   logger.error('AI 知识库未找到', { candidates: KB_CANDIDATES.join(' | ') });
   return '';
-}
-
-// ---------- 调用量统计（内存计数，重启清零） ----------
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-export const aiStats = { date: todayStr(), today: 0, total: 0 };
-function bumpStats(): void {
-  const today = todayStr();
-  if (aiStats.date !== today) {
-    aiStats.date = today;
-    aiStats.today = 0;
-  }
-  aiStats.today += 1;
-  aiStats.total += 1;
-}
-
-// ---------- 频控（内存实现：10 秒间隔，每日 50 次） ----------
-const RATE_INTERVAL_MS = 10_000;
-const RATE_DAILY_LIMIT = 50;
-const rateMap = new Map<number, { lastTs: number; count: number; date: string }>();
-
-function checkRateLimit(userId: number): { ok: boolean; msg?: string } {
-  const today = todayStr();
-  let entry = rateMap.get(userId);
-  if (!entry || entry.date !== today) {
-    entry = { lastTs: 0, count: 0, date: today };
-    rateMap.set(userId, entry);
-  }
-  if (Date.now() - entry.lastTs < RATE_INTERVAL_MS) {
-    return { ok: false, msg: '提问太频繁啦，请稍等几秒再试' };
-  }
-  if (entry.count >= RATE_DAILY_LIMIT) {
-    return { ok: false, msg: '今日提问次数已达上限（50 次），明天再来吧' };
-  }
-  entry.lastTs = Date.now();
-  entry.count += 1;
-  return { ok: true };
 }
 
 /**
@@ -491,8 +455,6 @@ const RISK_PATTERNS: Array<{ re: RegExp; note: string }> = [
   { re: /(裸聊|色情|约炮|贷款|套现|代开发票|代考|代写论文)/, note: '可能涉及违规内容，发布前请再确认' },
 ];
 
-/** 基础停用词：标签提取时剔除 */
-const STOP_WORDS = new Set(['我们', '你们', '这个', '那个', '什么', '怎么', '可以', '有没有', '一个', '就是', '但是', '因为', '所以', '现在', '今天', '同学', '大家']);
 
 /** 用关键词命中数给板块打分，返回最可能的板块 id（无命中返回 fallbackId 或 null） */
 export function guessSectionId(raw: string, fallbackId?: number | null): number | null {
@@ -505,58 +467,7 @@ export function guessSectionId(raw: string, fallbackId?: number | null): number 
   return best?.id ?? fallbackId ?? null;
 }
 
-/**
- * 校园词表：规则版标签的第一优先级。
- * 之前直接拿 3~4 字滑窗会切出「出一个九」「成新元可」这种半截词，
- * 换成「先认词表里的高频校园短语，再退到滑窗」才有可用标签。
- */
-export const TAG_LEXICON = [
-  '全新', '九成新', '八成新', '七成新', '可小刀', '可议价', '当面交易', '包邮', '低价', '急出', '闲置',
-  '求购', '代取', '快递', '宿舍', '东门', '西门', '南门', '图书馆', '食堂', '校园卡', '身份证', '钥匙',
-  '耳机', '自行车', '电动车', '笔记本', '手机', '平板', '显示器', '考研', '四级', '六级', '选课', '实习',
-  '兼职', '家教', '搭子', '开黑', '拼车', '返校', '机场', '高铁', '演唱会', '讲座', '社团', '招新',
-  '志愿', '竞赛', '自习', '表白', '寻人', '失物招领', '二手交易',
-];
 
-/** 从文本里抽标签：seeds（调用方给的干净词）→ 校园词表 → ASCII 词块 → 价格 → 中文滑窗兜底 */
-export function extractTags(raw: string, limit = 4, seeds: string[] = []): string[] {
-  const tags: string[] = [];
-  const seen = new Set<string>();
-  const push = (t: string) => {
-    if (!t || t.length < 2 || STOP_WORDS.has(t) || seen.has(t)) return;
-    seen.add(t);
-    tags.push(t);
-  };
-
-  // 0) 调用方种子（如套版抽出的物品/地点）优先级最高
-  for (const sd of seeds) push(sd);
-  // 1) 校园词表命中（最像标签）
-  for (const w of TAG_LEXICON) if (raw.includes(w)) push(w);
-  // 2) ASCII 词块（iPad / Air / GTX…）
-  for (const w of raw.match(/[A-Za-z][A-Za-z0-9+#.]{1,11}/g) ?? []) push(w);
-  // 3) 价格：¥1500
-  const price = extractPrice(raw);
-  if (price) push(`¥${price}`);
-
-  // 4) 兜底：中文 3~4 字块滑窗——仅在前面一个标签都没抽到时才用（宁可少标签，不出「到一张校」式半截词）
-  if (tags.length === 0) {
-    const cjk = raw.replace(/[^\u4e00-\u9fa5]/g, '');
-    for (const m of cjk.match(/[\u4e00-\u9fa5]{3,4}/g) ?? []) {
-      if (/[了的 是在我你他也就都很多吗呢把被给和与]/.test(m)) continue;
-      push(m);
-      if (tags.length >= limit) break;
-    }
-  }
-  return tags.slice(0, limit);
-}
-
-/** 从文本里抽价格（返回数字或 null） */
-export function extractPrice(raw: string): number | null {
-  const m = raw.match(/(\d+(?:\.\d+)?)\s*(?:元|块|r|rmb)|\u00a5\s*(\d+(?:\.\d+)?)/i);
-  if (!m) return null;
-  const n = Number(m[1] ?? m[2]);
-  return Number.isFinite(n) && n > 0 && n < 1_000_000 ? n : null;
-}
 
 /** 离线划重点：标题 2 字滑窗命中 + 句长 + 位置权重，抽取式摘要 */
 export function extractiveSummary(title: string, text: string, limit = 3): string[] {

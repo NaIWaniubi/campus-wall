@@ -7,7 +7,8 @@ import { getSetting, setSetting } from '../db.js';
 import { authRequired, superAdminRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
 import { DEFAULT_MODELS } from '../utils/ai.js';
-import { aiStats, getKbWritePath } from './ai.js';
+import { getKbWritePath } from './ai.js';
+import { aiStats } from './ai/usage.js';
 import { logger } from '../utils/logger.js';
 
 const KB_MAX_BYTES = 64 * 1024;

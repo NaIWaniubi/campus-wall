@@ -21,6 +21,7 @@ interface User {
 export const useUserStore = defineStore('user', {
   state: () => ({
     token: '' as string,
+    refreshToken: '' as string,
     user: null as User | null,
   }),
   getters: {
@@ -46,12 +47,14 @@ export const useUserStore = defineStore('user', {
     async login(account: string, password: string) {
       const res: any = await request.post('/auth/login', { account, password })
       this.token = res.data.token
+      this.refreshToken = res.data.refreshToken || ''
       this.user = res.data.user
       return res
     },
     async register(data: { account: string; password: string; nickname: string; college?: string; grade?: string }) {
       const res: any = await request.post('/auth/register', data)
       this.token = res.data.token
+      this.refreshToken = res.data.refreshToken || ''
       this.user = res.data.user
       return res
     },
@@ -77,9 +80,28 @@ export const useUserStore = defineStore('user', {
       this.user = res.data
       return res
     },
+    /**
+     * 静默续期：用 refresh token 换新 access token（refresh token 同时轮换）。
+     * 成功返回 true；refresh 过期/被吊销时返回 false，由调用方决定是否登出。
+     */
+    async refreshAccessToken() {
+      if (!this.refreshToken) return false
+      try {
+        const res: any = await request.post('/auth/refresh', { refreshToken: this.refreshToken })
+        if (res?.data?.token) {
+          this.token = res.data.token
+          if (res.data.refreshToken) this.refreshToken = res.data.refreshToken
+          return true
+        }
+      } catch {
+        /* 网络/服务端异常：保持现状，交由下一次请求重试 */
+      }
+      return false
+    },
     logout() {
       // 彻底清空登录态，避免残留数据导致权限判断错误
       this.token = ''
+      this.refreshToken = ''
       this.user = null
     },
   },

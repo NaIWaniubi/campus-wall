@@ -44,6 +44,55 @@ function getToken() {
   try { return wx.getStorageSync('token') || '' } catch (e) { return '' }
 }
 
+function getRefreshToken() {
+  const app = getAppSafe()
+  if (app && app.globalData && app.globalData.refreshToken) return app.globalData.refreshToken
+  try { return wx.getStorageSync('refreshToken') || '' } catch (e) { return '' }
+}
+
+/** 落盘新的 token 对（access + refresh 轮换） */
+function saveTokens(token, refreshToken) {
+  const app = getAppSafe()
+  if (app && app.globalData) {
+    app.globalData.token = token
+    if (refreshToken) app.globalData.refreshToken = refreshToken
+  }
+  try {
+    wx.setStorageSync('token', token)
+    if (refreshToken) wx.setStorageSync('refreshToken', refreshToken)
+  } catch (e) { /* storage 异常忽略 */ }
+}
+
+// 静默续期：并发多个请求同时 401 时只发起一次 refresh（与 Web 端 request.ts 同策略）
+let refreshInFlight = null
+function refreshSession() {
+  if (refreshInFlight) return refreshInFlight
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return Promise.resolve(false)
+  refreshInFlight = new Promise((resolve) => {
+    wx.request({
+      url: getBaseUrl() + '/auth/refresh',
+      method: 'POST',
+      data: { refreshToken },
+      header: { 'Content-Type': 'application/json' },
+      success: (res) => {
+        const body = res.data || {}
+        if (body.code === 200 && body.data && body.data.token) {
+          saveTokens(body.data.token, body.data.refreshToken)
+          resolve(true)
+        } else {
+          resolve(false)
+        }
+      },
+      fail: () => resolve(false),
+    })
+  }).then(
+    (ok) => { refreshInFlight = null; return ok },
+    () => { refreshInFlight = null; return false }
+  )
+  return refreshInFlight
+}
+
 /** 相对地址（/uploads/xx）补全为可显示的绝对地址 */
 function absUrl(u) {
   if (!u || typeof u !== 'string') return u
@@ -79,10 +128,12 @@ function handleUnauthorized() {
   const app = getAppSafe()
   if (app && app.globalData) {
     app.globalData.token = ''
+    app.globalData.refreshToken = ''
     app.globalData.userInfo = null
   }
   try {
     wx.removeStorageSync('token')
+    wx.removeStorageSync('refreshToken')
     wx.removeStorageSync('userInfo')
   } catch (e) { /* storage 异常忽略 */ }
   // 记录当前页面路径，登录页登录成功后据此回跳
@@ -132,8 +183,17 @@ const rawRequest = (options) => {
           if (body.code === 200) {
             resolve(body.data)
           } else if (body.code === 401) {
-            handleUnauthorized()
-            reject(body)
+            // 先尝试静默续期一次（refresh 端点自身不重试，避免自我循环）
+            if (!options.__retried && options.url !== '/auth/refresh') {
+              refreshSession().then((ok) => {
+                if (!ok) { handleUnauthorized(); reject(body); return }
+                const retryOptions = Object.assign({}, options, { __retried: true, loading: false })
+                rawRequest(retryOptions).then(resolve, reject)
+              })
+            } else {
+              handleUnauthorized()
+              reject(body)
+            }
           } else if (silentCodes.indexOf(body.code) >= 0) {
             // 指定业务码不弹错误（如 501 微信登录未配置），由调用方静默降级
             reject(body)
@@ -166,6 +226,9 @@ module.exports = {
   getBaseUrl,
   getServerOrigin,
   getToken,
+  getRefreshToken,
+  saveTokens,
+  refreshSession,
   getAppSafe,
   getCurrentRoute,
 }

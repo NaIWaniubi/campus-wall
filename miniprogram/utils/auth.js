@@ -20,9 +20,11 @@ function saveSession(result) {
   const user = normalizeUser(result.user || {})
   if (app && app.globalData) {
     app.globalData.token = result.token
+    app.globalData.refreshToken = result.refreshToken || ''
     app.globalData.userInfo = user
   }
   wx.setStorageSync('token', result.token)
+  if (result.refreshToken) wx.setStorageSync('refreshToken', result.refreshToken)
   wx.setStorageSync('userInfo', user)
   return result
 }
@@ -31,10 +33,12 @@ function clearSession() {
   const app = getAppSafe()
   if (app && app.globalData) {
     app.globalData.token = ''
+    app.globalData.refreshToken = ''
     app.globalData.userInfo = null
   }
   try {
     wx.removeStorageSync('token')
+    wx.removeStorageSync('refreshToken')
     wx.removeStorageSync('userInfo')
   } catch (e) { /* 忽略 */ }
 }

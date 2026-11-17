@@ -10,10 +10,26 @@ const request = axios.create({
   timeout: 10000,
 })
 
+// 静默续期：并发请求同时 401 时只发起一次 refresh
+let refreshPromise: Promise<boolean> | null = null
+function tryRefreshOnce(): Promise<boolean> {
+  if (!refreshPromise) {
+    const userStore = useUserStore()
+    refreshPromise = userStore.refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
+}
+
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
     const userStore = useUserStore()
+    // refresh 请求自身跳过 401 续期逻辑，避免递归
+    if (String(config.url || '').includes('/auth/refresh')) {
+      ;(config as any).__skipAuthRefresh = true
+    }
     if (userStore.token) {
       config.headers.Authorization = `Bearer ${userStore.token}`
     }
@@ -25,14 +41,22 @@ request.interceptors.request.use(
 
 // 响应拦截器
 request.interceptors.response.use(
-  (response) => {
+  async (response) => {
     const res = response.data
     if (res.code === 200) {
       return res
     }
-    // 401：未登录或Token过期
+    // 401：未登录或Token过期 —— 先尝试静默续期一次，成功则重放原请求
     if (res.code === 401) {
       const userStore = useUserStore()
+      const cfg = response.config as any
+      if (!cfg.__skipAuthRefresh && !cfg.__retriedAfterRefresh) {
+        cfg.__retriedAfterRefresh = true
+        const ok = await tryRefreshOnce()
+        if (ok) {
+          return request(cfg)
+        }
+      }
       // 在清空登录态之前，先快照原始位置（pathname + search + hash），便于登录后回跳
       const rawLocation =
         (typeof window !== 'undefined'

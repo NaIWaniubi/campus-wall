@@ -18,6 +18,9 @@ interface User {
   createdAt: string
 }
 
+// 静默续期单飞句柄：并发只发一次 /auth/refresh（见 refreshAccessToken 注释）
+let refreshInFlight: Promise<boolean> | null = null
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     token: '' as string,
@@ -39,6 +42,18 @@ export const useUserStore = defineStore('user', {
     },
   },
   actions: {
+    /**
+     * 启动续期：access token 只活在内存里（刷新页面即丢失），
+     * 若持久化的 refreshToken 存在，用它静默换发一次会话。
+     * 成功 → 会话恢复；失败（refresh 被吊销/过期/重放冲突）→ 清登录态。
+     */
+    async ensureSession() {
+      if (this.token || !this.refreshToken) return
+      const ok = await this.refreshAccessToken()
+      if (!ok) {
+        this.logout()
+      }
+    },
     /** 替换本地 token：改密后服务端签发新 token（旧 token 已因 token_version 递增失效） */
     setToken(token: string) {
       this.token = token
@@ -83,20 +98,33 @@ export const useUserStore = defineStore('user', {
     /**
      * 静默续期：用 refresh token 换新 access token（refresh token 同时轮换）。
      * 成功返回 true；refresh 过期/被吊销时返回 false，由调用方决定是否登出。
+     *
+     * 单飞（single-flight）：并发调用共用同一次刷新。典型并发场景＝启动时路由守卫与
+     * App.vue onMounted 几乎同时各调一次——refresh 是单次消费（服务端 jti 重放即拒），
+     * 若无此闸，两次各自发请求，第一次成功后第二次撞重放 401，第二次把有效会话清掉。
      */
     async refreshAccessToken() {
       if (!this.refreshToken) return false
-      try {
+      if (refreshInFlight) return refreshInFlight
+      const run = (async () => {
+        try {
         const res: any = await request.post('/auth/refresh', { refreshToken: this.refreshToken })
-        if (res?.data?.token) {
-          this.token = res.data.token
-          if (res.data.refreshToken) this.refreshToken = res.data.refreshToken
-          return true
+          if (res?.data?.token) {
+            this.token = res.data.token
+            if (res.data.refreshToken) this.refreshToken = res.data.refreshToken
+            return true
+          }
+        } catch {
+          /* 网络/服务端异常：保持现状，交由下一次请求重试 */
         }
-      } catch {
-        /* 网络/服务端异常：保持现状，交由下一次请求重试 */
+        return false
+      })()
+      refreshInFlight = run
+      try {
+        return await run
+      } finally {
+        refreshInFlight = null
       }
-      return false
     },
     logout() {
       // 彻底清空登录态，避免残留数据导致权限判断错误
@@ -105,8 +133,11 @@ export const useUserStore = defineStore('user', {
       this.user = null
     },
   },
+  // 只持久化 refreshToken + 用户资料：access token（2h）不落盘，
+  // 读取面从「整个存储区持续暴露」缩到「仅剩单次可用的 refresh」
   persist: {
     key: 'campus-wall-user',
     storage: localStorage,
+    pick: ['refreshToken', 'user'],
   },
 })

@@ -66,6 +66,9 @@ function onWake() {
 }
 
 onMounted(async () => {
+  // access token 只在内存：刷新页面后先用持久化的 refreshToken 静默续期，
+  // 再走后续依赖登录态的初始化（板块拉取/未读轮询）
+  try { await userStore.ensureSession() } catch { /* 已记录在 request.ts */ }
   // 启动时应用主题（设置 data-theme / theme-color）
   themeStore.init()
   // 把持久化里可能存在的旧版 snake_case 字段（student_id/credit_score/created_at）

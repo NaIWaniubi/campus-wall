@@ -7,9 +7,10 @@ import { login } from './helpers'
 
 test('演示用户可登录并保持登录态', async ({ page }) => {
   await login(page)
-  // Pinia persist 写入 localStorage
+  // 新存储契约：access 只在内存，localStorage 只落 refreshToken + 用户资料
   const stored = await page.evaluate(() => localStorage.getItem('campus-wall-user'))
-  expect(stored).toContain('token')
+  expect(JSON.parse(stored || '{}').refreshToken).toBeTruthy()
+  expect(JSON.parse(stored || '{}').user?.nickname).toBe('陈小北')
   // 刷新后仍是登录态（持久化生效）
   await page.reload()
   await page.goto('/profile/settings')
@@ -33,5 +34,9 @@ test('可退出登录并回到登录页', async ({ page }) => {
   await page.getByRole('button', { name: '退出', exact: true }).click()
   await page.waitForURL(/\/login/)
   const stored = await page.evaluate(() => localStorage.getItem('campus-wall-user'))
-  expect(JSON.parse(stored || '{}').token).toBe('')
+  const parsed = JSON.parse(stored || '{}')
+  // 登出清空会话：access 不存在（无内存态残留语义）、refreshToken 与 user 均被清掉
+  expect(parsed.token ?? '').toBe('')
+  expect(parsed.refreshToken).toBe('')
+  expect(parsed.user ?? null).toBeNull()
 })

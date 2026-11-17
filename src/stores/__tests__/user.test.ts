@@ -1,11 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '../user'
+
+// access token 只在内存，启动靠 refresh 静默续期——这里 mock 请求层覆盖三条分支。
+// vi.hoisted：mock 工厂在模块导入期就会执行，普通 const 此时尚未初始化，必须用 hoisted 声明
+const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }))
+vi.mock('@/utils/request', () => ({
+  default: {
+    post: (...args: unknown[]) => refreshMock(...args),
+    get: () => Promise.resolve({ data: {} }),
+  },
+}))
 
 describe('useUserStore', () => {
   beforeEach(() => {
     localStorage.clear()
     setActivePinia(createPinia())
+    refreshMock.mockReset()
   })
 
   it('initializes with empty token and null user', () => {
@@ -120,5 +131,42 @@ describe('useUserStore', () => {
     expect((store.user as any).creditScore).toBe(85)
     expect((store.user as any).studentId).toBe('20240004')
     expect((store.user as any).createdAt).toBe('2026-01-01')
+  })
+
+  it('ensureSession：内存无 token 且有持久化 refresh 时静默续期成功', async () => {
+    const store = useUserStore()
+    store.refreshToken = 'rt-abc'
+    refreshMock.mockResolvedValue({ data: { token: 'acc-1', refreshToken: 'rt-2' } })
+
+    await store.ensureSession()
+
+    expect(refreshMock).toHaveBeenCalledWith('/auth/refresh', { refreshToken: 'rt-abc' })
+    expect(store.token).toBe('acc-1')
+    expect(store.refreshToken).toBe('rt-2')
+    expect(store.isLoggedIn).toBe(true)
+  })
+
+  it('ensureSession：续期失败时清空登录态（吊销/过期）', async () => {
+    const store = useUserStore()
+    store.token = ''
+    store.user = { id: 9, studentId: 'x', nickname: 'n', avatar: '', college: '', grade: '', signature: '', creditScore: 100, role: 'student', status: 'active', createdAt: '' }
+    store.refreshToken = 'rt-dead'
+    refreshMock.mockRejectedValue(new Error('401'))
+
+    await store.ensureSession()
+
+    expect(store.token).toBe('')
+    expect(store.refreshToken).toBe('')
+    expect(store.user).toBeNull()
+  })
+
+  it('ensureSession：已有 token 时不再打续期接口（避免多余往返）', async () => {
+    const store = useUserStore()
+    store.token = 'live-acc'
+    store.refreshToken = 'rt-x'
+
+    await store.ensureSession()
+
+    expect(refreshMock).not.toHaveBeenCalled()
   })
 })

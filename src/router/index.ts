@@ -23,6 +23,7 @@ const routes = [
   { path: '/', name: 'home', component: HomePage, meta: { title: '校园墙' } },
   { path: '/login', name: 'login', component: LoginPage, meta: { title: '登录' } },
   { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册' } },
+  { path: '/legal/:doc', name: 'legal', component: () => import('@/pages/LegalPage.vue'), meta: { title: '协议' } },
   { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue'), meta: { title: '搜索' } },
   { path: '/topics', name: 'topics', component: () => import('@/pages/TopicsPage.vue'), meta: { title: '话题' } },
   { path: '/post/:id', name: 'postDetail', component: () => import('@/pages/PostDetailPage.vue'), meta: { title: '帖子详情' } },
@@ -77,14 +78,18 @@ const router = createRouter({
 })
 
 // 全局前置守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   document.title = `${to.meta.title || ''} - 校园墙`
 
   const userStore = useUserStore()
 
   if (to.meta.requireAuth && !userStore.isLoggedIn) {
-    next({ path: '/login', query: { redirect: to.fullPath } })
-    return
+    // access 只在内存：刷新/深链进入时先尝试静默续期，失败才打回登录页
+    if (userStore.refreshToken) await userStore.ensureSession()
+    if (!userStore.isLoggedIn) {
+      next({ path: '/login', query: { redirect: to.fullPath } })
+      return
+    }
   }
 
   if (to.meta.requireAdmin && !userStore.isAdmin) {

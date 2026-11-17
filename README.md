@@ -4,7 +4,7 @@
 
 # 校园墙 Campus Wall
 
-> CI：`.github/workflows/ci.yml` 六道门（lint / typecheck / 384 测试 / 雷达门 / 构建体积 / 文档死链 + 契约压测 + Browser E2E + Lighthouse）。仓库为私有，徽章仅协作者可见，故以文字说明替代。
+> CI：`.github/workflows/ci.yml` 六道门（lint / typecheck / 400 测试 / 雷达门 / 构建体积 / 文档死链 + 契约压测 + Browser E2E + Lighthouse）。仓库为私有，徽章仅协作者可见，故以文字说明替代。
 
 > 面向本校学生的校园信息聚合社区平台，让校园生活更有温度。
 > **V5 · 纸感海报**：墨线硬影设计语言 + AI 主链路（成稿/划重点/简报，全部带离线套版兜底）+ Web Push 离线推送 + 传播面全装（OG/JSON-LD/sitemap/RSS/小程序服务端分享卡）+ CI 六道门常绿。
@@ -85,7 +85,7 @@
 - **匿名信任层**：匿名帖不可按 `authorId` 反查、详情不返回作者、编辑不脱匿名；四路反查有回归测试
 - **失物匹配质控**：方向必须相反 + 品类不同即排除，避免「捡到校园卡」配到「捡到钥匙」
 - **Token 吊销**：改密/封禁递增 `token_version`，旧 token 立即失效（REST 与 WS 双通道校验）
-- **双 token 静默续期**：access 2h + refresh 7d；refresh 只允许在 `/api/auth/refresh` 使用（业务接口与 WS 均校验 `type=access`），且**单次消费**（jti 登记，换发后旧串重放即拒）——被盗 refresh 既不能当长寿命凭证，也不能在轮换后继续使用
+- **双 token 静默续期**：access 2h 只活在前端内存（不落 localStorage），启动时用 refresh 静默续期；refresh 7d 仅持久化 refreshToken，且**单次消费**（jti 登记，换发后旧串重放即拒）；业务接口与 WS 均校验 `type=access`，被盗 refresh 不能当长寿命凭证也不能在轮换后继续使用
 - **内容安全双保险**：本地敏感词三级评定 + 微信 `msgSecCheck`（文本同步）/ `mediaCheckAsync`（图片异步送审，结果回调对账）；接口抖动默认 fail-open，`WX_CONTENT_FAIL_CLOSED=1` 可切为拒绝
 - 频控：发帖每日上限、评论 10s 频控、举报 24h 频控
 - 软删除机制，数据可追溯
@@ -99,7 +99,7 @@
 - **运营埋点**：`events` 表记录注册/登录/首帖/首评/成交等转化事件；看板展示今日活跃、7 日活跃、激活率、成交闭环、审核时效
 - **管理审计**：封禁/解封/改信誉/重置密码/内容审核/删评/举报处理全部写 `admin_logs`，且仅在真实状态变更时记录
 - **算法回归门**：`npm run eval:radar -- --gate` 对失物雷达跑标注集，召回/误报/P@1 跌破阈值即 CI 失败
-- **CI 六道门**：静态（lint/typecheck/384 测试/雷达门/构建/体积预算 gzip/文档死链）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms（实测 ~2409 req/s））→ 浏览器 E2E（13 条核心用户流真 Chromium）→ Lighthouse（移动端 3 次中位数 perf≥72/a11y≥90/bp≥90/seo≥90，CI 实测 95/95/100/100）——任一失守即红
+- **CI 六道门**：静态（lint/typecheck/400 测试/雷达门/构建/体积预算 gzip/文档死链）→ 契约压测（24 并发零 5xx + 状态码契约全命中 + p95<800ms（实测 ~2409 req/s））→ 浏览器 E2E（13 条核心用户流真 Chromium）→ Lighthouse（移动端 3 次中位数 perf≥72/a11y≥90/bp≥90/seo≥90，CI 实测 95/95/100/100）——任一失守即红
 - **PWA**：可安装到主屏（manifest + Service Worker；指纹静态资源缓存优先，API/上传永不缓存）
 - 图片上传压缩管线：大图重编码 + WebP 缩略图；解码像素上限 5000 万（防解压炸弹），失败即拒绝而非回落原图
 - **数据库**：WAL + `busy_timeout` + 预编译语句缓存；FTS 触发器按列触发（浏览/点赞不再重建索引，实测快约 19 倍）

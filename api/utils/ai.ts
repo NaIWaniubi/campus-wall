@@ -105,6 +105,56 @@ function resetBreaker(): void {
   breakerUntil = 0;
 }
 
+/** 测试钩子：复位熔断与并发闸状态（生产代码勿用） */
+export function resetBreakerForTest(): void {
+  breakerUntil = 0;
+  activeChains = 0;
+  waiters.length = 0;
+}
+
+/**
+ * 链级并发闸：N 个并发请求各自跑完整模型链会放大上游压力与排队延迟。
+ * 同一时刻最多 MaxConcurrent 条链在跑；budgetMs 内抢不到闸位即抛错交给兜底
+ * （不无限排队——用户端预期是「快速有结果」，不是「更慢地排大队」）。
+ */
+const MAX_CONCURRENT = Number(process.env.AI_MAX_CONCURRENT || 4);
+let activeChains = 0;
+const waiters: Array<() => void> = [];
+
+function acquireChainSlot(budgetMs: number): Promise<() => void> {
+  return new Promise((resolve, reject) => {
+    const tryAcquire = () => {
+      if (activeChains < MAX_CONCURRENT) {
+        activeChains++;
+        resolve(() => {
+          activeChains--;
+          const next = waiters.shift();
+          if (next) next();
+        });
+        return true;
+      }
+      return false;
+    };
+    if (tryAcquire()) return;
+    const timer = setTimeout(() => {
+      const i = waiters.indexOf(waiter);
+      if (i >= 0) waiters.splice(i, 1);
+      reject(new Error('AI 并发闸满，本次使用站内结果'));
+    }, budgetMs);
+const waiter = () => {
+  clearTimeout(timer);
+  if (tryAcquire()) return;
+  waiters.push(waiter);
+};
+    waiters.push(waiter);
+  });
+}
+
+/** 供测试注入：等待中的闸位数量 */
+export function chainQueueDepth(): number {
+  return waiters.length;
+}
+
 /** 调用预算：整链最多花多少时间、单模型最多等多久 */
 export interface AiCallOptions {
   /** 整条模型链的总时间预算（毫秒），超出即停手交给兜底 */
@@ -263,31 +313,37 @@ export async function chatWithAI(
   const started = Date.now();
   const budgetMs = opts.budgetMs ?? 30_000;
   const perModelTimeoutMs = opts.perModelTimeoutMs ?? 20_000;
+  const releaseChain = await acquireChainSlot(budgetMs);
   let lastError: Error = new Error('无可用模型');
   // 认证失败是网关级信号：同端点（url+key）的其余模型不必再逐个空耗预算重试
   const deadEndpoints = new Set<string>();
 
-  for (const model of models) {
-    const remain = budgetMs - (Date.now() - started);
-    if (remain <= 500) break; // 预算耗尽，交给兜底，不再等
-    const ep = endpointKeyFor(model);
-    if (deadEndpoints.has(ep)) {
-      logger.warn('AI 跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
-      continue;
+  try {
+    for (const model of models) {
+      const remain = budgetMs - (Date.now() - started);
+      if (remain <= 500) break; // 预算耗尽，交给兜底，不再等
+      const ep = endpointKeyFor(model);
+      if (deadEndpoints.has(ep)) {
+        logger.warn('AI 跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
+        continue;
+      }
+      try {
+        const out = await requestOnce(model, messages, maxTokens, undefined, Math.min(perModelTimeoutMs, remain));
+        resetBreaker();
+        return out;
+      } catch (err: any) {
+        lastError = err;
+        if (isAuthError(err)) deadEndpoints.add(ep);
+        logger.error('AI 模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
+      }
     }
-    try {
-      const out = await requestOnce(model, messages, maxTokens, undefined, Math.min(perModelTimeoutMs, remain));
-      resetBreaker();
-      return out;
-    } catch (err: any) {
-      lastError = err;
-      if (isAuthError(err)) deadEndpoints.add(ep);
-      logger.error('AI 模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
-    }
+    // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
+    // 后台任务（ignoreBreaker）失败不掐前台：没人等待的场景失败不能惩罚在线用户
+    if (models.length > 0 && !opts.ignoreBreaker) tripBreaker(lastError.message);
+    throw lastError;
+  } finally {
+    releaseChain();
   }
-  // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
-  if (models.length > 0) tripBreaker(lastError.message);
-  throw lastError;
 }
 
 /**
@@ -302,47 +358,53 @@ export async function chatWithAIStream(
   opts: AiCallOptions = {}
 ): Promise<string> {
   if (!isAiEnabled()) throw new Error('AI 未配置');
-  if (!aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
+  if (!opts.ignoreBreaker && !aiReachable()) throw new Error('AI 处于熔断窗口，本次使用站内结果');
 
   const started = Date.now();
   const budgetMs = opts.budgetMs ?? 45_000;
   const perModelTimeoutMs = opts.perModelTimeoutMs ?? 30_000;
+  const releaseChain = await acquireChainSlot(budgetMs);
   let lastError: Error = new Error('无可用模型');
   const deadEndpoints = new Set<string>();
 
-  for (const model of models) {
-    const remain = budgetMs - (Date.now() - started);
-    if (remain <= 500) break;
-    const ep = endpointKeyFor(model);
-    if (deadEndpoints.has(ep)) {
-      logger.warn('AI 流式跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
-      continue;
-    }
-    let started_ = false;
-    try {
-      const out = await requestOnce(
-        model,
-        messages,
-        maxTokens,
-        (t) => {
-          started_ = true;
-          onDelta(t);
-        },
-        Math.min(perModelTimeoutMs, remain)
-      );
-      resetBreaker();
-      return out;
-    } catch (err: any) {
-      lastError = err;
-      if (isAuthError(err)) deadEndpoints.add(ep);
-      logger.error('AI 流式模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
-      if (started_) {
-        tripBreaker(err?.message ?? 'stream failed');
-        throw err;
+  try {
+    for (const model of models) {
+      const remain = budgetMs - (Date.now() - started);
+      if (remain <= 500) break;
+      const ep = endpointKeyFor(model);
+      if (deadEndpoints.has(ep)) {
+        logger.warn('AI 流式跳过已认证失败的网关', { model, endpoint: ep.split('|')[0] });
+        continue;
+      }
+      let started_ = false;
+      try {
+        const out = await requestOnce(
+          model,
+          messages,
+          maxTokens,
+          (t) => {
+            started_ = true;
+            onDelta(t);
+          },
+          Math.min(perModelTimeoutMs, remain)
+        );
+        resetBreaker();
+        return out;
+      } catch (err: any) {
+        lastError = err;
+        if (isAuthError(err)) deadEndpoints.add(ep);
+        logger.error('AI 流式模型调用失败', { model, error: err?.message, gatewayDead: isAuthError(err) });
+        if (started_) {
+          if (!opts.ignoreBreaker) tripBreaker(err?.message ?? 'stream failed');
+          throw err;
+        }
       }
     }
+    // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
+    // 后台任务（ignoreBreaker）失败不掐前台：没人等待的场景失败不能惩罚在线用户
+    if (models.length > 0 && !opts.ignoreBreaker) tripBreaker(lastError.message);
+    throw lastError;
+  } finally {
+    releaseChain();
   }
-  // 空链（如 fastOnly 过滤后只剩慢档）是配置形态，不是故障，不开熔断
-  if (models.length > 0) tripBreaker(lastError.message);
-  throw lastError;
 }

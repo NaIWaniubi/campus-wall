@@ -63,7 +63,8 @@ afterAll(() => {
 });
 
 describe('多模态接线', () => {
-  it('发帖带图片后，图片理解结果写入 post_image_meta', async () => {
+  // 共享 SQLite 全量并发跑时偶发锁等待，5s 默认余量不够 → 提到 30s（单跑实测 ~4s）
+  it('发帖带图片后，图片理解结果写入 post_image_meta', { timeout: 30_000 }, async () => {
     const res = await request(app)
       .post('/api/posts')
       .set('Authorization', `Bearer ${token}`)

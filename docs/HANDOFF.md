@@ -44,7 +44,7 @@
 
 ```bash
 cd E:\校园墙
-npm test                # 457 passed（API 350 + Web 56 + Mini 51）
+npm test                # 462 passed（API 355 + Web 56 + Mini 51）
 npx playwright test     # 15 passed
 npm run lint            # 0 错误
 npm run check           # 0 错误

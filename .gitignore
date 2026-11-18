@@ -101,3 +101,4 @@ api/seed.bundle.mjs
 # E2E/调试临时脚本
 probe*.mjs
 e2eprobe.mjs
+tmp/

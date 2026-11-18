@@ -63,12 +63,33 @@ function saveTokens(token, refreshToken) {
   } catch (e) { /* storage 异常忽略 */ }
 }
 
+/** 清会话（含 refresh）：递增会话代际，作废所有在飞的续期响应 */
+function clearTokens() {
+  sessionEpoch += 1
+  const app = getAppSafe()
+  if (app && app.globalData) {
+    app.globalData.token = ''
+    app.globalData.refreshToken = ''
+  }
+  try {
+    wx.removeStorageSync('token')
+    wx.removeStorageSync('refreshToken')
+  } catch (e) { /* storage 异常忽略 */ }
+}
+
+// 会话代际：登出/清会话时递增。
+// 与 Web 端 src/stores/user.ts 的 sessionEpoch 同款守卫——
+// 「点退出 → 在飞的 refresh 回来了」不能把会话复活（否则退出等于没退）。
+let sessionEpoch = 0
+
 // 静默续期：并发多个请求同时 401 时只发起一次 refresh（与 Web 端 request.ts 同策略）
 let refreshInFlight = null
 function refreshSession() {
   if (refreshInFlight) return refreshInFlight
   const refreshToken = getRefreshToken()
   if (!refreshToken) return Promise.resolve(false)
+  // 发起时记下代际：响应回来若代际已变（期间登出）→ 丢弃，绝不写回 token
+  const epochAtStart = sessionEpoch
   refreshInFlight = new Promise((resolve) => {
     wx.request({
       url: getBaseUrl() + '/auth/refresh',
@@ -77,6 +98,8 @@ function refreshSession() {
       header: { 'Content-Type': 'application/json' },
       success: (res) => {
         const body = res.data || {}
+        // 代际已变 = 期间用户登出：丢弃本次续期结果，不把会话写回来
+        if (epochAtStart !== sessionEpoch) { resolve(false); return }
         if (body.code === 200 && body.data && body.data.token) {
           saveTokens(body.data.token, body.data.refreshToken)
           resolve(true)
@@ -125,6 +148,8 @@ function getCurrentRoute() {
 /** 401 统一处理：清登录态、保存原始路由并跳登录页（登录后可回跳） */
 function handleUnauthorized() {
   showToast('登录已过期，请重新登录')
+  // 递增会话代际：作废在飞的续期响应（避免「续期回来把会话复活」）
+  sessionEpoch += 1
   const app = getAppSafe()
   if (app && app.globalData) {
     app.globalData.token = ''
@@ -228,6 +253,7 @@ module.exports = {
   getToken,
   getRefreshToken,
   saveTokens,
+  clearTokens,
   refreshSession,
   getAppSafe,
   getCurrentRoute,

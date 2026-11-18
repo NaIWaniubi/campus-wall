@@ -146,18 +146,33 @@ describe('useUserStore', () => {
     expect(store.isLoggedIn).toBe(true)
   })
 
-  it('ensureSession：续期失败时清空登录态（吊销/过期）', async () => {
+  it('ensureSession：续期被服务端明确拒绝（401）时清空登录态', async () => {
     const store = useUserStore()
     store.token = ''
     store.user = { id: 9, studentId: 'x', nickname: 'n', avatar: '', college: '', grade: '', signature: '', creditScore: 100, role: 'student', status: 'active', createdAt: '' }
     store.refreshToken = 'rt-dead'
-    refreshMock.mockRejectedValue(new Error('401'))
+    // 真实 axios 形态：有 response = 服务端给了明确响应（401）→ 判定吊销
+    refreshMock.mockRejectedValue(Object.assign(new Error('Request failed with status code 401'), { response: { status: 401 } }))
 
     await store.ensureSession()
 
     expect(store.token).toBe('')
     expect(store.refreshToken).toBe('')
     expect(store.user).toBeNull()
+  })
+
+  it('ensureSession：网络异常（无响应）时不得销毁持久化会话', async () => {
+    const store = useUserStore()
+    store.token = ''
+    store.user = { id: 9, studentId: 'x', nickname: 'n', avatar: '', college: '', grade: '', signature: '', creditScore: 100, role: 'student', status: 'active', createdAt: '' }
+    store.refreshToken = 'rt-alive'
+    // 无 response = 网络异常（弱网/断网），结果未知 → 保持现状等重试
+    refreshMock.mockRejectedValue(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' }))
+
+    await store.ensureSession()
+
+    expect(store.refreshToken).toBe('rt-alive')
+    expect(store.user).not.toBeNull()
   })
 
   it('登出期间在飞的 refresh 返回后不得复活会话（会话代际）', async () => {

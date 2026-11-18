@@ -160,7 +160,13 @@ router.put('/password', authRequired, authRateLimit, (req, res) => {
     role: req.currentUser!.role,
     ver: Number(row?.token_version ?? 0),
   });
-  success(res, { token: newToken }, '密码修改成功，其他设备需重新登录');
+  const newRefresh = generateRefreshToken({
+    id: req.currentUser!.id,
+    studentId: req.currentUser!.studentId,
+    role: req.currentUser!.role,
+    ver: Number(row?.token_version ?? 0),
+  });
+  success(res, { token: newToken, refreshToken: newRefresh }, '密码修改成功，其他设备需重新登录');
 });
 
 // 静默续期：用 refresh token 换发新的 access token + refresh token（轮换）

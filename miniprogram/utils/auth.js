@@ -6,7 +6,7 @@
  *
  * 微信静默登录：wxLogin（501 静默回退表单），由 rawRequest.silentCodes 拦截不弹错误。
  */
-const { rawRequest, getAppSafe } = require('./request')
+const { rawRequest, getAppSafe, clearTokens } = require('./request')
 const { normalizeUser } = require('./legacy-adapter')
 const { showToast } = require('./util')
 
@@ -30,17 +30,16 @@ function saveSession(result) {
 }
 
 function clearSession() {
+  // 会话代际由 utils/request.js 统一维护（clearTokens 内部递增 epoch），
+  // 这里复用它，避免两处 epoch 失配导致「续期回来把会话复活」。
+  clearTokens()
   const app = getAppSafe()
   if (app && app.globalData) {
-    app.globalData.token = ''
-    app.globalData.refreshToken = ''
     app.globalData.userInfo = null
   }
   try {
-    wx.removeStorageSync('token')
-    wx.removeStorageSync('refreshToken')
     wx.removeStorageSync('userInfo')
-  } catch (e) { /* 忽略 */ }
+  } catch (e) { /* storage 异常忽略 */ }
 }
 
 /** 账号密码登录：POST /auth/login -> {token, user}（账号可为手机号/拼音/邮箱前缀/原学号） */

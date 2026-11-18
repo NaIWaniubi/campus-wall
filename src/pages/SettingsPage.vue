@@ -216,7 +216,10 @@ async function savePassword() {
     // 服务端改密后旧 token 立即失效（token_version 递增），必须换用返回的新 token，
     // 否则当前设备会在下一次请求时被 401 踢下线
     const newToken = res?.data?.token || res?.token
-    if (newToken) userStore.setToken(newToken)
+    const newRefresh = res?.data?.refreshToken || res?.refreshToken
+    // 改密会递增 token_version：必须 access + refresh 一起换，
+    // 否则本设备下次静默续期会因 ver 不匹配被拒 → 用户被自己的改密踢下线
+    if (newToken) userStore.setSession(newToken, newRefresh)
     toast.success('密码已修改')
     pwdForm.oldPassword = ''
     pwdForm.newPassword = ''

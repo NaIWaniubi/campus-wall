@@ -19,7 +19,7 @@ interface User {
 }
 
 // 静默续期单飞句柄：并发只发一次 /auth/refresh（见 refreshAccessToken 注释）
-let refreshInFlight: Promise<boolean> | null = null
+let refreshInFlight: Promise<boolean | null> | null = null
 // 会话代际：logout/重新登录时递增，用于丢弃在飞的旧续期响应（防止退出被"复活"）
 let sessionEpoch = 0
 
@@ -47,18 +47,28 @@ export const useUserStore = defineStore('user', {
     /**
      * 启动续期：access token 只活在内存里（刷新页面即丢失），
      * 若持久化的 refreshToken 存在，用它静默换发一次会话。
-     * 成功 → 会话恢复；失败（refresh 被吊销/过期/重放冲突）→ 清登录态。
+     * 成功 → 会话恢复；服务端明确拒绝 → 清登录态；网络异常（null）→ 保持现状等重试。
      */
     async ensureSession() {
       if (this.token || !this.refreshToken) return
       const ok = await this.refreshAccessToken()
-      if (!ok) {
+      // null = 网络异常/未知，不销毁持久化会话（弱网抖动不该逼用户重登）
+      if (ok === false) {
         this.logout()
       }
     },
     /** 替换本地 token：改密后服务端签发新 token（旧 token 已因 token_version 递增失效） */
     setToken(token: string) {
       this.token = token
+    },
+    /**
+     * 同时写入 access + refresh（改密场景）：
+     * 服务端改密会递增 token_version 并签发新的一对 token，
+     * 若只换 access 不换 refresh，下次静默续期会因 ver 不匹配被拒 → 本设备自己掉线。
+     */
+    setSession(token: string, refreshToken?: string) {
+      this.token = token
+      if (refreshToken) this.refreshToken = refreshToken
     },
     /** 登录：账号可为手机号 / 拼音 / 邮箱前缀 / 原学号 */
     async login(account: string, password: string) {
@@ -99,20 +109,26 @@ export const useUserStore = defineStore('user', {
     },
     /**
      * 静默续期：用 refresh token 换新 access token（refresh token 同时轮换）。
-     * 成功返回 true；refresh 过期/被吊销时返回 false，由调用方决定是否登出。
+     *
+     * 三态返回：
+     * - true  续期成功
+     * - false 服务端明确拒绝（401/403：refresh 过期/被吊销/重放冲突）→ 调用方可登出
+     * - null  网络异常/响应异常，结果未知 → 保持现状，等下次请求重试
+     *   （原实现把网络异常也返回 false，ensureSession 因此在弱网抖动时直接销毁
+     *    持久化会话，用户被迫重新登录——这是可用性事故，不是安全策略）
      *
      * 单飞（single-flight）：并发调用共用同一次刷新。典型并发场景＝启动时路由守卫与
      * App.vue onMounted 几乎同时各调一次——refresh 是单次消费（服务端 jti 重放即拒），
      * 若无此闸，两次各自发请求，第一次成功后第二次撞重放 401，第二次把有效会话清掉。
      */
-    async refreshAccessToken() {
+    async refreshAccessToken(): Promise<boolean | null> {
       if (!this.refreshToken) return false
       if (refreshInFlight) return refreshInFlight
       // 会话代际：本次刷新发起时记下 epoch；若期间发生 logout（或重新登录），
       // 响应回来时必须丢弃——否则「点退出 → 在飞的 refresh 返回」会把会话复活，
       // 并把新的 refreshToken 重新写进 localStorage（等于用户退出失败）。
       const epochAtStart = sessionEpoch
-      const run = (async () => {
+      const run = (async (): Promise<boolean | null> => {
         try {
         const res: any = await request.post('/auth/refresh', { refreshToken: this.refreshToken })
           if (epochAtStart !== sessionEpoch) return false
@@ -121,10 +137,13 @@ export const useUserStore = defineStore('user', {
             if (res.data.refreshToken) this.refreshToken = res.data.refreshToken
             return true
           }
-        } catch {
-          /* 网络/服务端异常：保持现状，交由下一次请求重试 */
+          // 200 但没有 token：服务端明确不认这个 refresh → 拒绝
+          return false
+        } catch (e: any) {
+          // 有 response = 服务端给了响应（401/403 等明确拒绝）；无 response = 网络异常
+          if (e?.response) return false
+          return null
         }
-        return false
       })()
       refreshInFlight = run
       try {

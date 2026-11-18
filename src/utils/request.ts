@@ -11,8 +11,9 @@ const request = axios.create({
 })
 
 // 静默续期：并发请求同时 401 时只发起一次 refresh
-let refreshPromise: Promise<boolean> | null = null
-function tryRefreshOnce(): Promise<boolean> {
+// 三态：true 成功 / false 服务端拒绝 / null 网络异常（异常时不清会话，等重试）
+let refreshPromise: Promise<boolean | null> | null = null
+function tryRefreshOnce(): Promise<boolean | null> {
   if (!refreshPromise) {
     const userStore = useUserStore()
     refreshPromise = userStore.refreshAccessToken().finally(() => {

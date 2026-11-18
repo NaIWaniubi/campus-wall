@@ -29,7 +29,7 @@
 ## 工程质量（可复现数字）
 
 - 后端 Express 5 + SQLite（FTS5 中文二元分词）+ WebSocket 私信；前端 Vue3 + TS + Pinia + Vite
-- **413 条自动化测试**（44 文件）、**15 条 Playwright E2E**（真 Chromium 全流程）、lint/typecheck 0 错误
+- **419 条自动化测试**（45 文件）、**15 条 Playwright E2E**（真 Chromium 全流程）、lint/typecheck 0 错误
 - **CI 六道门常绿**：静态门 → 雷达算法门 → 构建体积 gzip 预算门 → 契约压测门（24 并发零 5xx、~2409 req/s、p95 5ms）→ 浏览器 E2E 门 → Lighthouse 门（移动端 95/95/100/100）
 - 安全：双 token（access 2h 仅内存 + refresh 7d 单次消费/重放即拒）、401 双入口静默续期、微信 msgSecCheck 文本机审 + 图片异步送审、匿名四路反查防护、上传防解压炸弹
 - 部署：单进程 `bash start.sh` 即起；空目录冷启动自动建库灌种子；已在 Ubuntu 24.04 + Node 24 复验全链路 0 个 5xx

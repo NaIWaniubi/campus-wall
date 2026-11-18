@@ -139,7 +139,12 @@ const showToast = (title, icon = 'none', duration = 2000) => {
   })
 }
 
+// 引用计数：并发多个请求时，先完成的那个调 hideLoading 会提前撤掉遮罩，
+// 而后台请求仍在 pending —— 用户以为加载完了，其实还没。计数归零才真正撤罩。
+let loadingCount = 0
+
 const showLoading = (title = '加载中...') => {
+  loadingCount += 1
   wx.showLoading({
     title: title,
     mask: true
@@ -147,7 +152,8 @@ const showLoading = (title = '加载中...') => {
 }
 
 const hideLoading = () => {
-  wx.hideLoading()
+  loadingCount = Math.max(0, loadingCount - 1)
+  if (loadingCount === 0) wx.hideLoading()
 }
 
 const showModal = (title, content, confirmText = '确定', cancelText = '取消') => {

@@ -16,7 +16,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { sectionApi } from '@/utils/api'
-import { trapWithInert } from '@/composables/useModalInert'
+import { acquireModalLock, releaseModalLock } from '@/composables/useModalInert'
 
 interface Item {
   id: string
@@ -34,6 +34,8 @@ const userStore = useUserStore()
 const themeStore = useThemeStore()
 
 const open = ref(false)
+/** 共享滚动锁持有标记（防止重复计数） */
+let lockHeld = false
 const query = ref('')
 const loading = ref(false)
 const posts = ref<any[]>([])
@@ -252,9 +254,10 @@ onUnmounted(() => {
 
 // 打开时锁定背景滚动
 watch(open, (v) => {
-  document.body.style.overflow = v ? 'hidden' : ''
+  // 共享滚动锁（引用计数）：与其他模态共存时先关的这个不能提前解锁背景
+  if (v && !lockHeld) { lockHeld = true; acquireModalLock() }
+  else if (!v && lockHeld) { lockHeld = false; releaseModalLock() }
 })
-trapWithInert(open)
 </script>
 
 <template>

@@ -16,6 +16,7 @@ import { db } from '../db.js';
 import { success, fail, toCamel } from '../utils/response.js';
 import { generateToken, generateRefreshToken } from '../utils/jwt.js';
 import { logger } from '../utils/logger.js';
+import { sha256Hex } from '../utils/hash.js';
 
 export const SAFE_USER_COLS = `id, student_id, nickname, avatar, college, grade, signature, credit_score, role, status, ban_reason, ban_until, openid, token_version, created_at`;
 
@@ -87,18 +88,38 @@ export async function wxLoginHandler(req: Request, res: Response) {
     return success(res, { token, refreshToken, user: toCamel(bound), isNewUser: false }, '登录成功');
   }
 
-  // 未绑定：创建占位账号。student_id 由 openid 派生，保证唯一且不能拿来猜他人学号
-  const placeholderStudentId = `wx_${openid.slice(0, 16)}`;
+  // 未绑定：创建占位账号。student_id 由 openid 完整哈希派生（前 16 位哈希，
+  // 原实现取 openid 前 16 字符，不同 openid 可能同前缀 → student_id UNIQUE 冲突），
+  // 且不能拿来猜他人学号
+  const placeholderStudentId = `wx_${sha256Hex(openid).slice(0, 16)}`;
   const nickname =
     typeof req.body?.nickname === 'string' && req.body.nickname.trim()
       ? req.body.nickname.trim().slice(0, 20)
       : '微信用户';
 
-  const result = db.prepare(
-    'INSERT INTO users (student_id, password, nickname, role, status, credit_score, openid) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(placeholderStudentId, 'wx-no-password', nickname, 'user', 'active', 100, openid);
-
-  const userId = Number(result.lastInsertRowid);
+  // 并发首登：两个请求可能都查到「未绑定」→ 同时 INSERT。
+  // openid 与 student_id 都是 UNIQUE，冲突时 better-sqlite3 同步抛错，
+  // 原实现不捕获 → Express 收不到 next(err)，请求无响应，客户端干等到 10s 超时。
+  // 这里捕获约束冲突后回查已存在行做幂等绑定（返回同一个账号）。
+  let userId: number;
+  try {
+    const result = db.prepare(
+      'INSERT INTO users (student_id, password, nickname, role, status, credit_score, openid) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(placeholderStudentId, 'wx-no-password', nickname, 'user', 'active', 100, openid);
+    userId = Number(result.lastInsertRowid);
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    if (!/UNIQUE|constraint/i.test(msg)) {
+      logger.error('wx-login insert failed', { error: msg });
+      return fail(res, '微信登录失败，请重试或使用学号密码登录', 500, 500);
+    }
+    // 并发首登：另一个请求已建好账号 → 幂等复用
+    const existing = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE openid = ?`).get(openid) as any;
+    if (!existing) return fail(res, '微信登录失败，请重试或使用学号密码登录', 409, 409);
+    const exToken = generateToken({ id: existing.id, studentId: existing.student_id, role: existing.role, ver: Number(existing.token_version ?? 0) });
+    const exRefresh = generateRefreshToken({ id: existing.id, studentId: existing.student_id, role: existing.role, ver: Number(existing.token_version ?? 0) });
+    return success(res, { token: exToken, refreshToken: exRefresh, user: toCamel(existing), isNewUser: false }, '登录成功');
+  }
   const user = db.prepare(`SELECT ${SAFE_USER_COLS} FROM users WHERE id = ?`).get(userId) as any;
   const token = generateToken({ id: userId, studentId: placeholderStudentId, role: 'user', ver: 0 });
   const refreshToken = generateRefreshToken({ id: userId, studentId: placeholderStudentId, role: 'user', ver: 0 });

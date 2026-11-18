@@ -9,7 +9,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { X, ArrowRight, LayoutGrid, PenSquare, Sparkles } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
-import { trapWithInert } from '@/composables/useModalInert'
+import { acquireModalLock, releaseModalLock } from '@/composables/useModalInert'
 
 const STORAGE_KEY = 'onboarding:v1'
 const router = useRouter()
@@ -17,6 +17,8 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const open = ref(false)
+/** 共享滚动锁持有标记（防止重复计数） */
+let lockHeld = false
 const step = ref(0)
 let autoTimer: ReturnType<typeof setTimeout> | null = null
 let seenDone = false
@@ -97,8 +99,11 @@ onUnmounted(() => {
   stopWatch()
 })
 
-watch(open, (v) => { document.body.style.overflow = v ? 'hidden' : '' })
-trapWithInert(open)
+// 滚动锁与 inert 统一走共享引用计数（多个模态共存时先关的那个不能提前解锁）
+watch(open, (v) => {
+  if (v && !lockHeld) { lockHeld = true; acquireModalLock() }
+  else if (!v && lockHeld) { lockHeld = false; releaseModalLock() }
+})
 </script>
 
 <template>

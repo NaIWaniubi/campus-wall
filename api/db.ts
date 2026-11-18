@@ -583,6 +583,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_openid ON users (openid);
 `);
 
+// openid 唯一约束：原实现只有普通索引 → 同一微信身份并发首登会产生多个账号，
+// 之后 .get() 任意取一行，封禁/绑定语义混乱。
+// 建唯一索引前先清理存量重复（保留 id 最小的一条，其余置空——置空而非删除，
+// 避免误删用户历史内容）。
+try {
+  const dupes = db
+    .prepare(
+      `SELECT openid FROM users WHERE openid IS NOT NULL AND openid <> ''
+        AND id NOT IN (SELECT MIN(id) FROM users WHERE openid IS NOT NULL AND openid <> '' GROUP BY openid)`
+    )
+    .all() as { openid: string }[];
+  for (const d of dupes) {
+    db.prepare('UPDATE users SET openid = NULL WHERE openid = ?').run(d.openid);
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_openid_unique ON users (openid)');
+} catch (e: any) {
+  // 唯一索引创建失败不阻断启动（索引只是加固，业务层已做幂等冲突处理）
+  // 用 console 而非 logger：db.ts 是最底层模块，引入 logger 会绕回 config 形成依赖环
+  console.warn('[db] openid 唯一索引创建失败（业务层仍有幂等保护）:', e?.message);
+}
+
 // Token 吊销：users 表幂等补列 token_version。
 // 改密/封禁时 +1，鉴权比对 JWT 里的 ver 与库中值，旧 token 立即失效
 // （否则改密后旧 token 仍可用满 7 天，是审计明确点名的缺口）。

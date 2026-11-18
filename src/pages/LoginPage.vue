@@ -222,7 +222,7 @@ function browseAsGuest() {
     <Teleport to="body">
       <div v-if="showForgot" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" @click.self="showForgot = false">
         <div class="ds-scrim absolute inset-0"></div>
-        <div class="relative ds-card w-full max-w-sm p-6 animate-scale-in">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-6 animate-scale-in">
           <button
             class="ds-icon-btn !w-8 !h-8 absolute top-3 right-3"
             aria-label="关闭"

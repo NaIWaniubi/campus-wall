@@ -110,3 +110,35 @@ export function creditTitle(score: number): CreditTitleInfo {
   if (score >= 60) return { name: '诚信新人', icon: 'award', color: '#f97316' }
   return { name: '待改进', icon: 'shield-alert', color: '#9ca3af' }
 }
+
+/**
+ * 防抖：高频事件（键入/滚动）合并为停止触发后的一次调用。
+ * 返回的函数带 cancel / flush，供卸载前补写（如草稿保存）。
+ */
+export function debounce<T extends (...args: any[]) => void>(fn: T, wait = 300) {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let lastArgs: Parameters<T> | null = null
+  function debounced(this: unknown, ...args: Parameters<T>) {
+    lastArgs = args
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      if (lastArgs) fn.apply(this, lastArgs)
+      lastArgs = null
+    }, wait)
+  }
+  debounced.cancel = () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    lastArgs = null
+  }
+  debounced.flush = () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    if (lastArgs) {
+      fn(...lastArgs)
+      lastArgs = null
+    }
+  }
+  return debounced
+}

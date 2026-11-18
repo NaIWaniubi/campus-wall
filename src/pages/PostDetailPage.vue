@@ -1126,7 +1126,7 @@ function closeMoreMenu(e: MouseEvent) {
           @click="onCommentInputClick"
         />
         <button :disabled="!canComment || commentPosting" class="ds-icon-btn ds-ink-btn shrink-0 disabled:opacity-50"
-          @click="submitComment">
+          aria-label="发送评论" @click="submitComment">
           <Loader2 v-if="commentPosting" class="w-4 h-4 animate-spin" />
           <Send v-else class="w-4 h-4" />
         </button>
@@ -1137,7 +1137,7 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showReportSheet" class="fixed inset-0 z-50 flex items-end" @click.self="showReportSheet = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
+        <div role="dialog" aria-modal="true" class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
           <h4 class="ds-title text-center mb-3">选择举报原因</h4>
           <div class="space-y-1">
             <button v-for="r in reportReasons" :key="r" class="hover-paper w-full py-3 text-center text-[13px] rounded-[10px]" style="color: var(--ink)" @click="submitReport(r)">
@@ -1153,7 +1153,7 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showOfferSheet" class="fixed inset-0 z-50 flex items-end" @click.self="showOfferSheet = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
+        <div role="dialog" aria-modal="true" class="ds-card animate-slide-up relative w-full max-w-[960px] mx-auto p-4" style="border-radius: 18px 18px 0 0">
           <h4 class="ds-title text-center mb-1">向卖家发起意向出价</h4>
           <p class="ds-sub text-center mb-3">卖家确认后交易即锁定，双方可在私信里约定交付</p>
           <div class="ds-input flex items-center gap-2">
@@ -1210,7 +1210,7 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showMarkSold" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showMarkSold = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="ds-card relative w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="ds-card relative w-full max-w-sm p-5">
           <h4 class="ds-title text-center">标记交易完成</h4>
           <p class="ds-sub text-center mt-1">可选登记买家账号，便于你之后定向评价对方</p>
           <input
@@ -1240,7 +1240,7 @@ function closeMoreMenu(e: MouseEvent) {
     <Teleport to="body">
       <div v-if="showRateDialog" class="fixed inset-0 z-50 flex items-center justify-center p-6" @click.self="showRateDialog = false">
         <div class="absolute inset-0 bg-black/40"></div>
-        <div class="ds-card relative w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="ds-card relative w-full max-w-sm p-5">
           <h4 class="ds-title text-center">评价这次交易</h4>
           <p class="ds-sub text-center mt-1">仅对方可见你的评分，评价提交后不可修改</p>
           <div class="flex justify-center gap-2 my-5">

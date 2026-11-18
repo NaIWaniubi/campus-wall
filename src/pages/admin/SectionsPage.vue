@@ -174,7 +174,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="formModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="formModal.visible = false">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker ds-sticker--sky">{{ formModal.id ? 'EDIT' : 'NEW' }}</span>
             <span class="ds-label">板块编排</span>
@@ -227,7 +227,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="deleteTarget = null">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker ds-sticker--coral">DELETE</span>
             <span class="ds-label">危险操作</span>

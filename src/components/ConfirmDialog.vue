@@ -8,7 +8,7 @@
  * - 关闭按钮有可访问名称
  */
 import { X } from '@lucide/vue'
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -49,6 +49,12 @@ watch(
     }
   }
 )
+
+// 打开状态下组件被卸载（如路由跳转强制关闭）时移除监听，
+// 否则 keydown 泄漏在 document 上，Esc 会对已销毁实例 emit('cancel')
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>

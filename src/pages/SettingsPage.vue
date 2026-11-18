@@ -167,6 +167,7 @@ async function onAvatarChange(e: Event) {
 }
 
 async function saveProfile() {
+  if (savingProfile.value) return // 重入守卫：双击/回车连点不重复提交
   if (!profileForm.nickname.trim()) {
     toast.error('昵称不能为空')
     return
@@ -191,6 +192,7 @@ async function saveProfile() {
 }
 
 async function savePassword() {
+  if (savingPassword.value) return // 重入守卫
   if (!pwdForm.oldPassword || !pwdForm.newPassword) {
     toast.error('请填写完整密码')
     return

@@ -137,7 +137,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="closeConfirm.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="cancelCloseConfirm">
         <div class="ds-scrim absolute inset-0"></div>
-        <div class="relative ds-card w-full max-w-sm p-6">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-6">
           <span class="ds-sticker ds-sticker--sky">CLOSE</span>
           <h3 class="ds-title mt-2 mb-3" style="color: var(--ink)">标记为已处理？</h3>
           <div v-if="closeConfirm.feedback" class="flex items-center gap-3 p-3 mb-3" style="background: var(--color-surface); border: 1px solid var(--hairline); border-radius: 12px">

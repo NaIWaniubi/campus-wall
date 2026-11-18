@@ -3,7 +3,7 @@
  * AI 助手悬浮组件：基于官网内容答疑 + 论坛相关讨论推荐
  * 支持流式输出（SSE）、本地历史、Markdown 渲染、论坛引用角标
  */
-import { ref, reactive, nextTick, computed, watch, onMounted } from 'vue'
+import { ref, reactive, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bot, X, Send, Loader2, MessagesSquare, ChevronRight, Trash2 } from '@lucide/vue'
 import { aiApi, type AiForumItem } from '@/utils/api'
@@ -103,16 +103,27 @@ function scrollToBottom() {
  })
 }
 
+let confirmClearTimer: ReturnType<typeof setTimeout> | null = null
+
 function clearChat() {
  if (!confirmClear.value) {
  confirmClear.value = true
- setTimeout(() => (confirmClear.value = false), 3000)
+ if (confirmClearTimer) clearTimeout(confirmClearTimer)
+ confirmClearTimer = setTimeout(() => (confirmClear.value = false), 3000)
  return
+ }
+ if (confirmClearTimer) {
+ clearTimeout(confirmClearTimer)
+ confirmClearTimer = null
  }
  confirmClear.value = false
  messages.value = [welcomeMessage()]
  saveHistory()
 }
+
+onUnmounted(() => {
+ if (confirmClearTimer) clearTimeout(confirmClearTimer)
+})
 
 // ---------- Markdown 渲染 + 论坛引用角标 ----------
 // marked/dompurify 懒加载：助手不打开就不求值这两个库（Lighthouse 启动期 TBT 大头）。

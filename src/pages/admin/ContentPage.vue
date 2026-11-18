@@ -381,7 +381,7 @@ onMounted(() => {
     <Teleport to="body">
       <div v-if="rejectModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="rejectModal.visible = false">
         <div class="ds-scrim absolute inset-0"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <h3 class="ds-title">驳回帖子</h3>
           <p class="ds-sub mt-1.5 mb-3 truncate">{{ rejectModal.post?.title }}</p>
           <label class="ds-label block mb-1.5" for="reject-reason">驳回原因（必填）</label>
@@ -409,7 +409,7 @@ onMounted(() => {
     <Teleport to="body">
       <div v-if="topModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="topModal.visible = false">
         <div class="ds-scrim absolute inset-0"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <h3 class="ds-title">设置置顶</h3>
           <p class="ds-sub mt-1.5 mb-4 truncate">{{ topModal.post?.title }}</p>
           <div class="space-y-2 mb-2">

@@ -352,7 +352,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="confirmDialog.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="closeConfirm">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker ds-sticker--coral">CONFIRM</span>
             <span class="ds-label">二次确认</span>
@@ -407,7 +407,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="banModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="banModal.visible = false">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker" :class="banModal.action === 'ban' ? 'ds-sticker--coral' : 'ds-sticker--sky'">{{ banModal.action === 'ban' ? 'BAN' : 'UNBAN' }}</span>
             <span class="ds-label">{{ banModal.action === 'ban' ? '处罚' : '恢复' }}</span>
@@ -452,7 +452,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="pwdModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="pwdModal.visible = false">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker ds-sticker--violet">RESET</span>
             <span class="ds-label">凭据</span>
@@ -490,7 +490,7 @@ onMounted(load)
     <Teleport to="body">
       <div v-if="creditModal.visible" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="creditModal.visible = false">
         <div class="absolute inset-0" style="background: rgb(20 17 15 / 0.55)"></div>
-        <div class="relative ds-card w-full max-w-sm p-5">
+        <div role="dialog" aria-modal="true" class="relative ds-card w-full max-w-sm p-5">
           <div class="flex items-center gap-2 mb-3">
             <span class="ds-sticker">CREDIT</span>
             <span class="ds-label">信誉</span>

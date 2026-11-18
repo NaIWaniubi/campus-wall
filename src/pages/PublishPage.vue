@@ -2,13 +2,13 @@
 /**
  * 发布页：板块选择、标题、正文、图片、匿名、敏感词检测、板块差异化字段
  */
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, X, ImagePlus, Loader2, ShieldAlert, ChevronDown, FileText, Sparkles, Wand2 } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { postApi, uploadApi, draftApi, aiApi } from '@/utils/api'
-import { assessRisk } from '@/utils/helpers'
+import { assessRisk, debounce } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PostCard from '@/components/PostCard.vue'
@@ -171,9 +171,9 @@ async function aiCompose() {
   }
 }
 
-watch(form, () => {
-  // 编辑模式不写本地草稿：避免把「对已发布帖的修改」误存成新建草稿
-  if (editId.value) return
+// 草稿写入防抖：deep watch 每个键入字符都会触发，同步 JSON.stringify + localStorage 写
+// 在快速打字时会阻塞输入帧 → 400ms 防抖合并（flush 在组件卸载前仍会补写最后一次）
+const persistDraft = debounce(() => {
   const hasContent = form.title.trim() || form.content.trim() || form.images.length
   if (hasContent) {
     localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify({
@@ -187,7 +187,18 @@ watch(form, () => {
   } else {
     localStorage.removeItem(LOCAL_DRAFT_KEY)
   }
+}, 400)
+
+watch(form, () => {
+  // 编辑模式不写本地草稿：避免把「对已发布帖的修改」误存成新建草稿
+  if (editId.value) return
+  persistDraft()
 }, { deep: true })
+
+onBeforeUnmount(() => {
+  // 防抖窗口内的最后改动在卸载时补写，避免丢字
+  if (!editId.value) persistDraft.flush?.()
+})
 
 async function saveDraft() {
   if (!userStore.isLoggedIn) {
@@ -298,11 +309,19 @@ async function addFiles(files: File[]): Promise<void> {
   try {
     // 并发上传：分块（每块 ≤3 张）+ Promise.all，替代原先的串行 for-await
     const CONCURRENCY = 3
+    // 与后端 multer fileFilter 对齐：仅 JPG/PNG、单文件 ≤5MB（前端提前拦截，
+    // 避免用户传完才发现后端拒收；非图片类型也会被后端 MIME 校验拒绝）
+    const ACCEPTED_TYPES = ['image/jpeg', 'image/png']
+    const MAX_FILE_SIZE = 5 * 1024 * 1024
     const validFiles: File[] = []
     for (const file of picked) {
       if (form.images.length + validFiles.length >= 9) break
-      if (file.size > 20 * 1024 * 1024) {
-        toast.error(`${file.name || '图片'} 超过20MB，无法上传`)
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        toast.error(`${file.name || '图片'} 仅支持 JPG/PNG 格式`)
+        continue
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name || '图片'} 超过5MB，无法上传`)
         continue
       }
       validFiles.push(file)

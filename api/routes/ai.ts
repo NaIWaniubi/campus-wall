@@ -426,8 +426,9 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
   const fallbackReply = localRetrievalAnswer(cleanMessage, loadKnowledge(), forums);
 
   if (!isAiUsable()) {
+    // degraded 标识：前端展示「站内检索回答」角标，用户能分辨这不是在线大模型
     send('delta', { t: fallbackReply });
-    send('done', { ok: true });
+    send('done', { ok: true, degraded: true });
     return res.end();
   }
 
@@ -449,7 +450,8 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
     send('done', { ok: true, guard: g.meta });
   } catch (err: any) {
     logger.error('AI 流式对话失败', { error: err?.message });
-    send('error', { message: fallbackReply });
+    // 降级到站内兜底同样带标识
+    send('error', { message: fallbackReply, degraded: true });
   }
   res.end();
 });

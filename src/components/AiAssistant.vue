@@ -17,6 +17,7 @@ interface ChatMessage {
  sources?: RagSourceItem[] // RAG 引用资料（回答中 [n] 对应）
  guard?: GuardMetaItem // 护栏可解释性（rewritten/redactedCount>0 时展示）
  streaming?: boolean // 正在流式输出中（按纯文本渲染）
+ degraded?: boolean // 站内兜底回答（非在线大模型）：UI 展示降级角标
 }
 
 /** RAG 引用来源（sources SSE 事件载荷） */
@@ -145,26 +146,43 @@ function escapeHtml(s: string): string {
  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function renderMarkdown(content: string): string {
+function renderMarkdown(content: string, msg?: ChatMessage): string {
  void mdReady.value // 建立响应式依赖：懒加载完成后重渲染
  if (!markedMod || !purifyMod) return escapeHtml(content)
  const html = markedMod.marked.parse(content, { async: false }) as string
  let safe = purifyMod.default.sanitize(html)
+ // 外链安全：模型输出的链接一律新标签打开 + rel 防反向 tabnabbing
+ safe = safe.replace(/<a\s/g, '<a target="_blank" rel="noopener noreferrer nofollow" ')
  // [论坛N] → 可点击角标（编号对应 forums 数组序号）
  safe = safe.replace(/\[论坛(\d+)\]/g, (_, n: string) => {
- return `<sup class="ai-cite" data-post-id="${n}">[论坛${n}]</sup>`
+ return `<sup class="ai-cite" data-cite-kind="forum" data-cite-n="${n}">[论坛${n}]</sup>`
  })
+ // [n] → RAG 引用角标（编号对应 sources.ref）；与论坛角标同一套交互。
+ // 仅当回答真带 sources 时转换，避免把正文普通方括号数字变成假引用
+ if (msg?.sources?.length) {
+ safe = safe.replace(/\[(\d{1,2})\]/g, (_, n: string) => {
+ return `<sup class="ai-cite" data-cite-kind="rag" data-cite-n="${n}">[${n}]</sup>`
+ })
+ }
  return safe
 }
 
 function onContentClick(e: MouseEvent) {
  const el = (e.target as HTMLElement).closest?.('.ai-cite') as HTMLElement | null
  if (!el) return
- const n = parseInt(el.dataset.postId || '', 10)
- // 从所在助手消息里找对应论坛卡片
+ const n = parseInt(el.dataset.citeN || el.dataset.postId || '', 10)
+ if (!Number.isFinite(n)) return
  const idx = (el.closest('[data-msg-idx]') as HTMLElement | null)?.dataset.msgIdx
  const msg = idx != null ? messages.value[Number(idx)] : null
- const forum = msg?.forums?.[n - 1]
+ if (!msg) return
+ if (el.dataset.citeKind === 'rag') {
+ // RAG 引用：按 ref 找来源，直接跳帖子
+ const src = msg.sources?.find((r) => r.ref === n)
+ if (src && src.sourceType === 'post') goPost(src.sourceId)
+ return
+ }
+ // 论坛引用：按序号找对应论坛卡片
+ const forum = msg.forums?.[n - 1]
  if (forum) goPost(forum.id)
 }
 
@@ -245,8 +263,10 @@ async function send(text?: string) {
  scrollToBottom()
  } else if (event === 'done') {
  ok = true
+ reply.degraded = !!data?.degraded
  } else if (event === 'error') {
  reply.content = reply.content || data.message || '抱歉，我暂时出了点问题。'
+ reply.degraded = !!data?.degraded || true // error 事件的服务端文案即站内兜底
  ok = true
  }
  }
@@ -358,7 +378,7 @@ function goPost(id: number) {
  class="ai-md rounded-[14px] px-3 py-2 text-[13.5px] leading-relaxed"
  style="background: var(--card); color: var(--ink); border: 1.5px solid var(--ink); box-shadow: var(--shadow-hard-sm)"
  @click="onContentClick"
- v-html="renderMarkdown(msg.content)"
+ v-html="renderMarkdown(msg.content, msg)"
  ></div>
  <div
  v-else
@@ -428,6 +448,10 @@ function goPost(id: number) {
  style="color: var(--ink-mute)"
  >
  内容安全：已过滤 {{ msg.guard.redactedCount + (msg.guard.rewritten ? 1 : 0) }} 处
+ </div>
+ <!-- AI 降级角标：站内检索兜底回答（非在线大模型），用户可分辨回答来源 -->
+ <div v-if="msg.degraded && !msg.streaming" class="pl-1 pt-1 text-[11px] flex items-center gap-1" style="color: var(--ink-mute)">
+ <span aria-hidden="true">ℹ️</span> 站内检索回答 · 在线模型暂不可用
  </div>
  </div>
  </div>

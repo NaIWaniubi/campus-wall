@@ -57,7 +57,9 @@ describe('vision heuristicVision 启发式降级', () => {
       expect(meta.labels).toContain('离线解析');
       expect(meta.labels).toContain('竖构图');
       expect(meta.model).toBe('heuristic');
-      expect(meta.safe).toBe(true);
+      // 启发式只做视觉描述、无能力判定内容安全 → parsed=true 但 safe 未知(null)
+      expect(meta.parsed).toBe(true);
+      expect(meta.safe).toBeNull();
       expect(meta.summary.length).toBeGreaterThan(0);
     } finally {
       fs.unlinkSync(tmp);
@@ -82,7 +84,9 @@ describe('vision heuristicVision 启发式降级', () => {
 
   it('analyzeImage 对不存在的文件也不 reject（安全兜底）', async () => {
     const meta = await analyzeImage('/nonexistent/path/ghost.png');
-    expect(meta.safe).toBe(false);
+    // 解析失败 ≠ 判定不安全：parsed=false，safe 未知(null)
+    expect(meta.parsed).toBe(false);
+    expect(meta.safe).toBeNull();
     expect(meta.model).toBe('fallback');
   });
 });
@@ -94,6 +98,7 @@ describe('multimodal store 读写', () => {
       labels: ['自行车', '蓝色', '离线解析'],
       summary: '一辆蓝色自行车',
       categoryGuess: '运动',
+      parsed: true,
       safe: true,
       model: 'heuristic',
     });
@@ -101,6 +106,7 @@ describe('multimodal store 读写', () => {
     expect(m).not.toBeNull();
     expect(m!.labels).toEqual(['自行车', '蓝色', '离线解析']);
     expect(m!.categoryGuess).toBe('运动');
+    expect(m!.parsed).toBe(true);
     expect(m!.safe).toBe(true);
     // upsert 覆盖
     saveMeta({
@@ -108,12 +114,15 @@ describe('multimodal store 读写', () => {
       labels: ['更新'],
       summary: '更新后',
       categoryGuess: '其他',
-      safe: false,
+      parsed: false,
+      safe: null,
       model: 'fallback',
     });
     const m2 = getMeta(999901);
     expect(m2!.labels).toEqual(['更新']);
-    expect(m2!.safe).toBe(false);
+    // safe=null（未知）必须原样读回，不能被压成 false
+    expect(m2!.parsed).toBe(false);
+    expect(m2!.safe).toBeNull();
   });
 
   it('getMeta 不存在的 post 返回 null', () => {
@@ -121,8 +130,8 @@ describe('multimodal store 读写', () => {
   });
 
   it('allLabels 聚合并排除通用标签', () => {
-    saveMeta({ postId: 999902, labels: ['手机', '离线解析', '图片'], summary: '', categoryGuess: '数码', safe: true, model: 'heuristic' });
-    saveMeta({ postId: 999903, labels: ['手机', '耳机'], summary: '', categoryGuess: '数码', safe: true, model: 'heuristic' });
+    saveMeta({ postId: 999902, labels: ['手机', '离线解析', '图片'], summary: '', categoryGuess: '数码', parsed: true, safe: null, model: 'heuristic' });
+    saveMeta({ postId: 999903, labels: ['手机', '耳机'], summary: '', categoryGuess: '数码', safe: true, parsed: true, model: 'heuristic' });
     const labels = allLabels(20);
     const phone = labels.find((l) => l.label === '手机');
     expect(phone).toBeDefined();

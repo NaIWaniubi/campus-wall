@@ -9,8 +9,20 @@ export interface VisionMeta {
   labels: string[];
   summary: string;
   category_guess: string;
-  safe: boolean;
-  model: string; // 'vision-gateway' | 'heuristic'
+  /**
+   * 解析是否成功（不是「内容是否安全」）。
+   * 原实现只有 safe 一个布尔，混淆两件事：
+   * - 启发式降级恒返回 safe:true —— 离线档根本无法判定黄赌，
+   *   却对外断言「安全」；
+   * - 双重失败占位返回 safe:false —— 那是「解析失败」不是「判定不安全」，
+   *   调用方无法区分。
+   * 现在拆为两态：parsed=false 表示结果未知（不得当作安全结论），
+   * safe 只在真正解析成功且网关给出判定时才有值。
+   */
+  parsed: boolean;
+  /** 仅在 parsed=true 且模型给出判定时有意义；parsed=false 时为 null（未知） */
+  safe: boolean | null;
+  model: string; // 'vision-gateway' | 'heuristic' | 'fallback'
 }
 
 /** 严格校验网关返回的 JSON（缺字段/类型错即拒绝，交由降级路径） */
@@ -45,6 +57,7 @@ export function validateVisionJson(raw: string): VisionMeta | null {
     summary: obj.summary,
     category_guess: obj.category_guess,
     safe: obj.safe,
+    parsed: true,
     model: 'vision-gateway',
   };
 }
@@ -144,7 +157,9 @@ export async function heuristicVision(imagePath: string): Promise<VisionMeta> {
     labels: [`图片`, `主色调:${colorName}`, shape, '离线解析'],
     summary: `一张${shape}的${colorName}色调图片，明暗${tone}。`,
     category_guess: '其他',
-    safe: true,
+    // 启发式只做视觉描述，无能力判定内容安全 → safe 置 null（未知），不得断言安全
+    parsed: true,
+    safe: null,
     model: 'heuristic',
   };
 }
@@ -163,7 +178,9 @@ export async function analyzeImage(imagePath: string): Promise<VisionMeta> {
         labels: ['图片'],
         summary: '图片解析暂时不可用。',
         category_guess: '其他',
-        safe: false,
+        // 解析失败 ≠ 判定不安全：parsed=false，safe 未知
+        parsed: false,
+        safe: null,
         model: 'fallback',
       };
     }

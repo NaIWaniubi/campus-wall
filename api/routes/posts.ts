@@ -13,6 +13,10 @@ import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSec
 import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/matching.js';
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
 import { applyDirectionFilter } from '../utils/direction-filter.js';
+import { analyzeAndSave } from '../multimodal/store.js';
+import { getStorage } from '../storage/index.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { cacheGet, cacheSet, cacheInvalidate } from '../utils/cache.js';
 import { validate, postSchemas, commonSchemas } from '../utils/validation.js';
 import { safeJsonParse, logger } from '../utils/logger.js';
@@ -475,6 +479,13 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
   const postId = result.lastInsertRowid as number;
   cacheInvalidate('posts');
 
+  // 多模态图片理解：发布成功后异步分析首图（网关优先，启发式降级），
+  // 结果写入 post_image_meta（标签/摘要/类别猜测），失败不影响发帖主流程。
+  // 原实现 analyzeAndSave 全仓零调用点 → 整条多模态链是死代码。
+  if (status === 'published' && imgs.length) {
+    void scheduleImageUnderstanding(postId, imgs[0]);
+  }
+
   // 失物招领智能匹配：发布成功后检索相似候选帖并双向站内通知（失败不影响发帖主流程）
   let matchedCount = 0;
   if (status === 'published') {
@@ -700,6 +711,56 @@ router.post('/:id/report', authRequired, (req, res) => {
 
   success(res, null, '举报已受理，我们会尽快处理');
 });
+
+/**
+ * 调度图片理解：把图片 URL 解析为存储 key，拉取字节落临时文件交给 vision 模块。
+ * 全程不抛错（多模态是增强能力，绝不阻塞发帖）。
+ */
+async function scheduleImageUnderstanding(postId: number, imageUrl: string): Promise<void> {
+  try {
+    const key = extractStorageKey(imageUrl);
+    if (!key) return;
+    const storageIface = getStorage();
+    const stream = await storageIface.get(key);
+    const buf = await readStreamToBuffer(stream);
+    if (!buf?.length) return;
+    // 临时文件：sharp 需要可读路径（Windows 下 NamedTemporaryFile 不可直接复用）
+    const tmpDir = path.join(process.cwd(), 'tmp', 'multimodal');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `m_${postId}_${Date.now()}.bin`);
+    fs.writeFileSync(tmpPath, buf);
+    try {
+      await analyzeAndSave(postId, tmpPath);
+    } finally {
+      try { fs.unlinkSync(tmpPath); } catch { /* 忽略清理失败 */ }
+    }
+  } catch (err: any) {
+    logger.warn('多模态图片理解调度失败（不影响发帖）', { error: err?.message });
+  }
+}
+
+/** 存储流 → Buffer（storage.get 返回 Readable） */
+async function readStreamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  if (Buffer.isBuffer(stream)) return stream;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream as any) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+/** 从图片 URL 反推存储 key（/uploads/xxx.png → xxx.png；S3 绝对 URL 取末段） */
+function extractStorageKey(imageUrl: string): string {
+  if (!imageUrl || typeof imageUrl !== 'string') return '';
+  if (imageUrl.startsWith('/uploads/')) return imageUrl.slice('/uploads/'.length);
+  try {
+    const u = new URL(imageUrl);
+    const seg = u.pathname.split('/').filter(Boolean).pop() || '';
+    return seg;
+  } catch {
+    return '';
+  }
+}
 
 export default router;
 

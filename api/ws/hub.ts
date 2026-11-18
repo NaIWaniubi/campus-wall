@@ -112,6 +112,13 @@ export function onlineUsers(): number[] {
   return Array.from(conns.keys());
 }
 
+/** 已认证连接数（未 hello 的预认证连接不计入配额，否则脚本可占满上限） */
+export function authedConnectionCount(): number {
+  let n = 0;
+  for (const set of conns.values()) n += set.size;
+  return n;
+}
+
 /** 在线用户 → hello 时记录的 token_version（复核吊销用；多端同版本取其一） */
 export function sessionVers(): Map<number, number> {
   const out = new Map<number, number>();

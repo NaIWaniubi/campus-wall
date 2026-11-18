@@ -100,6 +100,14 @@ function loadCommentsFor(postId: number, currentUserId?: number): any[] {
 }
 
 // 评论列表
+/**
+ * 匿名门槛：信誉分 <90 不可匿名发表（创建评论与回复评论共用同一口径）。
+ * 修复前回复路径缺此校验 → 低信誉用户可通过「回复」在任意公开帖匿名发言。
+ */
+function canPostAnonymous(creditScore: number, anonymous: number): boolean {
+  return !(creditScore < 90 && anonymous);
+}
+
 router.get('/posts/:id/comments', authOptional, validate({ params: commonSchemas.id }), (req, res) => {
   const postId = Number(req.params.id);
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as any;
@@ -153,7 +161,7 @@ router.post('/posts/:id/comments', authRequired, commentLimiter, validate({
 
   // 匿名跟随帖子
   const anonymous = post.is_anonymous ? 1 : (isAnonymous ? 1 : 0);
-  if (req.currentUser!.creditScore < 90 && anonymous) {
+  if (!canPostAnonymous(req.currentUser!.creditScore, anonymous)) {
     return fail(res, '信誉分低于90，不可匿名评论');
   }
 
@@ -220,6 +228,10 @@ router.post('/comments/:id/reply', authRequired, commentLimiter, validate({
     (viewer && (viewer.id === post.user_id || viewer.role === 'super_admin' || viewer.role === 'section_admin'));
   if (!canReply) return fail(res, '帖子不存在', 404, 404);
   const anonymous = post.is_anonymous ? 1 : (isAnonymous ? 1 : 0);
+  // 匿名门槛与「创建评论」同一口径：低信誉用户不得通过回复路径绕过
+  if (!canPostAnonymous(req.currentUser!.creditScore, anonymous)) {
+    return fail(res, '信誉分低于90，不可匿名评论');
+  }
 
   // 归一化父级到根：parent 可能本身是楼中楼回复（前端「回复某条回复」），历史数据还可能
   // 是三级嵌套链——沿 parent_id 循环上溯（带深度上限防环），列表只展开一层，任何中间层

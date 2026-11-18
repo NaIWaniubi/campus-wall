@@ -188,6 +188,9 @@ router.post('/refresh', authRateLimit, (req, res) => {
   if (!user) {
     return fail(res, '用户不存在', 404, 404);
   }
+  // 到期封禁惰性解封：与 REST 侧（middleware/auth.ts）同一口径。
+  // 原实现这里硬拒 403，而 REST 会自动解封 → 口径不一致，用户被迫重登。
+  if (user.status === 'banned' && liftExpiredBan(user)) user.status = 'active';
   if (user.status === 'banned') {
     return fail(res, '账号已被封禁，请联系管理员', 403, 403);
   }
@@ -214,7 +217,10 @@ router.post('/refresh', authRateLimit, (req, res) => {
 });
 
 // 退出登录（客户端清除本地 token 即可；此处仅作幂等确认）
-router.post('/logout', authRequired, (_req, res) => {
+router.post('/logout', authRequired, (req, res) => {
+  // 服务端吊销：递增 token_version，一次作废该用户全部新旧 access/refresh 链。
+  // 原实现只回 success 不吊销 → 被盗的 refreshToken 仍可续命到 7 天自然过期。
+  db.prepare('UPDATE users SET token_version = token_version + 1 WHERE id = ?').run(req.currentUser!.id);
   success(res, null, '已退出登录');
 });
 

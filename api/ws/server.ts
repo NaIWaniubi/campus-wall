@@ -9,7 +9,7 @@ import type { Server } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { ClientMsg, type TClientMsg } from './protocol.js';
 import { authJwt } from './auth.js';
-import { attach, detach, subscribeTopic, unsubscribeTopic, closeUser, sessionVers } from './hub.js';
+import { attach, detach, subscribeTopic, unsubscribeTopic, closeUser, sessionVers, authedConnectionCount } from './hub.js';
 import { handleMessage } from './handlers/message.js';
 import { db } from '../db.js';
 
@@ -57,7 +57,9 @@ export function attachWebSocket(server: Server): WebSocketServer {
   sweep.unref?.();
 
   server.on('upgrade', (req, socket, head) => {
-    if (wss.clients.size >= MAX_CONNECTIONS) {
+    // 只统计已认证连接：未 hello 的预认证连接占位最长 10s，
+    // 脚本持续新建即可常驻占满上限导致合法用户 503
+    if (authedConnectionCount() >= MAX_CONNECTIONS) {
       // 超限直接拒绝握手，避免继续分配连接对象
       socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
       socket.destroy();

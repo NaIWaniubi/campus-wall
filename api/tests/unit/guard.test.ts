@@ -76,10 +76,24 @@ describe('guard 输出侧：幻觉红线', () => {
     expect(v.text).not.toContain('[9]');
   });
 
-  it('不传 validRefs 时跳过红线检查', () => {
+  it('不传 validRefs 时红线仍然生效（∅ 集 ⇒ 任何 [n] 越界）', () => {
+    // 语义变更：原实现「不传 = 不校验」，导致网关抖动/检索全滤掉时红线整体静默失效
+    // （safeRetrieve 失败回退 [] → guardOutput 传 {} → 红线整段跳过）——恰是线上常态。
     const v = sanitizeOutput('自由引用[99]也不剔除');
+    expect(v.redactedCount).toBe(1);
+    expect(v.text).not.toContain('[99]');
+  });
+
+  it('三位及以上编号不得绕开红线', () => {
+    const v = sanitizeOutput('编造句[123]。', { validRefs: [1, 2] });
+    expect(v.redactedCount).toBe(1);
+    expect(v.text).not.toContain('[123]');
+  });
+
+  it('合法引用不被误杀', () => {
+    const v = sanitizeOutput('图书馆在东区[1]。', { validRefs: [1] });
     expect(v.redactedCount).toBe(0);
-    expect(v.text).toContain('[99]');
+    expect(v.text).toContain('[1]');
   });
 });
 

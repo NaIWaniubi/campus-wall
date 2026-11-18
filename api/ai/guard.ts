@@ -141,7 +141,8 @@ export function sanitizeOutput(
   // 2) 幻觉红线：引用编号超出资料范围的句子剔除
   // 原实现「无资料=不校验」会让网关抖动/检索全滤掉时红线整体静默失效——那恰是线上常态。
   // 集合语义：validRefs 缺省或为空数组 ⇒ 合法编号集为 ∅ ⇒ 任何 [n] 均越界。
-  if ('validRefs' in opts) {
+  // （显式传 validRefs: undefined 也按 ∅ 处理，避免调用方漏传参数就悄悄关掉红线）
+  {
     const valid = new Set(opts.validRefs ?? []);
     const kept = out.split(/(?<=[。！？；!?;\n])/).filter((s) => {
       const refs = Array.from(s.matchAll(/\[(\d+)\]/g)).map((m) => Number(m[1]));

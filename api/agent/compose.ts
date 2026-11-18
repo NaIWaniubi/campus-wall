@@ -3,27 +3,22 @@
  *
  * 有 LLM：把 evidence 喂给 chatWithAI 生成中文回答（提示词约束：仅基于工具结果、引用工具名）；
  * 无 LLM：把 evidence 拼成结构化卡片文本（每条「🔧 tool名：摘要」）。
- * 输出一律经 sanitizeOutput 清洗；guard 引擎未就绪时用本地最小实现兜底。
+ *
+ * 输出清洗已统一到 api/ai/guard.ts（此前此处是并行开发期留下的本地最小实现，
+ * 只剥注入标记与控制字符，缺风险句改写、幻觉红线与长度截断 → Agent 回答不受护栏约束）。
  */
 import { chatWithAI, isAiUsable, type AiMessage } from '../utils/ai.js';
 import { logger } from '../utils/logger.js';
+import { sanitizeOutput as guardSanitize } from '../ai/guard.js';
 import type { EvidenceEntry } from './executor.js';
 
-/* ==========================================================================
- * 输出清洗：api/ai/guard.ts 尚未存在（guard agent 并行开发中），
- * 先用本地最小实现——剥离常见注入标记与控制字符。
- * 待与 guard 引擎合并：合并后此处改为 import { sanitizeOutput } from '../ai/guard.js'。
- * ========================================================================== */
-
+/**
+ * Agent 回答的输出清洗：复用统一护栏（风险改写 + 幻觉红线 + 超长截断）。
+ * 幻觉红线在此传 validRefs=[]（Agent 回答引用的是工具证据编号而非 RAG 引用编号），
+ * 按「∅ 集 ⇒ 任何 [n] 越界」语义，模型编造的引用编号会被整句剔除。
+ */
 export function sanitizeOutput(text: string): string {
-  return String(text || '')
-    // 剥离模型可被诱导输出的角色扮演标记
-    .replace(/<\/?(system|assistant|user|im_start|im_end)>/gi, '')
-    // 剥离常见提示词注入包裹
-    .replace(/\[INST\]|\[\/INST\]|<<SYS>>|<<\/SYS>>/gi, '')
-    // 控制字符（保留换行/制表）
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-    .trim();
+  return guardSanitize(String(text || ''), { validRefs: [] }).text;
 }
 
 /* ==========================================================================

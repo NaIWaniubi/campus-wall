@@ -699,7 +699,7 @@ router.post('/draft', authRequired, aiLimiter, async (req: Request, res: Respons
 
 // ---------- 2. 帖子划重点：3 条要点 + 风险提示 ----------
 router.post('/summarize', authRequired, aiLimiter, async (req: Request, res: Response) => {
-  let title = String(req.body?.title || '').trim();
+  let title = String(req.body?.title || '').trim().slice(0, 60);
   let content = String(req.body?.content || '').trim();
   const postId = req.body?.postId ? Number(req.body.postId) : null;
 

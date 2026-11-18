@@ -391,7 +391,17 @@ router.get('/reports', sectionAllowed, (req, res) => {
       const post = db.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?').get(r.target_id) as any;
       if (post && post.is_anonymous) {
         const author = db.prepare('SELECT id, nickname, student_id FROM users WHERE id = ?').get(post.user_id) as any;
-        if (author) revealedAuthor = { id: author.id, nickname: author.nickname, studentId: author.student_id };
+        if (author) {
+          revealedAuthor = { id: author.id, nickname: author.nickname, studentId: author.student_id };
+          // 揭示真实作者是敏感操作，必须留痕（此前此接口是唯一不写 admin_logs 的管理出口）
+          db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+            req.currentUser!.id,
+            'reveal_anonymous_author',
+            'post',
+            r.target_id,
+            JSON.stringify({ reportId: r.id, reportCount: count.count, revealedUserId: author.id })
+          );
+        }
       }
     }
     return {

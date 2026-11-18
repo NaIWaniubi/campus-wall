@@ -99,11 +99,23 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
   const sectionId = req.query.sectionId ? parseInt(req.query.sectionId as string) : 0;
   const keyword = (req.query.keyword as string) || '';
   // 排序：hot（默认，HN 风格热度）/ new（时间倒序）；price_* 为交易板块专用
-  const sort = (req.query.sort as string) || 'hot';
+  // sortBy 是 sort 的别名（schema 里两者都声明）：sortBy=hot|latest 时映射到既有排序键，
+  // 否则此前 sortBy 传了也不生效（死参数）。
+  const sortByAlias = (req.query.sortBy as string) || '';
+  const sort =
+    (req.query.sort as string) ||
+    (sortByAlias === 'latest' ? 'new' : sortByAlias === 'hot' ? 'hot' : 'hot');
   // 交易/失物筛选项（全局执行，优于客户端二次排序）
   const priceRange = (req.query.priceRange as string) || '';   // 形如 "0-100" / "100-500" / "500-"
   const timeRange = (req.query.timeRange as string) || '';     // 形如 "1" / "7" / "30"（天）
   const subType = (req.query.subType as string) || '';          // extra_fields 子类型，如 tradeType/itemType
+  // 以下四个此前只在 schema 里声明、handler 从不消费（死参数）：前端传了也全量返回。
+  // 现按语义落地：minPrice/maxPrice → 价格区间；search → 与 keyword 等价的模糊搜；
+  // lostOrFound → 失物/招领方向；sortBy → 排序方式。
+  const minPrice = req.query.minPrice !== undefined ? parseFloat(String(req.query.minPrice)) : null;
+  const maxPrice = req.query.maxPrice !== undefined ? parseFloat(String(req.query.maxPrice)) : null;
+  const searchText = ((req.query.search as string) || '').trim();
+  const lostOrFound = (req.query.lostOrFound as string) || '';
 
   const currentUserId = req.currentUser?.id;
 
@@ -153,6 +165,25 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
         params.push(max);
       }
     }
+  }
+  // 模糊搜索（search 与 keyword 等价，供前端另一套参数名使用）
+  if (searchText) {
+    where += ` AND (p.title LIKE ? OR p.content LIKE ?)`;
+    params.push(`%${searchText}%`, `%${searchText}%`);
+  }
+  // 价格区间（与 priceRange 等价的另一套参数名）
+  if (minPrice !== null && Number.isFinite(minPrice)) {
+    where += ` AND CAST(json_extract(p.extra_fields, '$.price') AS REAL) >= ?`;
+    params.push(minPrice);
+  }
+  if (maxPrice !== null && Number.isFinite(maxPrice)) {
+    where += ` AND CAST(json_extract(p.extra_fields, '$.price') AS REAL) <= ?`;
+    params.push(maxPrice);
+  }
+  // 失物/招领方向筛选：extra_fields.direction ∈ {lost, found}
+  if (lostOrFound === 'lost' || lostOrFound === 'found') {
+    where += ` AND json_extract(p.extra_fields, '$.direction') = ?`;
+    params.push(lostOrFound);
   }
   // 时间范围筛选
   if (timeRange && /^\d+$/.test(timeRange)) {

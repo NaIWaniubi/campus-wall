@@ -50,6 +50,11 @@ jobs:
       - name: Radar algorithm gate
         run: npm run eval:radar -- --gate
 
+      # AI 护栏评估门：注入拦截/风险改写/幻觉红线/JSON 校验全离线用例，
+      # 任一失败（含反向回归误杀）即 CI 失败。
+      - name: AI guard eval gate
+        run: npm run eval:ai
+
       - name: Build
         run: npm run build
 

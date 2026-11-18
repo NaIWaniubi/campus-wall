@@ -150,12 +150,18 @@ function onScroll() {
 // A-T3 虚拟滚动（降级版：IntersectionObserver 哨兵触底自动加载）
 // 开关默认开；如出现兼容问题可临时改 false 退回 window scroll 监听
 const useVirtual = ref(true)
-const { sentinelRef: _sentinelRef } = useVirtualList({
+// 不要改名：模板用 ref="sentinelRef" 绑定，Vue 按字符串 key 查 setupState。
+// 原实现解构成 _sentinelRef → key 不存在 → ref 恒为 null → 观察器从未创建
+// → 首页无限滚动彻底失效（用户只能看到首屏 12 条）。
+const { sentinelRef } = useVirtualList({
  isLoading: () => loadingMore.value || loading.value,
  hasMore: () => hasMore.value,
  onLoad: () => loadList(false),
  rootMargin: '200px',
 })
+// 模板以 ref="sentinelRef" 字符串绑定（Vue 运行时按 setupState key 查找），
+// 模板里不能写 :ref="sentinelRef"，故此处显式引用避免被判定为未使用。
+void sentinelRef
 
 // A-T3 真·窗口虚拟化：只渲染可视区 ± overscan，DOM 节点数不随 list 无限增长。
 // 行高由 measureElement 实测（ResizeObserver），首屏用 estimateSize 估算。

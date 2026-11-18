@@ -44,11 +44,28 @@ function guardInput(message: string): { blocked: boolean; text: string; meta: Gu
   return { blocked: false, text: v.level === 'medium' ? v.sanitized.trim() : message, meta };
 }
 
-/** 护栏输出净化：风险改写 + 幻觉红线（validRefs 来自 RAG 引用编号） */
-function guardOutput(reply: string, ragSources: RagSource[], meta: GuardMeta): string {
+/**
+ * 护栏输出净化：风险改写 + 幻觉红线。
+ *
+ * 系统里并存两套引用编号：
+ * - RAG 资料引用：[n]，编号来自 ragSources
+ * - 论坛讨论引用：[论坛N]，编号来自 forums
+ * 红线若只认一套，另一套的编造引用就 100% 存活（原实现只认 [n]，
+ * 而非 RAG 路径的提示词要求输出 [论坛N] → 编造引用原样进前端）。
+ * 现在两套分别校验：各用自己的合法集，越界即整句剔除。
+ */
+function guardOutput(
+  reply: string,
+  ragSources: RagSource[],
+  meta: GuardMeta,
+  forums: ForumSource[] = [],
+): string {
   const validRefs = ragSources.map((s) => s.ref);
+  const validForumRefs = forums.map((_, i) => i + 1);
   // 始终携带 validRefs（含空数组）：∅ 集下任何 [n] 视为编造，全句剔除
-  const v = sanitizeOutput(reply, { validRefs });
+  let v = sanitizeOutput(reply, { validRefs, refScheme: 'rag' });
+  // 论坛引用单独一轮：[论坛N] 用论坛列表的编号空间校验
+  v = sanitizeOutput(v.text, { validRefs: validForumRefs, refScheme: 'forum' });
   meta.rewritten = v.rewritten;
   meta.redactedCount = v.redactedCount;
   return v.text;
@@ -269,10 +286,20 @@ ${knowledge || '（暂无官网内容）'}
 【相关论坛讨论】
 ${forumContext || '（无）'}`;
 
+  // history 也要过注入护栏：此前只检查 req.body.message，
+  // 攻击者把注入放进 history[].content 就能直接进入 LLM 上下文（slice(-6) 全量带入）。
+  // high → 整条 history 该条丢弃（不整轮拒答，避免历史里一条脏数据就废掉整轮对话）；
+  // medium → 剥离注入片段后带入。
   const recentHistory = history
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-6)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, 1000) }));
+    .map((m) => {
+      const raw = m.content.slice(0, 1000);
+      const v = inspectInput(raw);
+      if (v.level === 'high') return null;          // 丢弃该条历史
+      return { role: m.role, content: v.level === 'medium' ? v.sanitized.trim() : raw };
+    })
+    .filter((m): m is { role: 'user' | 'assistant'; content: string } => m !== null);
 
   return [
     { role: 'system', content: systemPrompt },
@@ -339,7 +366,7 @@ router.post('/chat', authRequired, aiLimiter, async (req: Request, res: Response
     const messages = buildMessages(cleanMessage, history, loadKnowledge(), forums, ragSources);
     const rawReply = await chatWithAI(messages, 1024, currentModels(true));
     bumpStats();
-    const reply = guardOutput(rawReply, ragSources, g.meta);
+    const reply = guardOutput(rawReply, ragSources, g.meta, forums);
     return success(res, { reply, forums, sources: ragSources, guard: g.meta });
   } catch (err: any) {
     logger.error('AI 对话失败', { error: err?.message });
@@ -417,7 +444,7 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
       currentModels(true)
     );
     bumpStats();
-    const reply = guardOutput(full, ragSources, g.meta);
+    const reply = guardOutput(full, ragSources, g.meta, forums);
     send('delta', { t: reply });
     send('done', { ok: true, guard: g.meta });
   } catch (err: any) {

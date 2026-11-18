@@ -2,7 +2,7 @@
 /**
  * 搜索页：历史记录 + 热门搜索 + 防抖搜索 + 结果列表（分页 + 竞态防护 + 板块/排序筛选）
  */
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch  } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { Ref } from 'vue'
 import { ArrowLeft, Search, X, Clock, Flame, Loader2 } from '@lucide/vue'
@@ -63,6 +63,8 @@ const inputRef: Ref<HTMLInputElement | null> = ref(null)
 // 列表底部的 sentinel DOM 节点：IntersectionObserver 命中即触发 loadMore
 const sentinelRef: Ref<HTMLElement | null> = ref(null)
 let ioObserver: IntersectionObserver | null = null
+/** 哨兵观察器 watcher 的停止句柄（重建时先停旧的，避免多个观察器同时触发） */
+let stopSentinelWatch: (() => void) | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 
 const HISTORY_KEY = 'campus-search-history'
@@ -192,15 +194,10 @@ onMounted(async () => {
   loadHistory()
   inputRef.value?.focus()
   if (!appStore.sections.length) appStore.fetchSections()
-  // 预留 IO 观察器钩子：模板中 sentinelRef 元素触发 loadMore
-  if (sentinelRef.value && 'IntersectionObserver' in window) {
-    ioObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) loadMore()
-      }
-    }, { rootMargin: '200px' })
-    ioObserver.observe(sentinelRef.value)
-  }
+  // IO 观察器：哨兵元素由 v-if="hasMore && results.length" 控制，
+  // 挂载那一刻可能还不存在 → 原实现在 onMounted 里一次性取值恒为 null，
+  // 观察器从未创建 → 搜索结果永远只有第一页 20 条。改为 watch 哨兵，出现即建。
+  setupSentinelObserver()
   try {
     const res: any = await sectionApi.hotSearch()
     hotWords.value = (res.data || []).slice(0, 8)
@@ -214,7 +211,35 @@ onMounted(async () => {
     doSearch(incoming)
   }
 })
+/**
+ * 建立/重建哨兵观察器。
+ * 哨兵由 v-if 控制、时有时无；只建一次的话，搜索完成时哨兵才出现 → 观察器缺失，
+ * 「加载更多」永不触发（用户只能看到第一页 20 条）。
+ * 这里 watch 哨兵：出现即建、消失即拆，条件渲染切换后也能自动恢复。
+ */
+function setupSentinelObserver() {
+  if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
+  stopSentinelWatch?.()
+  stopSentinelWatch = watch(
+    sentinelRef,
+    (el) => {
+      ioObserver?.disconnect()
+      ioObserver = null
+      if (!el) return
+      ioObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) loadMore()
+        }
+      }, { rootMargin: '200px' })
+      ioObserver.observe(el)
+    },
+    { immediate: true },
+  )
+}
+
 onUnmounted(() => {
+  stopSentinelWatch?.()
+  stopSentinelWatch = null
   if (ioObserver) {
     ioObserver.disconnect()
     ioObserver = null
@@ -344,7 +369,9 @@ onUnmounted(() => {
             <div ref="listRef" class="relative" :style="{ height: totalSize + 'px' }">
               <div
                 v-for="v in virtualItems"
+
                 :key="v.index"
+                :data-index="v.index"
                 :ref="measureRow"
                 class="pb-3"
                 :style="{

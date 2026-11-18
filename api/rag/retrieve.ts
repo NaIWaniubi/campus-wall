@@ -6,7 +6,7 @@
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { embedQuery } from './embedder.js';
-import { searchByVector } from './store.js';
+import { searchByVector, deleteBySource } from './store.js';
 import type { UpsertChunk } from './store.js';
 
 export interface RagSource {
@@ -125,7 +125,14 @@ export async function refreshIndex(): Promise<{ inserted: number; skipped: numbe
     const posts = db
       // 修复：原写 status='active'，而本库 posts 只写 pending/published/rejected/deleted——
       // 查询恒 0 行，RAG 的「站内帖子引用」实为死功能且无告警。
-      .prepare("SELECT id, title, content FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 200")
+      // JOIN users 过滤封禁：否则封禁用户的帖子仍进检索库并被引用，
+      // 封禁在 AI 问答通道失效（posts 路由 / agent 工具 / forum 检索三处都有此过滤）。
+      .prepare(
+        `SELECT p.id, p.title, p.content FROM posts p
+         JOIN users u ON u.id = p.user_id
+         WHERE p.status = 'published' AND u.status != 'banned'
+         ORDER BY p.id DESC LIMIT 200`
+      )
       .all() as any[];
     if (!posts.length) logger.warn('RAG 索引：无已发布帖子入索引（检查 posts.status）')
     for (const p of posts) {
@@ -134,6 +141,28 @@ export async function refreshIndex(): Promise<{ inserted: number; skipped: numbe
   } catch { /* 表不存在时跳过 */ }
 
   if (!inputs.length) return { inserted: 0, skipped: 0 };
+
+  // 失效来源清理：帖子被删/驳回/封禁后，其旧块仍在 rag_chunks 里被检索并引用
+  // （用户会看到已删除帖子的内容，引用 chips 跳转到空）。
+  // upsertChunks 按 hash 去重 → 内容改了会新旧并存；这里按「本次不在索引里的帖子」清理。
+  try {
+    const livePostIds = new Set(
+      (db
+        .prepare(
+          `SELECT p.id FROM posts p JOIN users u ON u.id = p.user_id
+           WHERE p.status = 'published' AND u.status != 'banned'`
+        )
+        .all() as any[]).map((r) => r.id),
+    );
+    const stalePosts = db
+      .prepare("SELECT DISTINCT source_id FROM rag_chunks WHERE source_type = 'post'")
+      .all() as { source_id: number }[];
+    for (const sp of stalePosts) {
+      if (!livePostIds.has(sp.source_id)) deleteBySource('post', sp.source_id);
+    }
+  } catch (err: any) {
+    logger.warn('RAG 索引：清理失效来源失败（不影响主流程）', { error: err?.message });
+  }
 
   const chunks = buildChunks(inputs);
   const seen = existingHashes();

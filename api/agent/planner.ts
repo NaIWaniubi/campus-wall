@@ -6,7 +6,7 @@
  *    ≤4 步，解析失败/工具名非法 → 自动降级到规则 planner（自主决策的第二层保险）；
  * 2. LLM 不可用：纯规则 planner —— 关键词路由到预设工具链，零外部依赖、毫秒级出计划。
  */
-import { chatWithAI, isAiUsable, type AiMessage } from '../utils/ai.js';
+import { chatWithAI, isAiUsable, type AiMessage, buildModelChain  } from '../utils/ai.js';
 import { describeTools, extractQuestionKeywords, TOOLS } from './tools.js';
 import { logger } from '../utils/logger.js';
 
@@ -149,7 +149,9 @@ export async function plan(question: string, usable?: boolean): Promise<AgentPla
         { role: 'user', content: q.slice(0, 300) },
       ];
       // 规划是小输出任务：给足预算但压低 maxTokens，失败快速降级
-      const raw = await chatWithAI(prompt, 512, [], { budgetMs: 12_000, perModelTimeoutMs: 10_000 });
+      // 第三参传 [] 会让模型链为空 → for 循环零次迭代 → 恒抛「无可用模型」，
+      // LLM 规划路径从未触网（实测 plan.mode 恒为 rule）。改用默认模型链。
+      const raw = await chatWithAI(prompt, 512, buildModelChain(), { budgetMs: 12_000, perModelTimeoutMs: 10_000 });
       const parsed = parsePlanJson(raw);
       const steps = sanitizeLlmPlan(parsed);
       if (steps && steps.length) {

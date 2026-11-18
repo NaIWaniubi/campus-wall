@@ -7,7 +7,7 @@
  * 输出清洗已统一到 api/ai/guard.ts（此前此处是并行开发期留下的本地最小实现，
  * 只剥注入标记与控制字符，缺风险句改写、幻觉红线与长度截断 → Agent 回答不受护栏约束）。
  */
-import { chatWithAI, isAiUsable, type AiMessage } from '../utils/ai.js';
+import { chatWithAI, isAiUsable, type AiMessage, buildModelChain  } from '../utils/ai.js';
 import { logger } from '../utils/logger.js';
 import { sanitizeOutput as guardSanitize } from '../ai/guard.js';
 import type { EvidenceEntry } from './executor.js';
@@ -18,7 +18,10 @@ import type { EvidenceEntry } from './executor.js';
  * 按「∅ 集 ⇒ 任何 [n] 越界」语义，模型编造的引用编号会被整句剔除。
  */
 export function sanitizeOutput(text: string): string {
-  return guardSanitize(String(text || ''), { validRefs: [] }).text;
+  // redlinePolicy='skip-when-empty'：Agent 卡片文本含帖子正文原文，
+  // 其中的方括号编号是「内容」不是「引用」——按 strict 语义会被整句删掉
+  // （实测「毕业要求[1]未满足」这类正文被吃掉）。
+  return guardSanitize(String(text || ''), { validRefs: [], redlinePolicy: 'skip-when-empty' }).text;
 }
 
 /* ==========================================================================
@@ -89,7 +92,9 @@ export async function composeAnswer(
         },
         { role: 'user', content: String(question || '').slice(0, 300) },
       ];
-      const raw = await chatWithAI(messages, 1024, [], { budgetMs: 30_000, perModelTimeoutMs: 20_000 });
+      // 第三参传 [] 会让模型链为空 → 恒抛「无可用模型」，
+    // LLM 合成路径从未触网（实测 compose.mode 恒为 card）。改用默认模型链。
+    const raw = await chatWithAI(messages, 1024, buildModelChain(), { budgetMs: 30_000, perModelTimeoutMs: 20_000 });
       const text = sanitizeOutput(raw);
       if (text) return { text, mode: 'llm' };
       logger.info('Agent LLM 合成输出为空，回退卡片');

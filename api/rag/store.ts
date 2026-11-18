@@ -98,9 +98,28 @@ export interface VectorHit extends StoredChunk {
 export function searchByVector(query: number[], topK: number): VectorHit[] {
   if (!query.length) return [];
   const rows = db.prepare('SELECT id, source_type, source_id, title, content, embedding FROM rag_chunks').all() as RagRow[];
+  // 检索期存活校验：post 来源的块要回查帖子当前状态（已删/驳回/作者被封禁的帖
+  // 不得再作为可信引用出现）。索引构建期的清理只能覆盖「构建时已失效」，
+  // 运行期删除的帖子仍会留在库里——这一层是检索时的最后一道闸。
+  const postAlive = new Map<number, boolean>();
+  const isPostAlive = (sourceId: number): boolean => {
+    let v = postAlive.get(sourceId);
+    if (v === undefined) {
+      const row = db
+        .prepare(
+          `SELECT 1 AS ok FROM posts p JOIN users u ON u.id = p.user_id
+           WHERE p.id = ? AND p.status = 'published' AND u.status != 'banned'`
+        )
+        .get(sourceId) as any;
+      v = !!row;
+      postAlive.set(sourceId, v);
+    }
+    return v;
+  };
   const q = new Float32Array(query);
   const scored: VectorHit[] = [];
   for (const r of rows) {
+    if (r.source_type === 'post' && !isPostAlive(r.source_id)) continue;
     const v = blobToVec(r.embedding);
     if (v.length !== EMBED_DIM) continue;
     let dot = 0;

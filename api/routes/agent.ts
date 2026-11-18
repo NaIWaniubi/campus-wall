@@ -10,6 +10,7 @@ import { authRequired } from '../middleware/auth.js';
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { fail } from '../utils/response.js';
 import { getRiskLevel } from '../utils/sensitive.js';
+import { inspectInput, REJECT_TEMPLATE } from '../ai/guard.js';
 import { isAiUsable } from '../utils/ai.js';
 import { logger } from '../utils/logger.js';
 import { plan } from '../agent/planner.js';
@@ -39,6 +40,16 @@ router.post('/assist/stream', authRequired, aiLimiter, async (req: Request, res:
   if (risk === 'reject') return fail(res, '问题包含敏感内容，请调整后再试');
   if (risk === 'review') return fail(res, '问题涉及敏感话题，请换个说法');
 
+  // Prompt 注入护栏（此前 Agent 入口零注入防护，只查敏感词）：
+  // 「忽略以上所有指令」这类输入会作为 user message 进入 planner 的 system+user 拼装。
+  const guard = inspectInput(question);
+  if (guard.level === 'high') {
+    return fail(res, REJECT_TEMPLATE, 400, 400);
+  }
+  // medium：剥离注入片段后再进入规划
+  const safeQuestion = guard.level === 'medium' ? guard.sanitized.trim() : question;
+  if (!safeQuestion) return fail(res, '请输入 1~500 字的问题');
+
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -53,7 +64,7 @@ router.post('/assist/stream', authRequired, aiLimiter, async (req: Request, res:
     const usable = isAiUsable();
 
     // 1) 规划
-    const agentPlan = await plan(question, usable);
+    const agentPlan = await plan(safeQuestion, usable);
     send('plan', { steps: agentPlan.steps, mode: agentPlan.mode });
 
     // 2) 执行（逐步推送 tool_call）

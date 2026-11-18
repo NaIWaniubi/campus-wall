@@ -36,10 +36,14 @@ router.get('/search/hot', readLimiter, (_req, res) => {
 });
 
 // 搜索帖子（FTS5 全文检索 + 降级 LIKE + 安全 JSON 解析）
+// sectionId/sort 为前端筛选器的真实后端消费（SearchPage 传 sectionId + sort: 'new'|'hot'）
 router.get('/search', readLimiter, (req, res) => {
   const keyword = (req.query.keyword as string) || '';
   const page = toInt(req.query.page, 1, 1);
   const pageSize = 20;
+  // 板块过滤：0/缺省 = 全部；sort：new（时间倒序，默认）/ hot（热度分）
+  const sectionId = toInt(req.query.sectionId, 0, 0);
+  const sort = (req.query.sort as string) === 'hot' ? 'hot' : 'new';
   if (!keyword.trim()) {
     return success(res, { list: [], total: 0, page, pageSize, hasMore: false });
   }
@@ -54,6 +58,21 @@ router.get('/search', readLimiter, (req, res) => {
     matchParams = [ftsQuery];
   }
 
+  // 板块过滤条件拼在 match 之后，参数顺序与占位符一一对应
+  const sectionClause = sectionId > 0 ? ' AND p.section_id = ?' : '';
+  if (sectionId > 0) matchParams.push(sectionId);
+
+  // 热度得分与 /posts 列表同源（HN 公式改造 + 30 分钟冷启动加权）
+  const hotScoreSql = `
+    (
+      (p.like_count * 2.0 + p.comment_count * 3.0)
+      / POW(MAX((julianday('now') - julianday(p.created_at)) * 24.0, 0) + 2, 1.5)
+    ) * CASE WHEN (julianday('now') - julianday(p.created_at)) * 1440.0 <= 30 THEN 1.5 ELSE 1.0 END
+  `;
+  const orderBy = sort === 'hot'
+    ? `ORDER BY (${hotScoreSql}) DESC, p.created_at DESC`
+    : 'ORDER BY p.created_at DESC';
+
   // 使用 INNER JOIN 与列表主查询保持一致，避免 LEFT JOIN 后 u.status 为 NULL 的过滤问题
   const posts = db.prepare(`
     SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college,
@@ -62,15 +81,15 @@ router.get('/search', readLimiter, (req, res) => {
     INNER JOIN users u ON p.user_id = u.id
     LEFT JOIN sections s ON p.section_id = s.id
     WHERE p.status = 'published' AND u.status != 'banned'
-    AND ${matchClause}
-    ORDER BY p.created_at DESC
+    AND ${matchClause}${sectionClause}
+    ${orderBy}
     LIMIT ? OFFSET ?
   `).all(...matchParams, pageSize, offset) as any[];
 
   const totalRow = db.prepare(`
     SELECT COUNT(*) as total FROM posts p INNER JOIN users u ON p.user_id = u.id
     WHERE p.status = 'published' AND u.status != 'banned'
-    AND ${matchClause}
+    AND ${matchClause}${sectionClause}
   `).get(...matchParams) as any;
 
   const total = totalRow ? totalRow.total : 0;

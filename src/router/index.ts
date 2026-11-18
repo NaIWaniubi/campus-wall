@@ -21,8 +21,8 @@ import AdminLayout from '@/pages/admin/AdminLayout.vue'
 const routes = [
   // 用户端
   { path: '/', name: 'home', component: HomePage, meta: { title: '校园墙' } },
-  { path: '/login', name: 'login', component: LoginPage, meta: { title: '登录' } },
-  { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册' } },
+  { path: '/login', name: 'login', component: LoginPage, meta: { title: '登录', guestOnly: true } },
+  { path: '/register', name: 'register', component: RegisterPage, meta: { title: '注册', guestOnly: true } },
   { path: '/legal/:doc', name: 'legal', component: () => import('@/pages/LegalPage.vue'), meta: { title: '协议' } },
   { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue'), meta: { title: '搜索' } },
   { path: '/topics', name: 'topics', component: () => import('@/pages/TopicsPage.vue'), meta: { title: '话题' } },
@@ -41,7 +41,7 @@ const routes = [
   { path: '/profile/subscriptions', name: 'mySubscriptions', component: () => import('@/pages/MySubscriptionsPage.vue'), meta: { title: '我的订阅', requireAuth: true } },
 
   // 管理后台
-  { path: '/admin/login', name: 'adminLogin', component: AdminLoginPage, meta: { title: '管理员登录' } },
+  { path: '/admin/login', name: 'adminLogin', component: AdminLoginPage, meta: { title: '管理员登录', guestOnly: true } },
   {
     path: '/admin',
     component: AdminLayout,
@@ -90,6 +90,15 @@ router.beforeEach(async (to, _from, next) => {
       next({ path: '/login', query: { redirect: to.fullPath } })
       return
     }
+  }
+
+  // 已登录用户访问登录页 → 弹回首页（反向守卫）。
+  // 原实现只有「未登录访问受保护页」方向，没有这条：
+  // 已登录后手动输网址进 /login，看到的还是登录表单，
+  // 可误触发再次登录覆盖当前会话。
+  if (to.meta.guestOnly && userStore.isLoggedIn) {
+    next(userStore.isAdmin ? '/admin' : '/')
+    return
   }
 
   if (to.meta.requireAdmin && !userStore.isAdmin) {

@@ -336,6 +336,7 @@ watch(sectionId, () => {
           <div
             v-for="v in virtualItems"
             :key="v.index"
+            :data-index="v.index"
             :ref="measureRow"
             class="pb-3"
             :style="{

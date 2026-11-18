@@ -18,7 +18,7 @@
  *   })
  *   <div ref="sentinelRef" />
  */
-import { ref, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted, type Ref } from 'vue'
 
 export interface UseVirtualListOptions {
   /** 加载中状态（响应式取值） */
@@ -50,10 +50,18 @@ export function useVirtualList(options: UseVirtualListOptions) {
     }
   }
 
-  onMounted(() => {
-    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return
-    const el = sentinelRef.value
-    if (!el) return
+  /**
+   * 哨兵观察器的建立时机：
+   * 原实现在 onMounted 里一次性取 sentinelRef.value —— 但哨兵常被 v-if 包裹
+   * （如「有更多时才渲染」），挂载那一刻它可能还不存在 → el 为 null → 直接 return，
+   * IntersectionObserver 从未创建 → 无限滚动彻底失效。
+   * 改为 watch 哨兵 ref：元素出现时建观察器，消失时拆掉；条件渲染切换也能正确重建。
+   */
+  const setupObserver = (el: HTMLElement | null) => {
+    observer?.disconnect();
+    observer = null;
+    if (!el) return;
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
     observer = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -61,13 +69,21 @@ export function useVirtualList(options: UseVirtualListOptions) {
         }
       },
       { rootMargin: options.rootMargin ?? '200px' },
-    )
-    observer.observe(el)
-  })
+    );
+    observer.observe(el);
+  };
+
+  const stopWatch = watch(sentinelRef, (el) => setupObserver(el), { immediate: true });
+
+  onMounted(() => {
+    // 兜底：watch immediate 已处理首次；若哨兵在挂载后才被 v-if 渲染，watch 会补建
+    if (!observer && sentinelRef.value) setupObserver(sentinelRef.value);
+  });
 
   onUnmounted(() => {
-    observer?.disconnect()
-    observer = null
+    stopWatch();
+    observer?.disconnect();
+    observer = null;
   })
 
   return { sentinelRef, onReachBottom }

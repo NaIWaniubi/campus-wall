@@ -12,7 +12,8 @@ import { logger } from '../utils/logger.js';
 /**
  * 注入模式（≥12 条，中英）：匹配即视为攻击面。
  * - high：直接指令覆盖 / 系统角色重置 / 密钥泄露请求——拒答，不调 LLM
- * - medium：诱导性话术——剥离命中片段后放行
+ * - medium：注入 medium 命中（全局剥离后放行）或敏感词 queue（调用方自行决定走审核口径）
+ * - low：放行
  */
 const INJECTION_PATTERNS: { re: RegExp; level: 'high' | 'medium'; label: string }[] = [
   { re: /忽略(以上|上面|之前|所有|前面)(所有|的)?(指令|提示|规则|设定|内容)/i, level: 'high', label: 'ignore-instructions-zh' },
@@ -63,8 +64,9 @@ export function inspectInput(text: string): InputVerdict {
         worst = 'high';
       } else if (worst !== 'high') {
         worst = 'medium';
-        // medium：剥离命中片段（把匹配处替换为空格），其余内容保留
-        sanitized = sanitized.replace(p.re, ' ');
+        // medium：剥离命中片段（全局替换，含重复出现的同句式；原实现只剥第一处）
+        const gRe = new RegExp(p.re.source, p.re.flags.includes('g') ? p.re.flags : p.re.flags + 'g');
+        sanitized = sanitized.replace(gRe, ' ');
       }
     }
   }
@@ -137,10 +139,12 @@ export function sanitizeOutput(
     .join('');
 
   // 2) 幻觉红线：引用编号超出资料范围的句子剔除
-  if (opts.validRefs && opts.validRefs.length) {
-    const valid = new Set(opts.validRefs);
+  // 原实现「无资料=不校验」会让网关抖动/检索全滤掉时红线整体静默失效——那恰是线上常态。
+  // 集合语义：validRefs 缺省或为空数组 ⇒ 合法编号集为 ∅ ⇒ 任何 [n] 均越界。
+  if ('validRefs' in opts) {
+    const valid = new Set(opts.validRefs ?? []);
     const kept = out.split(/(?<=[。！？；!?;\n])/).filter((s) => {
-      const refs = Array.from(s.matchAll(/\[(\d{1,2})\]/g)).map((m) => Number(m[1]));
+      const refs = Array.from(s.matchAll(/\[(\d+)\]/g)).map((m) => Number(m[1]));
       const bad = refs.filter((n) => !valid.has(n));
       if (bad.length) {
         redactedCount++;

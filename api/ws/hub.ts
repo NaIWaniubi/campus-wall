@@ -10,6 +10,8 @@ import type { TServerMsg } from './protocol.js';
 export interface Conn {
   ws: WebSocket;
   userId: number;
+  /** hello 时刻的 token_version：封禁/改密后周期复核据此踢连接 */
+  ver: number;
   topics: Set<string>;              // 已订阅的广播主题
   subscribedConvs: Set<number>;     // 已订阅的会话
 }
@@ -18,8 +20,8 @@ const conns = new Map<number, Set<Conn>>();       // userId -> connections
 const convSubs = new Map<number, Set<Conn>>();    // convId  -> connections
 const topicSubs = new Map<string, Set<Conn>>();   // topic   -> connections
 
-export function attach(ws: WebSocket, userId: number): Conn {
-  const c: Conn = { ws, userId, topics: new Set(), subscribedConvs: new Set() };
+export function attach(ws: WebSocket, userId: number, ver = 0): Conn {
+  const c: Conn = { ws, userId, ver, topics: new Set(), subscribedConvs: new Set() };
   const set = conns.get(userId) ?? new Set();
   set.add(c);
   conns.set(userId, set);
@@ -87,6 +89,36 @@ export function subscribeTopic(c: Conn, topic: string): void {
 export function unsubscribeTopic(c: Conn, topic: string): void {
   c.topics.delete(topic);
   topicSubs.get(topic)?.delete(c);
+}
+
+/** 吊销某用户全部 WS 连接（封禁 / 改密即时生效用）；返回关闭数量 */
+export function closeUser(userId: number, code = 4003, reason = 'session revoked'): number {
+  const set = conns.get(userId);
+  if (!set || set.size === 0) return 0;
+  const payload = JSON.stringify({ type: 'error', code: String(code), message: reason });
+  let n = 0;
+  for (const c of set) {
+    // 先走 detach：否则 convSubs/topicSubs 会残留已关连接的房间订阅，缓慢膨胀
+    try { sendSafe(c, payload); } catch { /* noop */ }
+    try { c.ws.close(code, reason); } catch { /* noop */ }
+    detach(c);
+    n++;
+  }
+  return n;
+}
+
+/** 列出当前在线用户（复核与指标用） */
+export function onlineUsers(): number[] {
+  return Array.from(conns.keys());
+}
+
+/** 在线用户 → hello 时记录的 token_version（复核吊销用；多端同版本取其一） */
+export function sessionVers(): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const [uid, set] of conns) {
+    for (const c of set) { out.set(uid, c.ver); break; }
+  }
+  return out;
 }
 
 export function stats() {

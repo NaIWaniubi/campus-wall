@@ -9,8 +9,9 @@ import type { Server } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { ClientMsg, type TClientMsg } from './protocol.js';
 import { authJwt } from './auth.js';
-import { attach, detach, subscribeTopic, unsubscribeTopic } from './hub.js';
+import { attach, detach, subscribeTopic, unsubscribeTopic, closeUser, sessionVers } from './hub.js';
 import { handleMessage } from './handlers/message.js';
+import { db } from '../db.js';
 
 const HELLO_TIMEOUT_MS = 10_000;
 /** 单帧上限：业务消息最长 2000 字，64KB 足够且能挡住大帧压内存（ws 默认 100MB） */
@@ -36,7 +37,24 @@ export function attachWebSocket(server: Server): WebSocketServer {
     }
   }, HEARTBEAT_MS);
   heartbeat.unref?.();
-  wss.on('close', () => clearInterval(heartbeat));
+  wss.on('close', () => { clearInterval(heartbeat); clearInterval(sweep); });
+
+  // 会话吊销复核：封禁 / 改密递增 token_version 后，存量长连接不会被 hello 重验，
+  // 若不主动复核，被封用户可持续 message:send 绕过 REST 封禁（WS 成为旁路）。
+  // 60s 一轮：单条索引查询/在线用户；封禁的即时踢由 admin 端点直接调 closeUser。
+  const sweep = setInterval(() => {
+    const vers = sessionVers();
+    if (vers.size === 0) return;
+    const stmt = db.prepare('SELECT token_version, status FROM users WHERE id = ?');
+    for (const [id, ver] of vers) {
+      const row = stmt.get(id) as { token_version: number | null; status: string } | undefined;
+      if (!row) continue;
+      const revoked = Number(row.token_version ?? 0) !== ver;
+      const banned = row.status === 'banned';
+      if (revoked || banned) closeUser(id, 4003, revoked ? 'session revoked' : 'user banned');
+    }
+  }, 60_000);
+  sweep.unref?.();
 
   server.on('upgrade', (req, socket, head) => {
     if (wss.clients.size >= MAX_CONNECTIONS) {
@@ -89,16 +107,18 @@ export function attachWebSocket(server: Server): WebSocketServer {
           try { ws.close(4008, 'duplicate hello'); } catch { /* noop */ }
           return;
         }
+        let helloVer = 0;
         try {
           const u = authJwt(parsed.token);
           userId = u.id;
+          helloVer = u.ver;
         } catch {
           ws.send(JSON.stringify({ type: 'error', code: 'UNAUTHORIZED', message: 'bad token' }));
           try { ws.close(4001, 'unauthorized'); } catch { /* noop */ }
           return;
         }
         clearTimeout(helloTimer);
-        conn = attach(ws, userId);
+        conn = attach(ws, userId, helloVer);
         ws.send(JSON.stringify({ type: 'pong', ts: Date.now() }));
         return;
       }

@@ -3,6 +3,7 @@
  * 输出带引用编号的资料片段。全库空召回时返回空数组，
  * 调用方（ai.ts）回退到原有 official.md 全文模式，行为不回归。
  */
+import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { embedQuery } from './embedder.js';
 import { searchByVector } from './store.js';
@@ -122,8 +123,11 @@ export async function refreshIndex(): Promise<{ inserted: number; skipped: numbe
   // 3) 最近 200 条帖子
   try {
     const posts = db
-      .prepare("SELECT id, title, content FROM posts WHERE status = 'active' ORDER BY id DESC LIMIT 200")
+      // 修复：原写 status='active'，而本库 posts 只写 pending/published/rejected/deleted——
+      // 查询恒 0 行，RAG 的「站内帖子引用」实为死功能且无告警。
+      .prepare("SELECT id, title, content FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 200")
       .all() as any[];
+    if (!posts.length) logger.warn('RAG 索引：无已发布帖子入索引（检查 posts.status）')
     for (const p of posts) {
       inputs.push({ source: 'post', sourceId: p.id, title: p.title || '帖子', content: String(p.content || '') });
     }

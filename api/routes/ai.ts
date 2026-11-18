@@ -47,7 +47,8 @@ function guardInput(message: string): { blocked: boolean; text: string; meta: Gu
 /** 护栏输出净化：风险改写 + 幻觉红线（validRefs 来自 RAG 引用编号） */
 function guardOutput(reply: string, ragSources: RagSource[], meta: GuardMeta): string {
   const validRefs = ragSources.map((s) => s.ref);
-  const v = sanitizeOutput(reply, validRefs.length ? { validRefs } : {});
+  // 始终携带 validRefs（含空数组）：∅ 集下任何 [n] 视为编造，全句剔除
+  const v = sanitizeOutput(reply, { validRefs });
   meta.rewritten = v.rewritten;
   meta.redactedCount = v.redactedCount;
   return v.text;

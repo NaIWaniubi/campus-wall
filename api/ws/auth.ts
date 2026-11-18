@@ -8,7 +8,7 @@ import { db } from '../db.js';
 import { verifyToken } from '../utils/jwt.js';
 import { liftExpiredBan } from '../middleware/auth.js';
 
-export function authJwt(token: string): { id: number; studentId: string; role: string } {
+export function authJwt(token: string): { id: number; studentId: string; role: string; ver: number } {
   const payload = verifyToken(token);
   // 只接受 access token：refresh token（7 天）不得用于建立 WS 长连接
   if (!payload || payload.type !== 'access') throw new Error('invalid token');
@@ -28,5 +28,5 @@ export function authJwt(token: string): { id: number; studentId: string; role: s
   if (user.status !== 'active') throw new Error('user banned');
 
   // 以库中角色为准：token 里的 role 可能是降权前的旧值
-  return { id: user.id, studentId: user.student_id, role: user.role };
+  return { id: user.id, studentId: user.student_id, role: user.role, ver: payload.ver };
 }

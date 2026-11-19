@@ -137,6 +137,49 @@ export function searchByVector(query: number[], topK: number): VectorHit[] {
   return scored.slice(0, topK);
 }
 
+/**
+ * 全库关键词扫描检索：按 keywords 在 title/content 上命中计分。
+ * 与 searchByVector 并行后由调用方按 chunk id 合并，
+ * 让强关键词命中但低向量相似度的块也能进入候选池参与融合排序。
+ */
+export function searchByKeyword(keywords: string[], topK: number): VectorHit[] {
+  if (!keywords.length) return [];
+  const rows = db.prepare('SELECT id, source_type, source_id, title, content FROM rag_chunks').all() as { id: number; source_type: string; source_id: number; title: string; content: string }[];
+  const postAlive = new Map<number, boolean>();
+  const isPostAlive = (sourceId: number): boolean => {
+    let v = postAlive.get(sourceId);
+    if (v === undefined) {
+      const row = db
+        .prepare(
+          `SELECT 1 AS ok FROM posts p JOIN users u ON u.id = p.user_id
+           WHERE p.id = ? AND p.status = 'published' AND u.status != 'banned'`
+        )
+        .get(sourceId) as any;
+      v = !!row;
+      postAlive.set(sourceId, v);
+    }
+    return v;
+  };
+  const scored: VectorHit[] = [];
+  for (const r of rows) {
+    if (r.source_type === 'post' && !isPostAlive(r.source_id)) continue;
+    // title hit ×2 + content hit ×1（与 keywordScore 同口径）
+    const tl = r.title.toLowerCase();
+    const cl = r.content.toLowerCase();
+    let hits = 0;
+    for (const k of keywords) {
+      const lk = k.toLowerCase();
+      if (tl.includes(lk)) hits += 2;
+      else if (cl.includes(lk)) hits += 1;
+    }
+    if (hits > 0) {
+      scored.push({ id: r.id, sourceType: r.source_type, sourceId: r.source_id, title: r.title, content: r.content, score: hits / (keywords.length * 2) });
+    }
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
+
 /** 库内块数（评估与自检用） */
 export function chunkCount(): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM rag_chunks').get() as { n: number }).n;

@@ -6,8 +6,8 @@
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
 import { embedQuery } from './embedder.js';
-import { searchByVector, deleteBySource } from './store.js';
-import type { UpsertChunk } from './store.js';
+import { searchByVector, searchByKeyword, deleteBySource } from './store.js';
+import type { VectorHit, UpsertChunk } from './store.js';
 
 export interface RagSource {
   ref: number;             // 引用编号，回答中 [n] 对应
@@ -18,19 +18,32 @@ export interface RagSource {
   score: number;
 }
 
-/** 关键词提取：ASCII 词块 + 中文 2 字滑窗（与旧版 ai.ts 口径一致，命中数排序去噪） */
+/** 常见中文功能词 2-gram（无信息量，命中后引入噪声） */
+const STOP_BIGRAMS = new Set([
+  '可以', '什么', '怎么', '怎样', '如何', '是否', '哪里', '哪个',
+  '知道', '关于', '对于', '问题', '情况', '时候', '现在', '还是',
+  '但是', '而且', '因为', '所以', '如果', '虽然', '已经', '应该',
+  '这样', '那样', '一个', '一些', '的发', '的时', '的时',
+]);
+
+/** 关键词提取：英文词块（优先，≤4）+ 中文 2-gram（≤8），总计 ≤8 */
 export function extractKeywords(question: string): string[] {
-  const cleaned = question.replace(/[\s，。！？、；：,.!?;:~～"'"'（）()\[\]{}]/g, '');
-  const words = new Set<string>();
+  // English/ASCII word blocks first (higher specificity per token)
+  const englishWords: string[] = [];
   for (const w of question.match(/[a-zA-Z0-9]{2,}/g) || []) {
-    if (w.length <= 20) words.add(w.toLowerCase());
+    const low = w.toLowerCase();
+    if (!englishWords.includes(low)) englishWords.push(low);
+    if (englishWords.length >= 4) break;
   }
+  // Chinese bigrams separately capped (original: English monopolized all 8 slots)
+  const cleaned = question.replace(/[\s，。！？、；：,.!?;:~～"'"'（）()\[\]{}]/g, '');
   const chinese = cleaned.replace(/[a-zA-Z0-9]/g, '');
-  for (let i = 0; i + 2 <= chinese.length; i++) {
-    words.add(chinese.slice(i, i + 2));
-    if (words.size >= 8) break;
+  const bigrams: string[] = [];
+  for (let i = 0; i + 2 <= chinese.length && bigrams.length < 8; i++) {
+    const bg = chinese.slice(i, i + 2)!;
+    if (!STOP_BIGRAMS.has(bg) && !bigrams.includes(bg)) bigrams.push(bg);
   }
-  return Array.from(words).slice(0, 8);
+  return [...englishWords, ...bigrams].slice(0, 8);
 }
 
 /** 关键词得分：标题命中 ×2 + 正文命中 ×1，占命中关键词数比例 */
@@ -56,12 +69,24 @@ export async function retrieve(question: string, opts: RetrieveOptions = {}): Pr
   const kwW = 1 - vecW;
 
   const queryVec: number[] = await embedQuery(question);
-  const rows = searchByVector(queryVec, topK * 3);
-  if (!rows.length) return [];
-
+  // 双路候选池：纯向量排序的候选可能因向量相似度低而漏掉强关键词命中的块，
+  // 增加关键词扫描候选后按 chunk id 合并，确保两条路径都能进入融合阶段。
+  const vecRows = searchByVector(queryVec, topK * 3);
   const keywords = extractKeywords(question);
-  // 向量相似度已由 searchByVector 排序；这里补关键词分做融合
-  const fused = rows.map((r) => ({
+  const kwRows = searchByKeyword(keywords, topK * 3);
+
+  // 按 chunk id 去重合并；同一条 chunk 取两路中的最高原始分
+  const merged = new Map<number, VectorHit>();
+  for (const r of vecRows) merged.set(r.id, r);
+  for (const r of kwRows) {
+    const existing = merged.get(r.id);
+    if (!existing || r.score > existing.score) merged.set(r.id, r);
+  }
+
+  if (!merged.size) return [];
+
+  // 向量相似度 + 关键词命中融合排序
+  const fused = Array.from(merged.values()).map((r) => ({
     ...r,
     fused: vecW * Math.max(r.score, 0) + kwW * keywordScore(keywords, r.title, r.content),
   }));

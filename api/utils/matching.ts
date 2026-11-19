@@ -275,7 +275,7 @@ export function findRadarMatches(
   // 3. FTS5 BM25 快速召回（方向相反 + 同板块 + 发布中 + 时间窗内）
   //    时间窗以「当前帖发布时间」为基准向后取，而不是相对 now——否则一篇 29 天前的帖
   //    永远找不到同期候选，此时差衰减也才有意义。
-  const ftsQuery = buildFtsQuery(current.title + ' ' + current.content);
+  const ftsQuery = buildFtsQuery(current.title + ' ' + current.content, 16); // 召回优先，上限提到 16
   const candidates = db
     .prepare(
       `SELECT p.id, p.title, p.content, p.extra_fields, p.created_at,

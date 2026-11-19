@@ -19,7 +19,8 @@ interface CacheEntry {
 interface CacheStats {
   hits: number;
   misses: number;
-  evictions: number;
+  evictions: number; // 容量驱动的主动驱逐
+  expired: number;   // TTL 到期失效（与驱逐分开计，避免空闲流量虚增 evictions）
   size: number;
   maxSize: number;
   hitRate: number;
@@ -32,6 +33,7 @@ let stats = {
   hits: 0,
   misses: 0,
   evictions: 0,
+  expired: 0,
 };
 
 export function cacheGet<T = any>(key: string): T | undefined {
@@ -41,9 +43,11 @@ export function cacheGet<T = any>(key: string): T | undefined {
     return undefined;
   }
   if (Date.now() > hit.expiresAt) {
+    // R3 审查 P2：TTL 过期与容量驱逐原都记 evictions —— 空闲流量会让驱逐指标线性虚增，
+    // 缓存效率告警/SLO 误触发。分开计：过期走 expired，容量淘汰才走 evictions。
     store.delete(key);
     stats.misses++;
-    stats.evictions++;
+    stats.expired++;
     return undefined;
   }
   // LRU touch：移到尾部
@@ -84,6 +88,7 @@ export function cacheStats(): CacheStats {
     hits: stats.hits,
     misses: stats.misses,
     evictions: stats.evictions,
+    expired: stats.expired,
     size: store.size,
     maxSize: MAX_SIZE,
     hitRate: total > 0 ? Math.round((stats.hits / total) * 10000) / 100 : 0,
@@ -93,7 +98,7 @@ export function cacheStats(): CacheStats {
 /** 清空所有缓存（用于测试或紧急情况） */
 export function cacheClear(): void {
   store.clear();
-  stats = { hits: 0, misses: 0, evictions: 0 };
+  stats = { hits: 0, misses: 0, evictions: 0, expired: 0 };
 }
 
 /** 预热缓存（可选功能，用于关键数据） */

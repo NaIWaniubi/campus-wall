@@ -29,18 +29,35 @@ router.post('/register', authRateLimit, validate({ body: userSchemas.register })
   const { password, nickname, college, grade } = req.body;
   const studentId = String(req.body.account ?? req.body.studentId ?? '').trim();
 
-  const exist = db.prepare('SELECT id FROM users WHERE student_id = ?').get(studentId);
-  if (exist) {
+  // R3 审查 P2：check+insert 包进单事务消除 TOCTOU（并发同号注册两个请求都过 exist 检查，
+  // UNIQUE 冲突以 500 形式冒泡）。事务内写锁串行化竞争者，冲突转成规范的 409。
+  let userId: number;
+  try {
+    userId = Number(
+      db.transaction(() => {
+        const exist = db.prepare('SELECT id FROM users WHERE student_id = ?').get(studentId);
+        if (exist) return -1 as any;
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        const result = db
+          .prepare(
+            'INSERT INTO users (student_id, password, nickname, college, grade, role, status, credit_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+          )
+          .run(studentId, hashedPassword, nickname.trim(), college || '', grade || '', 'user', 'active', 100);
+        return result.lastInsertRowid as number;
+      })()
+    );
+  } catch (err: any) {
+    // UNIQUE 约束冲突 = 竞争失败方已插入（事务回滚）
+    if (/UNIQUE constraint/i.test(String(err?.message))) {
+      recordAuthFailure(req);
+      return fail(res, '该账号已被注册，换一个或直接登录');
+    }
+    throw err;
+  }
+  if (userId < 0) {
     recordAuthFailure(req);
     return fail(res, '该账号已被注册，换一个或直接登录');
   }
-
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const result = db.prepare(
-    'INSERT INTO users (student_id, password, nickname, college, grade, role, status, credit_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(studentId, hashedPassword, nickname.trim(), college || '', grade || '', 'user', 'active', 100);
-
-  const userId = result.lastInsertRowid as number;
   const token = generateToken({ id: userId, studentId, role: 'user' });
   const refreshToken = generateRefreshToken({ id: userId, studentId, role: 'user' });
   clearAuthFailures(req);

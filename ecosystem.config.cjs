@@ -22,7 +22,9 @@ module.exports = {
         PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || '',
         PORT: process.env.PORT || '3001',
         DATA_DIR: process.env.DATA_DIR || './data',
-        TRUST_PROXY: process.env.TRUST_PROXY || '1',
+        // R3 审查 P1：原先默认 '1' 让 PM2 直跑时信任任意 XFF，限流按攻击者自选 IP 分桶被完全绕过。
+        // 空串保持 app.ts 的安全默认（trust proxy=false）；反代部署须显式设置跳数。
+        TRUST_PROXY: process.env.TRUST_PROXY || '',
         WS_ENABLED: process.env.WS_ENABLED || '1',
       },
     },

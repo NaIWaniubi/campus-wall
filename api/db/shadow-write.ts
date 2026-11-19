@@ -40,7 +40,8 @@ function getShadow(): Kysely<DB> {
     const conn = process.env.SHADOW_DATABASE_URL ?? process.env.DATABASE_URL;
     if (!conn) throw new Error('影子写需要 SHADOW_DATABASE_URL 或 DATABASE_URL');
     _shadow = new Kysely<DB>({
-      dialect: new PostgresDialect({ pool: new Pool({ connectionString: conn, max: 5 }) }),
+      // R3 审查 P2：同 db/index.ts，无超时池会把 5 条连接永久占死在故障后
+      dialect: new PostgresDialect({ pool: new Pool({ connectionString: conn, max: 5, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30_000 }) }),
     });
   }
   return _shadow;

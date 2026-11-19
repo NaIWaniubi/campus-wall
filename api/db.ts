@@ -11,10 +11,15 @@ import bcrypt from 'bcryptjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 数据库路径可通过环境变量配置；默认存放在 api/data.db
+// 数据库路径可通过环境变量配置；默认存放在 api/data.db。
+// R3 审查 P2：DATA_DIR 是 DEPLOY.md/ecosystem/render 承诺的「数据目录」，此前代码无人读取，
+// PM2/Render 部署（不经 start.sh 的翻译）会把库写进源码树或只读挂载失败。
+const dataDirBase = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR!) : null;
 const dbPath = process.env.DB_PATH
   ? (path.isAbsolute(process.env.DB_PATH) ? process.env.DB_PATH : path.join(process.cwd(), process.env.DB_PATH))
-  : path.join(__dirname, 'data.db');
+  : dataDirBase
+    ? path.join(dataDirBase, 'campus.db')
+    : path.join(__dirname, 'data.db');
 
 // 确保目录存在
 const dbDir = path.dirname(dbPath);

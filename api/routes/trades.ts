@@ -43,6 +43,9 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
   if (!isTradeSection(post.section_name)) {
     return fail(res, '仅二手交易板块的帖子可以成交并互评');
   }
+  // R3 审查 P2：getPost 只排除 deleted，pending_review/rejected 帖可被标成交 → 审核门被绕过。
+  // offers 端点显式要求 published，这里对齐同一门槛。
+  if (post.status !== 'published') return fail(res, '帖子不可见或未过审，无法成交', 404, 404);
 
   const extra = JSON.parse(post.extra_fields || '{}');
   if (extra.soldAt) return fail(res, '该交易已标记完成');
@@ -142,28 +145,29 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
 
   const commentText = typeof comment === 'string' ? comment.slice(0, 200) : '';
 
+  // R3 审查 P2：INSERT 与 credit UPDATE 必须同一事务——原来两者各自 autocommit，
+  // 中途失败会出现「有评分无分数」或「有分数无评分」的账目不一致。
+  const delta = creditDelta(score);
+  let newScore: number;
   try {
-    db.prepare(`
-      INSERT INTO trade_ratings (post_id, rater_id, ratee_id, rating, comment)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(postId, req.currentUser!.id, rateeId, score, commentText);
+    newScore = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO trade_ratings (post_id, rater_id, ratee_id, rating, comment)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(postId, req.currentUser!.id, rateeId, score, commentText);
+      let updated: number = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
+      if (delta !== 0) {
+        db.prepare('UPDATE users SET credit_score = MAX(?, MIN(?, credit_score + ?)) WHERE id = ?').run(
+          CREDIT_MIN, CREDIT_MAX, delta, rateeId
+        );
+        updated = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
+      }
+      return updated;
+    })();
   } catch (err: any) {
     if (String(err?.message || '').includes('UNIQUE')) return fail(res, '您已评价过该交易');
     throw err;
   }
-
-  // 计入信誉分（好评+2 差评-3，钳制 0-120）—— trade_ratings INSERT + users.credit_score UPDATE 放事务里
-  const delta = creditDelta(score);
-  const newScore = db.transaction(() => {
-    let updated: number = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
-    if (delta !== 0) {
-      db.prepare('UPDATE users SET credit_score = MAX(?, MIN(?, credit_score + ?)) WHERE id = ?').run(
-        CREDIT_MIN, CREDIT_MAX, delta, rateeId
-      );
-      updated = (db.prepare('SELECT credit_score FROM users WHERE id = ?').get(rateeId) as any).credit_score;
-    }
-    return updated;
-  })();
 
   // 通知被评人（事务外：通知失败不应回滚已落库的 trade_ratings / credit_score）
   upsertNotification(

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ master, main, develop ]
 
+# R3 审查 P1：无并发组时同一分支连推两次会把整套重门（verify + 三个下游 job）
+# 同时跑两遍，重复烧 runner 分钟并拖慢反馈。组键按 ref 取消在途旧跑。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -115,7 +121,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run E2E
-        run: npx playwright test --reporter=line
+        # R3 审查 P2：不传 --reporter=line（会整体覆盖 config 的 html reporter，
+        # 失败后上传步骤找不到 playwright-report/ 目录，在真实失败上叠一层假失败）
+        run: npx playwright test
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4

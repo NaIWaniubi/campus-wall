@@ -49,7 +49,8 @@ router.get('/search', readLimiter, (req, res) => {
   }
 
   const offset = (page - 1) * pageSize;
-  const ftsQuery = buildFtsQuery(keyword, 8);
+  // R3 审查 P1：词数上限 8 → 24，长中文短语（>9 字）不再只剩前缀命中
+  const ftsQuery = buildFtsQuery(keyword, 24);
   let matchClause = '(p.title LIKE ? OR p.content LIKE ?)';
   let matchParams: any[] = [`%${keyword}%`, `%${keyword}%`];
 

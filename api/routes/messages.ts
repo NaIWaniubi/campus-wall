@@ -53,10 +53,12 @@ router.get('/', authRequired, (req, res) => {
   success(res, { list: messages, unreadCount: unreadCount.count, hasMore, page, pageSize });
 });
 
-// 标记单条已读
+// 标记单条已读（R3 审查 P2：原实现无条件 success，「已读」「他人消息」「不存在」不可区分，
+// 与 PATCH /:id/read 同口径按 changes 判定）
 router.put('/read/:id', authRequired, (req, res) => {
   const id = Number(req.params.id);
-  db.prepare('UPDATE messages SET is_read = 1 WHERE id = ? AND user_id = ?').run(id, req.currentUser!.id);
+  const result = db.prepare('UPDATE messages SET is_read = 1 WHERE id = ? AND user_id = ?').run(id, req.currentUser!.id);
+  if (result.changes === 0) return fail(res, '消息不存在或无权限', 404, 404);
   success(res, null, '已标记已读');
 });
 

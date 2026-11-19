@@ -44,11 +44,18 @@ function encryptFile(plainPath: string, encPath: string, key: Buffer): void {
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const data = fs.readFileSync(plainPath);
   const sealed = Buffer.concat([cipher.update(data), cipher.final()]);
-  fs.writeFileSync(
-    encPath,
-    Buffer.concat([Buffer.from(ENC_MAGIC, 'utf-8'), iv, cipher.getAuthTag(), sealed])
-  );
-  fs.unlinkSync(plainPath);
+  // R3 审查 P2：原实现任一步骤失败（ENOSPC/EACCES）都会让明文 .db 留在 backups/，
+  // 而它匹配轮换正则被当成「有效备份」计数 → 运维以为已加密而磁盘上堆着明文全库。
+  // 密文先写 .tmp（改名前不匹配轮换正则，半成品被忽略），明文删除进 finally。
+  try {
+    fs.writeFileSync(
+      `${encPath}.tmp`,
+      Buffer.concat([Buffer.from(ENC_MAGIC, 'utf-8'), iv, cipher.getAuthTag(), sealed])
+    );
+    fs.renameSync(`${encPath}.tmp`, encPath); // 原子替换
+  } finally {
+    try { fs.unlinkSync(plainPath); } catch { /* 已删或从未存在 */ }
+  }
 }
 
 /**

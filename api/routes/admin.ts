@@ -70,9 +70,16 @@ router.get('/users', superOnly, (req, res) => {
 
   const totalRow = db.prepare(`SELECT COUNT(*) as total FROM users ${where}`).get(...params) as any;
 
-  const postCounts = db.prepare(`
-    SELECT user_id, COUNT(*) as count FROM posts WHERE status != 'deleted' GROUP BY user_id
-  `).all() as any[];
+  // R3 审查 P2：原实现整表 GROUP BY——每页请求都随帖子总量线性变慢。
+  // 只聚合当前页 100 个以内的 user_id（IN 子句变量数安全）
+  const pageIds = users.map((u) => u.id);
+  const postCounts = pageIds.length
+    ? (db.prepare(`
+        SELECT user_id, COUNT(*) as count FROM posts
+        WHERE status != 'deleted' AND user_id IN (${pageIds.map(() => '?').join(',')})
+        GROUP BY user_id
+      `).all(...pageIds) as any[])
+    : [];
   const countMap = new Map(postCounts.map((p) => [p.user_id, p.count]));
 
   const list = users.map((u) => ({
@@ -104,27 +111,30 @@ router.put('/users/:id/ban', superOnly, validate({
     }
     // 封禁同时递增 token_version：被封用户的现有会话立即失效，
     // 否则旧 token 在有效期内仍可访问（WS 侧已单独回查 status，此处覆盖 REST）
-    db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ?, token_version = token_version + 1 WHERE id = ?').run(
-      'banned', reason || '违规', banUntil, id
-    );
-    
     logger.warn('用户被封禁', { targetUserId: id, adminId: req.currentUser!.id, reason, duration });
-    // 通知用户
-    db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
-      id, 'system', `您的账号已被封禁，原因：${reason || '违规'}${banUntil ? `，解封时间：${new Date(banUntil).toLocaleString('zh-CN')}` : '，永久封禁'}`
-    );
-    // 审计
-    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
-      req.currentUser!.id, 'ban_user', 'user', id, JSON.stringify({ reason: reason || '违规', duration: duration || 'forever', banUntil })
-    );
+    // R3 审查 P2：UPDATE + 通知消息 + 审计三步包进单事务——原实现任一失败返回 500，
+    // 管理员重试会造成重复封禁通知/重复审计条目，且封禁本身已生效
+    db.transaction(() => {
+      db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ?, token_version = token_version + 1 WHERE id = ?').run(
+        'banned', reason || '违规', banUntil, id
+      );
+      db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(
+        id, 'system', `您的账号已被封禁，原因：${reason || '违规'}${banUntil ? `，解封时间：${new Date(banUntil).toLocaleString('zh-CN')}` : '，永久封禁'}`
+      );
+      db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+        req.currentUser!.id, 'ban_user', 'user', id, JSON.stringify({ reason: reason || '违规', duration: duration || 'forever', banUntil })
+      );
+    })();
     success(res, null, '已封禁用户');
   } else {
-    db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ? WHERE id = ?').run('active', '', '', id);
-    db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(id, 'system', '您的账号已解封');
-    // 审计
-    db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
-      req.currentUser!.id, 'unban_user', 'user', id, JSON.stringify({ reason: reason || '' })
-    );
+    // R3 审查 P2：同 ban，解封三步原子化
+    db.transaction(() => {
+      db.prepare('UPDATE users SET status = ?, ban_reason = ?, ban_until = ? WHERE id = ?').run('active', '', '', id);
+      db.prepare('INSERT INTO messages (user_id, type, content) VALUES (?, ?, ?)').run(id, 'system', '您的账号已解封');
+      db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+        req.currentUser!.id, 'unban_user', 'user', id, JSON.stringify({ reason: reason || '' })
+      );
+    })();
     success(res, null, '已解封用户');
   }
   // 封禁/解封影响列表可见性，失效帖子缓存（审计 quality P2-7）
@@ -381,26 +391,55 @@ router.get('/reports', sectionAllowed, (req, res) => {
 
   const totalRow = db.prepare(`SELECT COUNT(*) as total FROM reports r ${where}`).get(...params) as any;
 
-  // 获取举报人数
+  // R3 审查 P1a：原实现逐行 COUNT（每行一条 SQL，pageSize=100 时一次请求 100+ 条语句），
+  // 改为按本页 (target_type, target_id) 一次性 OR 谓词聚合为一条查询
+  const pendingCounts = new Map<string, number>();
+  if (reports.length) {
+    const pairs = Array.from(new Set(reports.map((r) => ({ t: r.target_type, id: r.target_id }))));
+    const orParts = pairs.map(() => '(target_type = ? AND target_id = ?)').join(' OR ');
+    const aggParams: any[] = [];
+    for (const p of pairs) aggParams.push(p.t, p.id);
+    const rows = db.prepare(
+      `SELECT target_type || ':' || target_id AS key, COUNT(*) AS cnt
+       FROM reports WHERE status = 'pending' AND (${orParts})
+       GROUP BY target_type, target_id`
+    ).all(...aggParams) as any[];
+    for (const row of rows) pendingCounts.set(row.key, row.cnt);
+  }
+  // R3 审查 P1b：原实现在 GET 里 INSERT admin_logs → 刷新一次页面就写一行审计，
+  // 无限刷新无限增长、审计流被读操作污染。揭示留痕移到「首次揭示」：同一帖子已留痕则不再写。
+  const auditRevealed = new Set<string>();
+  if (req.currentUser) {
+    const auditedRows = db.prepare(
+      "SELECT DISTINCT target_id FROM admin_logs WHERE action = 'reveal_anonymous_author' AND target_type = 'post'"
+    ).all() as { target_id: number }[];
+    for (const a of auditedRows) auditRevealed.add(String(a.target_id));
+  }
+
+  // 可追溯平衡设计：匿名帖有效举报数达阈值时，仅在本管理端接口附加真实作者；
+  // 未达阈值不返回该字段，普通用户侧任何接口零改动、永不泄露
   const list = reports.map((r) => {
-    const count = db.prepare("SELECT COUNT(*) as count FROM reports WHERE target_type = ? AND target_id = ? AND status = 'pending'").get(r.target_type, r.target_id) as any;
-    // 可追溯平衡设计：匿名帖有效举报数达阈值时，仅在本管理端接口附加真实作者；
-    // 未达阈值不返回该字段，普通用户侧任何接口零改动、永不泄露
+    const key = `${r.target_type}:${r.target_id}`;
+    const count = { count: pendingCounts.get(key) ?? 0 };
     let revealedAuthor: { id: any; nickname: any; studentId: any } | undefined;
     if (r.target_type === 'post' && count.count >= REPORT_REVEAL_THRESHOLD) {
       const post = db.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?').get(r.target_id) as any;
       if (post && post.is_anonymous) {
         const author = db.prepare('SELECT id, nickname, student_id FROM users WHERE id = ?').get(post.user_id) as any;
-        if (author) {
+        if (author && !auditRevealed.has(String(r.target_id))) {
           revealedAuthor = { id: author.id, nickname: author.nickname, studentId: author.student_id };
-          // 揭示真实作者是敏感操作，必须留痕（此前此接口是唯一不写 admin_logs 的管理出口）
-          db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
-            req.currentUser!.id,
-            'reveal_anonymous_author',
-            'post',
-            r.target_id,
-            JSON.stringify({ reportId: r.id, reportCount: count.count, revealedUserId: author.id })
-          );
+          // 揭示真实作者是敏感操作，必须留痕（仅首次揭示写日志，同一帖重复展示不再写）
+          try {
+            db.prepare('INSERT INTO admin_logs (actor_id, action, target_type, target_id, detail) VALUES (?, ?, ?, ?, ?)').run(
+              req.currentUser!.id,
+              'reveal_anonymous_author',
+              'post',
+              r.target_id,
+              JSON.stringify({ reportId: r.id, reportCount: count.count, revealedUserId: author.id })
+            );
+          } catch { /* 日志写失败不阻断列表展示 */ }
+        } else if (author) {
+          revealedAuthor = { id: author.id, nickname: author.nickname, studentId: author.student_id };
         }
       }
     }
@@ -429,27 +468,35 @@ router.put('/reports/:id', sectionAllowed, (req, res) => {
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id) as any;
   if (!report) return fail(res, '举报工单不存在', 404, 404);
 
+  // 状态守卫：已处理的工单不可重复处理（防止 count 漂移和重复封禁通知）
+  if (report.status !== 'pending') return fail(res, '该工单已处理', 409, 409);
+
   // 封禁为超管专属（对齐 PUT /users/:id/ban 的 superOnly）：section_admin 可在举报队列里
   // 删内容，但不能借举报接口封号。校验放在工单状态更新之前，避免「驳回动作却把工单标成已处理」。
   if (action === 'ban_user' && req.currentUser!.role !== 'super_admin') {
     return forbidden(res, '封禁用户需要超级管理员权限');
   }
 
-  db.prepare('UPDATE reports SET status = ?, handler_id = ?, handle_result = ? WHERE id = ?').run(
-    'handled', req.currentUser!.id, result || action, id
+  // CAS 更新：确保并发下只有一个请求能成功标记为 handled
+  const casResult = db.prepare("UPDATE reports SET status = 'handled', handler_id = ?, handle_result = ? WHERE id = ? AND status = 'pending'").run(
+    req.currentUser!.id, result || action, id
   );
+  if (casResult.changes === 0) return fail(res, '该工单已被他人处理', 409, 409);
 
   if (action === 'delete_content') {
     if (report.target_type === 'post') {
       db.prepare("UPDATE posts SET status = 'deleted' WHERE id = ?").run(report.target_id);
       cacheInvalidate('posts');
     } else if (report.target_type === 'comment') {
-      // 删除评论时同步减少帖子 comment_count，与 comments.ts 删除逻辑保持一致
-      const comment = db.prepare('SELECT post_id FROM comments WHERE id = ?').get(report.target_id) as any;
-      db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(report.target_id);
-      if (comment?.post_id) {
-        db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
-        cacheInvalidate('posts');
+      // 删除评论时同步减少帖子 comment_count（与 comments.ts 删除逻辑保持一致）
+      const comment = db.prepare('SELECT post_id, status FROM comments WHERE id = ?').get(report.target_id) as any;
+      // 仅在评论仍为 active 时才减计数（防止对已删评论重复处理导致 count 漂移）
+      if (comment?.status === 'active') {
+        db.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(report.target_id);
+        if (comment?.post_id) {
+          db.prepare('UPDATE posts SET comment_count = MAX(0, comment_count - 1) WHERE id = ?').run(comment.post_id);
+          cacheInvalidate('posts');
+        }
       }
     }
   } else if (action === 'ban_user') {
@@ -512,7 +559,8 @@ router.get('/stats', superOnly, (_req, res) => {
   const pendingReports = db.prepare("SELECT COUNT(*) as count FROM reports WHERE status = 'pending'").get() as any;
   const pendingPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status IN ('pending', 'pending_review')").get() as any;
   const approvedPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status = 'published'").get() as any;
-  const totalAllPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status IN ('published', 'pending', 'rejected')").get() as any;
+  // R3 审查 P2：分母漏了 pending_review → 人工审核队列的帖不在分母里，passRate 系统性虚高
+  const totalAllPosts = db.prepare("SELECT COUNT(*) as count FROM posts WHERE status IN ('published', 'pending', 'rejected', 'pending_review')").get() as any;
   const auditPassRate = totalAllPosts.count > 0 ? Math.round((approvedPosts.count / totalAllPosts.count) * 100) : 100;
 
   // 近7天数据趋势

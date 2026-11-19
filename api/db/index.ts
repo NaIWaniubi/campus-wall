@@ -38,7 +38,9 @@ export function getDb(): Kysely<DB> {
     if (!conn) throw new Error('DB_DRIVER=postgres 但未配置 DATABASE_URL');
     _db = new Kysely<DB>({
       dialect: new PostgresDialect({
-        pool: new Pool({ connectionString: conn, max: 10 }),
+        // R3 审查 P2：无超时的池在网络分区/failover 下会永久占满所有连接，
+        // 所有查询无限等待无失败信号 → API 静默挂死。给 fail-fast 三件套。
+        pool: new Pool({ connectionString: conn, max: 10, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30_000 }),
       }),
     });
   } else {

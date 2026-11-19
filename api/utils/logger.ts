@@ -75,7 +75,10 @@ export const logger = winston.createLogger(loggerOptions);
 export function requestLogger() {
   return (req: any, res: any, next: any) => {
     const start = Date.now();
-    const requestId = req.headers['x-request-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // R3 审查 P2：客户端 x-request-id 原样入库并回显 → 可伪造任意「关联 ID」污染链路日志。
+    // 白名单校验，格式不合则用服务端生成的 UUID。
+    const h = String(req.headers['x-request-id'] || '');
+    const requestId = /^[A-Za-z0-9_-]{8,64}$/.test(h) ? h : `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 将 requestId 附加到请求对象
     req.requestId = requestId;
@@ -91,22 +94,30 @@ export function requestLogger() {
       userId: req.user?.id,
     });
     
-    // 拦截响应
-    const originalSend = res.send;
-    res.send = function (data: any) {
-      const duration = Date.now() - start;
-      
+    // R3 审查 P2：原实现只拦 res.send —— SSE 流式端点（AI 对话/Agent 流）走
+    // res.write/end 不触发，响应日志对最重的端点结构性失明，断连也不可见。
+    // 改用 finish/close 事件统一覆盖 send/write/end 与客户端中断。
+    res.on('finish', () => {
       logger.info('HTTP Response', {
         requestId,
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,
-        duration: `${duration}ms`,
+        duration: `${Date.now() - start}ms`,
         userId: req.user?.id,
       });
-      
-      return originalSend.call(this, data);
-    };
+    });
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        logger.warn('HTTP Response Aborted', {
+          requestId,
+          method: req.method,
+          path: req.path,
+          duration: `${Date.now() - start}ms`,
+          userId: req.user?.id,
+        });
+      }
+    });
     
     next();
   };

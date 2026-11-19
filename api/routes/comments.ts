@@ -51,14 +51,19 @@ function formatComment(comment: any, currentUserId?: number, likedIds?: Set<numb
  * 评论列表组装（R2 性能修复）：原为「每条评论 2 次查询」的 N+1（likes 单查 + replies 递归），
  * 50 条评论一次请求 ≈ 100+ 条 SQL 且回复查询全表扫。固定 3 查询：
  * 顶层 + 全部回复一次 IN 批量（idx_comments_parent_status 命中）+ 点赞一次 IN 批量。
+ *
+ * 顶层评论上限 50（R3 审查 P1）：原实现无 LIMIT，热门帖数千条评论会
+ * 全量物化行 → 内存压力 + SQLite 变量数超限崩溃。加 LIMIT + 按时间倒序取最新。
  */
 function loadCommentsFor(postId: number, currentUserId?: number): any[] {
+  const TOP_COMMENT_LIMIT = 50;
   const tops = db.prepare(`
     SELECT c.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar
     FROM comments c LEFT JOIN users u ON c.user_id = u.id
     WHERE c.post_id = ? AND c.parent_id IS NULL AND c.status = 'active'
-    ORDER BY c.like_count DESC, c.created_at DESC
-  `).all(postId) as any[];
+    ORDER BY c.created_at DESC
+    LIMIT ?
+  `).all(postId, TOP_COMMENT_LIMIT) as any[];
   const topIds = tops.map((c) => c.id);
   if (!topIds.length) return [];
 

@@ -92,9 +92,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // 受控上传文件访问：避免目录遍历/直接列举（替换原 express.static）
 // 云部署通过 UPLOAD_DIR 指到持久化目录；本地仍回落到 public/uploads
+// R3 审查 P2：UPLOAD_DIR 未设时认 DATA_DIR/uploads（与 db.ts 同口径，部署文档承诺生效）
+const _dataDirBase = process.env.DATA_DIR?.trim() ? path.resolve(process.env.DATA_DIR!) : null;
 const uploadsDir = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
-  : path.join(__dirname, '..', 'public', 'uploads')
+  : _dataDirBase
+    ? path.join(_dataDirBase, 'uploads')
+    : path.join(__dirname, '..', 'public', 'uploads')
 // 校验规则：filename 必须为 <userId>_<timestamp>_<rand>.<ext> 或其缩略图 <原名>.thumb.webp
 // （rand 段是后加的：同毫秒上传会撞 timestamp，用随机后缀避免覆盖；老文件名无 rand 也兼容）
 const UPLOAD_NAME_RE = /^[A-Za-z0-9_]+_\d+(_[a-f0-9]{6})?\.(jpg|jpeg|png)(\.thumb\.webp)?$/
@@ -206,15 +210,19 @@ app.get('/api/docs', (_req: Request, res: Response) => {
 app.get('/metrics', async (req: Request, res: Response) => {
   try {
     const expected = process.env.METRICS_TOKEN?.trim();
-    if (expected) {
-      const provided = String(req.headers['x-metrics-token'] || '');
-      if (provided !== expected) {
-        // 未授权：只给最基础的存活指标，不暴露业务与 SQL 细节
-        res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
-        return res.send(
-          '# HELP process_up 进程存活\n# TYPE process_up gauge\nprocess_up 1\n'
-        );
-      }
+    const provided = String(req.headers['x-metrics-token'] || '');
+    // 令牌比对走常量时间比较，避免逐字符短路泄露时序（审计 P2）
+    const tokenOk = expected
+      ? Buffer.byteLength(provided) === Buffer.byteLength(expected) &&
+        crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+      : !expected;
+    if (!tokenOk) {
+      // 未授权或未配置令牌：只给最基础的存活指标，不暴露业务与 SQL 细节。
+      // 未配置令牌时强制只给存活指标（审计 P1：否则匿名即可抓全量内部指标）
+      res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+      return res.send(
+        '# HELP process_up 进程存活\n# TYPE process_up gauge\nprocess_up 1\n'
+      );
     }
     res.setHeader('Content-Type', register.contentType);
     res.send(await register.metrics());
@@ -250,10 +258,17 @@ app.use('/api/health', (_req: Request, res: Response) => {
   } catch { /* 探测失败 → degraded */ }
 
   const dbDriver = (process.env.DB_DRIVER ?? 'sqlite').toLowerCase()
-  const degraded = !dbOk || !storageOk
 
-  res.status(dbOk ? 200 : 503).json({
-    code: dbOk ? 200 : 503,
+  // R3 审查 P1：原实现只要 SELECT 1 成功就回 200 —— storage 挂了、备份停摆，
+  // 监控/负载均衡探活全部失明，auto-healing 永不触发。degraded 时回 503。
+  const backupStale =
+    lastBackupAt !== null &&
+    process.env.BACKUP_ENABLED !== 'false' &&
+    Date.now() - lastBackupAt > (Number.parseInt(process.env.BACKUP_INTERVAL_HOURS ?? '24', 10) || 24) * 2 * 3600_000;
+  const degraded = !dbOk || !storageOk || backupStale
+
+  res.status(degraded ? 503 : 200).json({
+    code: degraded ? 503 : 200,
     message: degraded ? 'degraded' : 'ok',
     data: {
       status: degraded ? 'degraded' : 'ok',
@@ -269,6 +284,7 @@ app.use('/api/health', (_req: Request, res: Response) => {
         uptimeSec: Math.round(process.uptime()),
         lastBackupAt,
         lastBackupError,
+        backupStale,
       },
     },
   })
@@ -316,6 +332,10 @@ app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
   }
 
   // Express body-parser 解析错误（如 JSON 语法错）也属 4xx
+    // R3 审查 P2：body 超限（entity.too.large/413）原落入通用 500 —— 可重试的客户端错误被报成服务端故障，还污染 5xx 指标
+    if ((error as any).type === 'entity.too.large' || (error as any).statusCode === 413) {
+      return res.status(413).json({ code: 413, message: '请求体过大', data: null });
+    }
   if ((error as any).type === 'entity.parse.failed' || (error as any).statusCode === 400) {
     return res.status(400).json({ code: 400, message: '请求体格式错误', data: null })
   }

@@ -53,7 +53,10 @@ describe('帖子列表筛选参数（死参数修复回归）', () => {
     expect(res.status).toBe(200);
     expect(res.body.code).toBe(200);
     const list = pickList(res.body);
+    // 置顶帖（is_top）按论坛语义强制排在最前，优先级高于时间倒序——
+    // 所以单调性检查排除置顶项，只对「非置顶主体区」断言 created_at 单调不增。
     const times = list
+      .filter((p: any) => !p.isTop)
       .map((p: any) => new Date(p.createdAt || p.created_at || 0).getTime())
       .filter((t: number): t is number => !Number.isNaN(t));
     for (let i = 1; i < times.length; i++) {

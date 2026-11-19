@@ -145,7 +145,7 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
   }
   if (keyword) {
     // FTS5 全文检索：unicode61 分词 + BM25，避免 LIKE 全表扫描；空词回退 LIKE 兜底
-    const ftsQuery = buildFtsQuery(keyword, 8);
+    const ftsQuery = buildFtsQuery(keyword, 24); // R3 审查 P1：同 sections，上限提到 24
     if (ftsQuery && ftsQuery !== '""') {
       where += ` AND p.id IN (SELECT rowid FROM posts_fts WHERE posts_fts MATCH ?)`;
       params.push(ftsQuery);
@@ -260,6 +260,8 @@ router.get('/', authOptional, readLimiter, validate({ query: postSchemas.list })
     `sectionId=${sectionId}`, `keyword=${keyword}`,
     `priceRange=${priceRange}`, `timeRange=${timeRange}`, `subType=${subType}`,
     `direction=${directionApplied}`, `campus=${campus}`,
+    `minPrice=${minPrice ?? ''}`, `maxPrice=${maxPrice ?? ''}`,
+    `search=${searchText}`, `lostOrFound=${lostOrFound}`,
     // authorId 是 WHERE 条件，漏进 key 会让不同作者的主页命中同一份缓存行
     `authorId=${authorId}`,
     // 匿名可见性随查看者身份变化（作者/管理员能看到自己的匿名帖，陌生人不能）。
@@ -363,8 +365,9 @@ router.get('/:id/share-card.png', async (req, res) => {
   }
 });
 
-// 帖子详情
-router.get('/:id', authOptional, (req, res) => {
+// 帖子详情（R3 审查 P2：补读限流——原实现无 readLimiter，脚本循环刷浏览量可无限增长，
+// 且每次详情读取都是一次同步写 UPDATE，热门帖被分享时会串行化所有读者的读路径）
+router.get('/:id', authOptional, readLimiter, (req, res) => {
   const id = Number(req.params.id);
   if (!id) return fail(res, '帖子不存在', 404, 404);
 
@@ -420,11 +423,7 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
   }
 
   // 每日发帖上限校验
-  const todayCount = db.prepare("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND date(created_at) = date('now')").get(req.currentUser!.id) as any;
   const limit = creditScore < 80 ? 3 : 10;
-  if (todayCount.count >= limit) {
-    return fail(res, `今日发帖已达上限(${limit}条)`);
-  }
 
   // 敏感词风险分级：review→人工审核队列(pending_review)；warn→放行但标记 risk_flag；pass→直接过
   const risk = assessRisk(title, content);
@@ -462,21 +461,47 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
     finalExtra.riskFlag = { level: 'warn', hits: risk.hits };
   }
 
-  const result = db.prepare(`
-    INSERT INTO posts (user_id, section_id, title, content, images, is_anonymous, status, extra_fields)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    req.currentUser!.id,
-    sectionId,
-    title.trim(),
-    content,
-    JSON.stringify(imgs),
-    isAnonymous ? 1 : 0,
-    status,
-    JSON.stringify(finalExtra)
-  );
-
-  const postId = result.lastInsertRowid as number;
+  // R3 审查 P2：限额检查 + INSERT posts + 系统消息写入包进单事务（better-sqlite3 同步
+  // 串行化写操作，check 与 insert 之间不再有竞态窗口；消息与帖子同生共死）。
+  let postId: number;
+  try {
+    const outcome = db.transaction(() => {
+      const todayCount = db
+        .prepare("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND date(created_at) = date('now')")
+        .get(req.currentUser!.id) as any;
+      if (todayCount.count >= limit) {
+        return { error: `今日发帖已达上限(${limit}条)` } as const;
+      }
+      const result = db.prepare(`
+        INSERT INTO posts (user_id, section_id, title, content, images, is_anonymous, status, extra_fields)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        req.currentUser!.id,
+        sectionId,
+        title.trim(),
+        content,
+        JSON.stringify(imgs),
+        isAnonymous ? 1 : 0,
+        status,
+        JSON.stringify(finalExtra)
+      );
+      // 系统消息并入同一事务（发帖失败回滚时不残留孤立消息）
+      const msg = status === 'published'
+        ? '您发布的帖子已通过审核并展示'
+        : status === 'pending_review'
+          ? '您发布的帖子内容待人工审核，请耐心等待'
+          : '您发布的帖子正在审核中，请耐心等待';
+      db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
+        req.currentUser!.id, 'system', msg, result.lastInsertRowid
+      );
+      return { id: result.lastInsertRowid as number } as const;
+    })();
+    if ('error' in outcome) return fail(res, String(outcome.error));
+    postId = outcome.id;
+  } catch (err: any) {
+    logger.error('发帖写入失败', { error: err?.message });
+    return fail(res, '发布失败，请稍后重试');
+  }
   cacheInvalidate('posts');
 
   // 多模态图片理解：发布成功后异步分析首图（网关优先，启发式降级），
@@ -506,21 +531,6 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
     } catch (err: any) {
       logger.error('失物招领匹配失败', { error: err?.message });
     }
-  }
-
-  if (status === 'published') {
-    // 发送系统消息
-    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
-      req.currentUser!.id, 'system', '您发布的帖子已通过审核并展示', postId
-    );
-  } else if (status === 'pending_review') {
-    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
-      req.currentUser!.id, 'system', '您发布的帖子内容待人工审核，请耐心等待', postId
-    );
-  } else {
-    db.prepare('INSERT INTO messages (user_id, type, content, related_id) VALUES (?, ?, ?, ?)').run(
-      req.currentUser!.id, 'system', '您发布的帖子正在审核中，请耐心等待', postId
-    );
   }
 
   // 埋点：发帖 + 首次发帖（激活标志，漏斗核心指标）

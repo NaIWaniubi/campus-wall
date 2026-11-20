@@ -907,7 +907,17 @@ async function refreshDigest(): Promise<void> {
       { budgetMs: 100_000, perModelTimeoutMs: 95_000, ignoreBreaker: true } satisfies AiCallOptions
     );
     bumpStats();
-    const line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
+    let line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
+    // R5 审查 P2：成稿里的帖子标题是用户生成内容，直进 LLM 提示词后又原样
+    // 广播进全体订阅者的站内通知——对最终成稿过注入护栏：高危退回规则版摘要，
+    // 中危剥离注入片段后使用，空稿同样退回（避免把独白当播报）
+    const guardLine = inspectInput(line);
+    if (guardLine.level === 'high' || !line.trim()) {
+      digestCache.data = { ...base, offline: true };
+      digestCache.ts = Date.now();
+      return;
+    }
+    if (guardLine.level === 'medium') line = guardLine.sanitized.slice(0, 80);
     digestCache.data = line.length >= 8 ? { ...base, summary: line, offline: false } : { ...base, offline: true };
     digestCache.ts = Date.now();
   } catch (err: any) {

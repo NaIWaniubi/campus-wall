@@ -129,7 +129,7 @@ router.get('/me/favorites', authRequired, (req, res) => {
     id: p.id,
     title: p.title,
     content: p.content,
-    images: JSON.parse(p.images || '[]'),
+    images: safeJsonParse<string[]>(p.images || '[]', [], 'users.favorites.images'),
     isAnonymous: !!p.is_anonymous,
     viewCount: p.view_count,
     likeCount: p.like_count,

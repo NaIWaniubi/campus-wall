@@ -92,7 +92,9 @@ export function dispatchByPeer(senderId: number, toUserId: number, content: stri
   const b = Math.max(senderId, toUserId);
   let conv = db.prepare('SELECT * FROM conversations WHERE user_a_id = ? AND user_b_id = ?').get(a, b) as ConvRow | undefined;
   if (!conv) {
-    db.prepare('INSERT INTO conversations (user_a_id, user_b_id) VALUES (?, ?)').run(a, b);
+    // OR IGNORE：REST 与 WS 双路并发建会话时，普通 INSERT 会撞 UNIQUE 抛错，
+    // IGNORE 后按唯一约束幂等（与会话路由的 INSERT OR IGNORE 同口径）
+    db.prepare('INSERT OR IGNORE INTO conversations (user_a_id, user_b_id) VALUES (?, ?)').run(a, b);
     conv = db.prepare('SELECT * FROM conversations WHERE user_a_id = ? AND user_b_id = ?').get(a, b) as ConvRow;
   }
   return dispatchChatMessage(conv, senderId, content, meta);

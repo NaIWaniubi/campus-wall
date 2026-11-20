@@ -21,13 +21,23 @@ router.post('/subscribe', authRequired, (req, res) => {
   const p256dh = sub?.keys?.p256dh;
   const auth = sub?.keys?.auth;
   if (!endpoint || !p256dh || !auth) return fail(res, '订阅结构不完整（需 endpoint + keys.p256dh + keys.auth）');
+  // R5 审查 P2：原实现对字段长度与字符集零校验——可存任意超长串（或多 MB 垃圾）
+  // 进 push_subscriptions；Push endpoint 应是 https URL，密钥是定长 base64url。
+  if (endpoint.length > 512 || !/^https:\/\//i.test(endpoint)) {
+    return fail(res, 'endpoint 不合法');
+  }
+  const sP256dh = String(p256dh);
+  const sAuth = String(auth);
+  if (sP256dh.length > 128 || sAuth.length > 64 || !/^[A-Za-z0-9_-]+$/.test(sP256dh) || !/^[A-Za-z0-9_-]+$/.test(sAuth)) {
+    return fail(res, '密钥格式不合法');
+  }
   if (!getPublicKey()) return fail(res, '推送未开启（服务端未配置 VAPID）', 501, 501);
-  saveSubscription(req.currentUser!.id, endpoint, String(p256dh), String(auth));
+  saveSubscription(req.currentUser!.id, endpoint, sP256dh, sAuth);
   success(res, { subscribed: true });
 });
 
 router.post('/unsubscribe', authRequired, (req, res) => {
-  const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : '';
+  const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint.slice(0, 512) : '';
   if (!endpoint) return fail(res, '缺少 endpoint');
   // 只能退订自己的订阅：拿到他人 endpoint（日志/共享设备泄漏）不可用来摘掉别人设备
   removeSubscription(endpoint, req.currentUser!.id);

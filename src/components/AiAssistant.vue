@@ -18,6 +18,7 @@ interface ChatMessage {
  guard?: GuardMetaItem // 护栏可解释性（rewritten/redactedCount>0 时展示）
  streaming?: boolean // 正在流式输出中（按纯文本渲染）
  degraded?: boolean // 站内兜底回答（非在线大模型）：UI 展示降级角标
+ welcome?: boolean // 固定欢迎语：不进模型上下文
 }
 
 /** RAG 引用来源（sources SSE 事件载荷） */
@@ -56,6 +57,7 @@ const STORE_KEY = computed(() => `ai-chat-history-${userStore.user?.id ?? 0}`)
 function welcomeMessage(): ChatMessage {
  return {
  role: 'assistant',
+ welcome: true, // 上下文过滤标记：固定问候语不进模型输入
  content:
  '你好，我是校园墙 AI 助手 👋 可以问我平台使用问题（发帖、匿名、信誉分等），也会为你推荐论坛里的相关讨论。',
  }
@@ -94,6 +96,9 @@ async function toggleOpen() {
  if (open.value) {
  void ensureMarkdown()
  scrollToBottom()
+ } else {
+ // R4：关面板即中止流式生成（不烧流量、不把半截回答当完整答案入库）
+ sendController?.abort()
  }
 }
 
@@ -124,6 +129,7 @@ function clearChat() {
 
 onUnmounted(() => {
  if (confirmClearTimer) clearTimeout(confirmClearTimer)
+ sendController?.abort() // 组件卸载即断流，reader.read() 抛 AbortError 走 catch 的中止分支
 })
 
 // ---------- Markdown 渲染 + 论坛引用角标 ----------
@@ -189,14 +195,28 @@ function onContentClick(e: MouseEvent) {
 // ---------- 发送（SSE 流式，失败回退非流式） ----------
 function buildRequestMessages(): { role: 'user' | 'assistant'; content: string }[] {
  return messages.value
- .filter((m) => !m.forums || m.role === 'user') // 欢迎语与降级提示不进上下文
+ // R4：原过滤器注释说「欢迎语与降级提示不进上下文」，实际 !forums 的 assistant 全保留——
+ // 欢迎语每轮都进上下文稀释语义。按契约补排 welcome/degraded。
+ .filter(
+ (m) =>
+ (!m.forums || m.role === 'user') && !(m.role === 'assistant' && (m.welcome || m.degraded)),
+ )
  .slice(-7)
  .map((m) => ({ role: m.role, content: m.content }))
 }
 
+// 发送串行锁与 AbortController（R4 审查 P1/P2）：
+// 原实现 loading 在 await ensureMarkdown（首次动态导入 marked/dompurify）之后才置位，
+// 冷启动窗口内连按两次回车/点两个建议会双发——两个气泡、两条重叠 SSE、半截回答还入库。
+let sending = false
+let sendController: AbortController | null = null
+
 async function send(text?: string) {
+ if (sending) return // 首个 await 之前的同步锁
  const content = (text ?? input.value).trim()
- if (!content || loading.value) return
+ if (!content) return
+ sending = true
+ sendController = new AbortController()
  await ensureMarkdown()
  input.value = ''
  confirmClear.value = false
@@ -218,6 +238,7 @@ async function send(text?: string) {
  'Content-Type': 'application/json',
  },
  body: JSON.stringify({ message: content, history: buildRequestMessages().slice(0, -1) }),
+ signal: sendController.signal,
  })
  httpStatus = resp.status
  if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
@@ -299,7 +320,13 @@ async function send(text?: string) {
  reply.forums = data.forums || []
  reply.sources = data.sources || []
  ok = true
- } catch {
+ } catch (err: any) {
+ // R4：中途中止（关面板/卸载）——不再写兜底文案，也不再发起非流式回退请求
+ if (sendController?.signal.aborted || err?.name === 'AbortError') {
+ ok = true
+ reply.streaming = false
+ return
+ }
  /* 落到统一兜底文案 */
  }
  }
@@ -310,10 +337,15 @@ async function send(text?: string) {
  else reply.content = reply.content || '抱歉，我暂时出了点问题，请稍后再试。'
  }
  } finally {
+ const aborted = sendController?.signal.aborted ?? false
  reply.streaming = false
  loading.value = false
+ sending = false
+ if (!aborted) {
+ // 中止轮的半成品不写历史（否则下次打开看到截断的假完整回答）
  saveHistory()
  scrollToBottom()
+ }
  }
 }
 

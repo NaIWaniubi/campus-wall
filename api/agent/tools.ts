@@ -309,19 +309,31 @@ const LF_MIN_SCORE = 2;
 /** 与 posts 路由规则保持一致：匹配窗口（天） */
 const LF_WINDOW_DAYS = 30;
 
-/** 与 api/routes/ai.ts extractKeywords 同思路：英文词块 + 中文 2 字滑窗 */
+/** 与 api/routes/ai.ts extractKeywords 同思路：英文词块 + 中文 2 字滑窗。
+ * R4 审查 P2：同款英文占满上限修复——英文无独立配额时滑窗无位（matchLostFound 哑火）。
+ */
+const LF_STOP_BIGRAMS = new Set([
+  '可以', '什么', '怎么', '怎样', '如何', '是否', '哪里', '哪个',
+  '知道', '关于', '对于', '问题', '情况', '时候', '现在', '还是',
+  '但是', '而且', '因为', '所以', '如果', '虽然', '已经', '应该',
+  '这样', '那样', '一个', '一些', '的发', '的时', '的时',
+]);
+
 export function extractQuestionKeywords(text: string): string[] {
-  const cleaned = String(text || '').replace(/[\s，。！？、；：,.!?;:~～""''（）()\[\]{}]/g, '');
-  const words = new Set<string>();
+  const cleaned = String(text || '').replace(/[\s，。！？、；：,.!?;:~~\"'""''（）()\[\]{}]/g, '');
+  const englishWords: string[] = [];
   for (const w of String(text || '').match(/[a-zA-Z0-9]{2,}/g) || []) {
-    if (w.length <= 20) words.add(w.toLowerCase());
+    const low = w.toLowerCase();
+    if (!englishWords.includes(low)) englishWords.push(low);
+    if (englishWords.length >= 4) break;
   }
   const chinese = cleaned.replace(/[a-zA-Z0-9]/g, '');
-  for (let i = 0; i + 2 <= chinese.length; i++) {
-    words.add(chinese.slice(i, i + 2));
-    if (words.size >= 8) break;
+  const bigrams: string[] = [];
+  for (let i = 0; i + 2 <= chinese.length && bigrams.length < 8; i++) {
+    const bg = chinese.slice(i, i + 2)!;
+    if (!LF_STOP_BIGRAMS.has(bg) && !bigrams.includes(bg)) bigrams.push(bg);
   }
-  return Array.from(words).slice(0, 8);
+  return [...englishWords, ...bigrams].slice(0, 8);
 }
 
 const matchLostFoundTool: AgentTool = {

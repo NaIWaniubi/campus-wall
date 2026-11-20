@@ -106,6 +106,25 @@ describe('401 续期拦截（HTTP 状态码与业务码双入口）', () => {
     expect(refreshMock).not.toHaveBeenCalled()
     expect(mockStore.logout).toHaveBeenCalledTimes(1)
   })
+
+  // R4 审查 P1：三态契约的第三态——null = 网络无响应（fetch reject），
+  // store 单飞机制明确「不清会话、等重试」。原拦截器把 null 当失败处理，
+  // 一次瞬时断网叠加 token 到期就强制掉线。
+  it('网络异常（null）不销毁会话：拒请求但不清登录态、不跳登录页', async () => {
+    mockStore.refreshAccessToken.mockReset().mockResolvedValue(null as unknown as boolean)
+    const { adapter } = makeAdapter(['401-http'])
+    request.defaults.adapter = adapter
+
+    let caught: any
+    try {
+      await request.get('/posts')
+    } catch (e) {
+      caught = e
+    }
+    expect(String(caught?.message)).toContain('网络异常')
+    expect(mockStore.logout).not.toHaveBeenCalled()
+    expect(pushSpy).not.toHaveBeenCalled()
+  })
 })
 // ---- fetchWithAuth（SSE 流式接口专用）----
 import { fetchWithAuth } from '../request'

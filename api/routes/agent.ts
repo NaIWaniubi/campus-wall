@@ -56,6 +56,15 @@ router.post('/assist/stream', authRequired, aiLimiter, async (req: Request, res:
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
+  // R4 审查 P2：SSE 中途断开不取消 handler——LLM 规划与合成照常烧预算，
+  // 收尾事件被 Node 静默丢弃。这里检查连接状态，断开即收尾退出。
+  const streamClosed = () => req.aborted === true || res.destroyed === true;
+  if (streamClosed()) {
+    try { res.end(); } catch { /* 已关闭 */ }
+    return;
+  }
+
+
   const send = (event: string, data: any) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
@@ -78,12 +87,15 @@ router.post('/assist/stream', authRequired, aiLimiter, async (req: Request, res:
       });
     });
 
-    // 3) 合成回答
-    const { text, mode } = await composeAnswer(question, evidence, usable);
-    send('answer', { text, mode });
-
-    // 4) 收尾
-    send('end', { ok: true });
+    // 3) 合成回答（R4 审查 P1）：compose 同样吃「清洗后」的问题——
+    // 原实现传原始 question，medium 级注入剥离只发生在 planner 一侧，
+    // composer 的 user message 仍带着注入片段进模型上下文。
+    const { text, mode } = await composeAnswer(safeQuestion, evidence, usable);
+    // 4) 收尾（客户端已断开则不再写）
+    if (!streamClosed()) {
+      send('answer', { text, mode });
+      send('end', { ok: true });
+    }
   } catch (err: any) {
     // 兜底错误通道：计划/执行全链异常时仍给前端一个可渲染的 error 事件
     logger.error('Agent 流式处理失败', { error: err?.message, question: question.slice(0, 50) });

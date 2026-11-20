@@ -3,7 +3,7 @@
  * 消息中心：顶层「通知 / 私信」双 Tab
  * 通知：Tab切换、列表、标记已读；私信：会话列表 + 同页分栏 ChatPanel
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, MessageCircle, Heart, Bell, CheckCheck, MapPin, Newspaper } from '@lucide/vue'
 import { messageApi, conversationApi } from '@/utils/api'
@@ -113,8 +113,8 @@ const convs = ref<any[]>([])
 const convsLoading = ref(false)
 const convsLoaded = ref(false)
 const activeConvId = ref<number | null>(null)
-// 从帖子详情跳转过来时定位到指定会话
-const pendingConvId = Number(route.query.conv) || null
+// 从帖子详情跳转过来时定位到指定会话：live 读 route.query（不快照，
+// R4 审查 P1：同组件路由复用时快照永远停在旧 conv，定位失效）
 
 const activeConv = computed(() => convs.value.find((c) => c.id === activeConvId.value) || null)
 const chatUnread = computed(() => convs.value.reduce((s, c) => s + (c.unread || 0), 0))
@@ -125,7 +125,8 @@ async function loadConvs(silent = false) {
   try {
     const res: any = await conversationApi.list()
     convs.value = res.data || []
-    // 定位指定会话（来自 PostDetailPage 私信按钮）
+    // 定位指定会话（来自 PostDetailPage 私信按钮 / 通知点击跳转）——live 读 query
+    const pendingConvId = Number(route.query.conv) || null
     if (pendingConvId && convs.value.some((c) => c.id === pendingConvId)) {
       activeConvId.value = pendingConvId
     }
@@ -188,6 +189,32 @@ onMounted(() => {
   load()
   if (view.value === 'chat') loadConvs()
 })
+
+/**
+ * R4 审查 P1：RouterView 无 :key，同路径换 query（通知里点「私信」→
+ * /message?tab=chat&conversationId=N）复用同一实例，setup 期的 view/pendingConvId
+ * 快照不更新 → 点击看似无效。watch query 变化驱动 view 切换与会话定位。
+ */
+watch(
+  () => [route.query.tab as string, route.query.conv as string],
+  ([tab], _prev) => {
+    const targetView = tab === 'chat' ? 'chat' : 'notice'
+    if (targetView !== view.value) {
+      view.value = targetView
+      if (targetView === 'chat') void loadConvs()
+      return
+    }
+    // 已在聊天视图但 conv 变了（如从 A 会话的通知跳到 B 会话）：重载列表并定位
+    const convQuery = Number(route.query.conv) || null
+    if (targetView === 'chat' && convQuery && !convs.value.some((c) => c.id === convQuery)) {
+      void loadConvs().then(() => {
+        if (convs.value.some((c) => c.id === convQuery)) activeConvId.value = convQuery
+      })
+    } else if (targetView === 'chat' && convs.value.some((c) => c.id === convQuery)) {
+      activeConvId.value = convQuery
+    }
+  },
+)
 onUnmounted(() => {
   if (convRefreshTimer !== null) {
     clearTimeout(convRefreshTimer)

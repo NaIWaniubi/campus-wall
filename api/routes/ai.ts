@@ -104,23 +104,31 @@ function loadKnowledge(): string {
  * 从问题中提取论坛检索关键词：
  * 英文/数字取连续词块；中文按 2 字滑窗切分（无分词依赖，召回优先，靠命中数排序去噪）
  */
+// R4 审查 P2：与 rag/retrieve.ts 同款修复——原实现英文词块无独立上限，
+// 一句多英文词（如 "How to reset my iPad password settings quickly"）能占满全部 8 个词位，
+// 中文滑窗一位都进不去 → 论坛推荐的关键词路直接哑火。
+const STOP_BIGRAMS = new Set([
+  '可以', '什么', '怎么', '怎样', '如何', '是否', '哪里', '哪个',
+  '知道', '关于', '对于', '问题', '情况', '时候', '现在', '还是',
+  '但是', '而且', '因为', '所以', '如果', '虽然', '已经', '应该',
+  '这样', '那样', '一个', '一些', '的发', '的时', '的时',
+]);
+
 function extractKeywords(question: string): string[] {
-  const cleaned = question.replace(/[\s，。！？、；：,.!?;:~～"'"'（）()\[\]{}]/g, '');
-  const words = new Set<string>();
-
-  // ASCII 词块
+  const cleaned = question.replace(/[\s，。！？、；：,.!?;:~~\"'""''（）()\[\]{}]/g, '');
+  const englishWords: string[] = [];
   for (const w of question.match(/[a-zA-Z0-9]{2,}/g) || []) {
-    if (w.length <= 20) words.add(w.toLowerCase());
+    const low = w.toLowerCase();
+    if (!englishWords.includes(low)) englishWords.push(low);
+    if (englishWords.length >= 4) break;
   }
-
-  // 中文 2 字滑窗
   const chinese = cleaned.replace(/[a-zA-Z0-9]/g, '');
-  for (let i = 0; i + 2 <= chinese.length; i++) {
-    words.add(chinese.slice(i, i + 2));
-    if (words.size >= 8) break;
+  const bigrams: string[] = [];
+  for (let i = 0; i + 2 <= chinese.length && bigrams.length < 8; i++) {
+    const bg = chinese.slice(i, i + 2)!;
+    if (!STOP_BIGRAMS.has(bg) && !bigrams.includes(bg)) bigrams.push(bg);
   }
-
-  return Array.from(words).slice(0, 8);
+  return [...englishWords, ...bigrams].slice(0, 8);
 }
 
 interface ForumSource {
@@ -432,6 +440,16 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
     return res.end();
   }
 
+  // R4 审查 P2：SSE 客户端中途断开时 Node 不会取消 handler——LLM 生成照常跑完
+  // （最坏白烧一次最重的调用），写出的增量也被静默丢弃。这里在中途检查连接状态：
+  // 断开即跳过收尾事件，flushHeaders 前已发出的内容无法撤回但不产生新写入。
+  const streamClosed = () => req.aborted === true || res.destroyed === true;
+
+  if (streamClosed()) {
+    try { res.end(); } catch { /* 已关闭 */ }
+    return;
+  }
+
   try {
     const messages = buildMessages(cleanMessage, history, loadKnowledge(), forums, ragSources);
     // 流式输出需要整体缓冲后过护栏（幻觉红线与风险改写按句处理，流式逐字改写会造成前后矛盾）
@@ -444,10 +462,12 @@ router.post('/chat/stream', authRequired, aiLimiter, async (req: Request, res: R
       1024,
       currentModels(true)
     );
-    bumpStats();
-    const reply = guardOutput(full, ragSources, g.meta, forums);
-    send('delta', { t: reply });
-    send('done', { ok: true, guard: g.meta });
+    if (!streamClosed()) {
+      bumpStats();
+      const reply = guardOutput(full, ragSources, g.meta, forums);
+      send('delta', { t: reply });
+      send('done', { ok: true, guard: g.meta });
+    }
   } catch (err: any) {
     logger.error('AI 流式对话失败', { error: err?.message });
     // 降级到站内兜底同样带标识
@@ -733,8 +753,12 @@ router.post('/summarize', authRequired, aiLimiter, async (req: Request, res: Res
   const postId = req.body?.postId ? Number(req.body.postId) : null;
 
   if ((!content || !title) && postId) {
+    // R4 审查 P2：原查询不过滤封禁作者——封禁用户的帖子仍可被划重点引用，
+    // 与列表/详情/RAG 三处的封禁口径不一致。
     const row = db
-      .prepare('SELECT title, content FROM posts WHERE id = ? AND status = \'published\'')
+      .prepare(
+        "SELECT p.title, p.content FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = ? AND p.status = 'published' AND u.status != 'banned'"
+      )
       .get(postId) as { title: string; content: string } | undefined;
     if (row) {
       title = title || row.title;

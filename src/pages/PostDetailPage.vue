@@ -2,7 +2,7 @@
 /**
  * 帖子详情页：内容展示、互动、评论楼中楼、举报、删除
  */
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, MoreHorizontal, Heart, MessageCircle, Bookmark, Flag, Eye, Trash2, Share2, X, Send, Flame, Loader2, ChevronLeft, ChevronRight, MessagesSquare, UserPlus, UserCheck, Star, Sparkles, ShieldAlert, ChevronDown, ImageIcon } from '@lucide/vue'
 import { useUserStore } from '@/stores/user'
@@ -598,17 +598,49 @@ function share() {
   }
 }
 
-onMounted(async () => {
+/** 全量加载：fetchPost 是主链，其余四类挂载或切换时按需跟随 */
+async function loadAll() {
+  loading.value = true
   await fetchPost()
   // 帖子不存在/加载失败时短路：后续四类请求只会产生无意义的 404 与 /NaN 噪声（R2 真机审计）
   if (!post.value) {
-    document.addEventListener('click', closeMoreMenu)
+    loading.value = false
     return
   }
   fetchComments()
   await fetchMatches()
   await fetchRadar()
   await fetchOffers()
+  loading.value = false
+}
+
+/**
+ * R4 审查 P1：App.vue 的 RouterView 无 :key，/post/:id → /post/:id（雷达卡片、
+ * 可能相关、消息跳转全是 router.push 同路径不同参数）复用同一组件实例，
+ * onMounted 不重跑 → 新 id 仍显示旧帖内容，点赞/删除/回复全部作用于错误帖子。
+ * 补 watch 路由参数切换：复位状态并重载（与 SectionPage 的 watch(sectionId) 同范式）。
+ */
+function resetForNewPost() {
+  post.value = null
+  comments.value = []
+  matches.value = []
+  radarMatches.value = []
+  offersState.value = { isSeller: false, hasAccepted: false, myOffer: null, offers: [] }
+  commentText.value = ''
+  replyTarget.value = null
+  expandedReplies.value = new Set()
+  showMoreMenu.value = false
+  showPoster.value = false
+  showReportSheet.value = false
+  showDeleteDialog.value = false
+  previewIndex.value = -1
+  aiSummary.value = null
+  aiSummaryOpen.value = false
+  matchesHighlighted.value = false
+}
+
+onMounted(async () => {
+  await loadAll()
   document.addEventListener('click', closeMoreMenu)
   // 匹配通知跳入：滚动定位到「可能相关」卡片并短暂高亮（自动展开候选列表）
   if (route.query.showMatches === '1' && matches.value.length) {
@@ -619,6 +651,23 @@ onMounted(async () => {
     })
   }
 })
+
+watch(
+  () => route.params.id,
+  (nid, oldId) => {
+    if (String(nid ?? '') === String(oldId ?? '')) return
+    resetForNewPost()
+    void loadAll()
+    // query 侧效果随新 id 重放（?showMatches=1 通知跳入）
+    if (route.query.showMatches === '1') {
+      nextTick(() => {
+        matchesCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        matchesHighlighted.value = true
+        setTimeout(() => (matchesHighlighted.value = false), 2500)
+      })
+    }
+  },
+)
 onUnmounted(() => {
   document.removeEventListener('click', closeMoreMenu)
 })

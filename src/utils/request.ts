@@ -37,7 +37,15 @@ async function handleUnauthorized(config: any, message?: string): Promise<any> {
   if (config && !config.__skipAuthRefresh && !config.__retriedAfterRefresh) {
     config.__retriedAfterRefresh = true
     const ok = await tryRefreshOnce()
-    if (ok) return request(config)
+    if (ok === true) return request(config)
+    // R4 审查 P1：续期三态契约要求 null（网络无响应）不得清会话——
+    // 原实现把 null 落到下面的登出分支，一次瞬时断网叠加 token 到期就强制掉线，
+    // 恰好击穿了 store 单飞/三态机制要防的可用性事故。
+    if (ok === null) {
+      showToast('网络异常，请稍后重试', 'error')
+      return Promise.reject(new Error('网络异常'))
+    }
+    // ok === false：服务端明确拒绝 → 继续走登出流程
   }
   // 在清空登录态之前，先快照原始位置（pathname + search + hash），便于登录后回跳
   const rawLocation =

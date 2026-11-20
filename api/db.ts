@@ -659,8 +659,6 @@ db.exec(`
 
 /**
  * 管理操作审计日志表（admin-security P2-12）
- * - 字段对齐 kysely types.ts 的 AuditLogTable（DB 抽象层用）
- * - 同步建在 kysely migration 0002_admin_logs.ts，供 PG 路径使用
  * - detail 存 JSON 字符串（action 相关上下文：reason / duration / score 等）
  */
 db.exec(`

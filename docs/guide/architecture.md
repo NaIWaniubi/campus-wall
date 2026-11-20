@@ -22,7 +22,7 @@ docs/         文档站（VitePress）
 | `api/utils` | jwt、敏感词、推送、缓存等工具 |
 | `api/ws` | WebSocket 层（hub / server / handlers） |
 | `api/storage` | 存储抽象（local / s3 / factory） |
-| `api/db` | 数据库层 + migrations |
+| `api/db` | 数据库层（better-sqlite3，api/db.ts 为唯一事实源） |
 
 ## 请求链路
 

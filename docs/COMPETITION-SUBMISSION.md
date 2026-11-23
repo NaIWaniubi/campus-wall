@@ -22,7 +22,7 @@ V3 起它不再是「又一个绿白校园墙」：视觉换成**紫→品红→
 - CI 六道门（GitHub Actions，master 常绿）：静态门（含文档死链）→ 雷达算法门 → 构建 + 体积 gzip 预算门 → 契约压测门（24 并发零 5xx、p95<800ms，实测 ~2409 req/s / p95 5ms）→ 浏览器 E2E 门（15/15）→ Lighthouse 门（移动端 3 次中位数 perf 95/a11y 95/bp 100/seo 100）
 - 前端产物：Vue3 + Vite 打包，含 ECharts 图表懒加载、虚拟列表（`@tanstack/vue-virtual`）
 - 后端：Express 5 + SQLite（FTS5 中文二元分词全文检索）+ WebSocket 实时私信
-- 部署：单进程 Node 服务，`bash start.sh` 即可跑；**空数据目录冷启动 → 自动建库灌种子 → 登录 / 发帖 / 雷达 / 缩略图 / 今日简报 / AI 成稿 / AI 划重点** 全链路在 Ubuntu 24.04.1 + Node 24.22.2 复验 0 个 5xx（`scripts/verify-stage-wsl.sh`）
+- 部署：三种等价形态——**源码 Docker**（仓库根 `Dockerfile` 多阶段构建 + `docker-compose.yml`，评委最短路径「clone → docker compose up」）、托管平台（`.zcode-site/stage/` 部署包，node:sqlite 变体），PM2/Caddy VPS 运营级部署。**空数据目录冷启动 → 自动建库灌种子 → 登录 / 发帖 / 雷达 / 缩略图 / 今日简报 / AI 成稿 / AI 划重点** 全链路在 Ubuntu 24.04.1 + Node 24.22.2 复验 0 个 5xx（`scripts/verify-stage-wsl.sh`）；Docker 镜像构建与容器冒烟由 CI 的 docker job 实测把关
 
 ## 4. 评委体验路径（建议 90 秒）
 
@@ -49,7 +49,7 @@ V3 起它不再是「又一个绿白校园墙」：视觉换成**紫→品红→
 - 生产日志默认只打 stdout（容器磁盘有限时不再写满 `logs/`）；空 `exceptionHandlers` 会吞掉启动异常的坑一并修掉
 - 上传文件改用流式读取（`res.sendFile` 在含非 ASCII 的 Windows 路径上会误判 404）
 - 桌面端补右栏（公告 / 热门搜索 / 板块直达 / 品牌卡），搜索页支持 `/search?keyword=` 直达
-- 新增 `start.sh` + `render.yaml` + `Dockerfile`，同一份产物可部署到 ZCode Sites / Render / 任意容器平台
+- 新增 `start.sh` + `render.yaml` + `.zcode-site/deploy/Dockerfile`（托管平台部署包）与仓库根 `Dockerfile` + `.dockerignore` + `docker-compose.yml`（源码级容器交付），同一套行为可部署到 ZCode Sites / Render / Docker Compose / 任意容器平台
 
 ## 7. 界面：原生小程序骨架 → V3 多巴胺青春体系（彻底去绿白）
 

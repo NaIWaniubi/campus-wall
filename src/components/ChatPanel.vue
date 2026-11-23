@@ -257,7 +257,7 @@ onUnmounted(() => {
       </div>
       <template v-else>
         <EmptyState v-if="!messages.length" text="还没有消息，打个招呼吧" />
-        <div v-for="m in messages" :key="m.id"
+        <div v-for="m in messages" :key="m.pendingId || m.id"
           class="flex items-end gap-2" :class="m.isMine ? 'justify-end' : 'justify-start'">
           <p v-if="m.createdAt && !m.isMine" class="text-[10px] flex-shrink-0" style="color: var(--ink-mute)">{{ formatTime(m.createdAt) }}</p>
           <div class="max-w-[70%] px-3 py-2 rounded-2xl text-sm leading-relaxed break-words whitespace-pre-wrap"

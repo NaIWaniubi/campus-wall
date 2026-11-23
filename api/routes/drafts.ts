@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { success, fail } from '../utils/response.js';
 import { draftLimiter } from '../middleware/rateLimit.js';
+import { safeJsonParse } from '../utils/logger.js';
 
 const router = Router();
 
@@ -29,9 +30,9 @@ router.get('/', authRequired, (req, res) => {
     sectionIcon: d.section_icon,
     title: d.title,
     content: d.content,
-    images: JSON.parse(d.images || '[]'),
+    images: safeJsonParse<string[]>(d.images || '[]', [], 'draftList.images'),
     isAnonymous: !!d.is_anonymous,
-    extraFields: JSON.parse(d.extra_fields || '{}'),
+    extraFields: safeJsonParse<Record<string, unknown>>(d.extra_fields || '{}', {}, 'draftList.extraFields'),
     createdAt: d.created_at ? new Date(d.created_at).toISOString() : d.created_at,
   }));
   success(res, list);

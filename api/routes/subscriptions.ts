@@ -27,7 +27,9 @@ router.post('/:sectionId', authRequired, (req, res) => {
     db.prepare('DELETE FROM subscriptions WHERE id = ?').run(existing.id);
     return success(res, { subscribed: false }, '已取消订阅');
   }
-  db.prepare('INSERT INTO subscriptions (user_id, section_id) VALUES (?, ?)').run(userId, sectionId);
+  // R6 审查 P2：check-then-insert 双击并发会撞 UNIQUE(user_id, section_id) 冒泡 500；
+  // OR IGNORE 按唯一约束幂等（并发下已存在即视为订阅成功）
+  db.prepare('INSERT OR IGNORE INTO subscriptions (user_id, section_id) VALUES (?, ?)').run(userId, sectionId);
   success(res, { subscribed: true }, '订阅成功');
 });
 

@@ -29,7 +29,9 @@ router.post('/:id/follow', authRequired, followLimiter, (req, res) => {
     db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(me, targetId);
     following = false;
   } else {
-    db.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(me, targetId);
+    // R6 审查 P2：并发双击会撞 PK(follower_id, following_id) 冒泡 500；
+    // OR IGNORE 按主键幂等（并发下已关注即视为成功）
+    db.prepare('INSERT OR IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)').run(me, targetId);
     following = true;
   }
 

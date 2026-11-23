@@ -9,7 +9,7 @@ import { authRequired } from '../middleware/auth.js';
 import { success, fail, unauthorized, forbidden, toInt } from '../utils/response.js';
 import { cacheInvalidate } from '../utils/cache.js';
 import { validate, adminSchemas, commonSchemas } from '../utils/validation.js';
-import { logger } from '../utils/logger.js';
+import { logger, safeJsonParse } from '../utils/logger.js';
 import { growthMetrics } from '../utils/events.js';
 
 const router = Router();
@@ -221,7 +221,7 @@ router.get('/posts', sectionAllowed, (req, res) => {
     id: p.id,
     title: p.title,
     content: p.content,
-    images: JSON.parse(p.images || '[]'),
+    images: safeJsonParse<string[]>(p.images || '[]', [], 'adminAuditList.images'),
     isAnonymous: !!p.is_anonymous,
     status: p.status,
     isTop: !!p.is_top,

@@ -21,6 +21,15 @@ function creditDelta(rating: number): number {
   return 0;
 }
 
+/** extra_fields 容错读取：库内坏行（历史写入/迁移残留）不能让成交/出价/互评整链 500 */
+function readPostExtra(raw: string | null | undefined): Record<string, unknown> {
+  try {
+    return JSON.parse(String(raw || '{}')) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 function getPost(id: number): any {
   return db.prepare(
     `SELECT p.id, p.user_id, p.title, p.status, p.extra_fields, s.name AS section_name
@@ -47,7 +56,7 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
   // offers 端点显式要求 published，这里对齐同一门槛。
   if (post.status !== 'published') return fail(res, '帖子不可见或未过审，无法成交', 404, 404);
 
-  const extra = JSON.parse(post.extra_fields || '{}');
+  const extra = readPostExtra(post.extra_fields);
   if (extra.soldAt) return fail(res, '该交易已标记完成');
   extra.soldAt = new Date().toISOString();
 
@@ -60,19 +69,31 @@ router.post('/trades/:postId/complete', authRequired, (req, res) => {
     extra.soldTo = buyerId;
   }
 
-  db.prepare('UPDATE posts SET extra_fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
-    JSON.stringify(extra), postId
-  );
+  // R6 审查 P2：posts 与 trade_offers 两步写是两个 autocommit 语句——进程在两者
+  // 之间被杀（断电/部署重启）会留下撕裂态（soldAt 已标、出价没收口 completed）。
+  // 包进单事务保证原子；事务内重查 soldAt 兼做多实例部署的纵深防御。
+  const outcome: { soldAt: string; soldTo: number | null } | null = db.transaction(() => {
+    const freshRow = getPost(postId);
+    if (!freshRow) throw new Error('POST_MISSING');
+    const freshExtra = readPostExtra(freshRow.extra_fields);
+    if (freshExtra.soldAt) return null;
+    freshExtra.soldAt = new Date().toISOString();
+    if (buyerId) freshExtra.soldTo = buyerId;
+    db.prepare('UPDATE posts SET extra_fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(JSON.stringify(freshExtra), postId);
+    // 已锁定的意向出价同步置为已完成（撮合闭环收口）
+    db.prepare(
+      "UPDATE trade_offers SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'accepted'"
+    ).run(postId);
+    return { soldAt: freshExtra.soldAt as string, soldTo: (freshExtra.soldTo as number) ?? null };
+  })();
+
+  if (!outcome) return fail(res, '该交易已标记完成');
   cacheInvalidate('posts'); // extra_fields 影响列表价格排序与筛选
 
-  // 已锁定的意向出价同步置为已完成（撮合闭环收口）
-  db.prepare(
-    "UPDATE trade_offers SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE post_id = ? AND status = 'accepted'"
-  ).run(postId);
-
-  trackEvent(req.currentUser!.id, 'trade_complete', postId, { soldTo: extra.soldTo ?? null });
+  trackEvent(req.currentUser!.id, 'trade_complete', postId, { soldTo: outcome.soldTo });
   touchActive(req.currentUser!.id);
-  success(res, { postId, soldAt: extra.soldAt, soldTo: extra.soldTo ?? null }, '交易已完成');
+  success(res, { postId, soldAt: outcome.soldAt, soldTo: outcome.soldTo }, '交易已完成');
 });
 
 // 当前登录用户对某帖的交易评价状态：是否已评 / 卖家登记的买家
@@ -84,7 +105,7 @@ router.get('/trades/:postId/my-rating', authRequired, (req, res) => {
   const row = db.prepare('SELECT rating FROM trade_ratings WHERE post_id = ? AND rater_id = ?').get(
     postId, req.currentUser!.id
   ) as any;
-  const extra = JSON.parse(post.extra_fields || '{}');
+  const extra = readPostExtra(post.extra_fields);
 
   success(res, {
     hasRated: !!row,
@@ -105,7 +126,7 @@ router.post('/trades/:postId/rate', authRequired, (req, res) => {
   if (!isTradeSection(post.section_name)) return fail(res, '仅二手交易板块支持互评');
 
   // 仅已标记完成的交易可评价
-  const extra = JSON.parse(post.extra_fields || '{}');
+  const extra = readPostExtra(post.extra_fields);
   if (!extra.soldAt) return fail(res, '交易完成后才能评价');
 
   // 评价对象必须是交易对手方：卖家只能评登记的买家，买家只能评卖家。
@@ -247,7 +268,7 @@ router.post('/trades/:postId/offers', authRequired, (req, res) => {
   if (post.user_id === req.currentUser!.id) return fail(res, '不能对自己的帖子出价');
   if (!isTradeSection(post.section_name)) return fail(res, '仅二手交易板块支持意向出价');
 
-  const extra = JSON.parse(post.extra_fields || '{}');
+  const extra = readPostExtra(post.extra_fields);
   if (extra.soldAt) return fail(res, '该物品已售出');
 
   const price = Number(req.body?.offerPrice);

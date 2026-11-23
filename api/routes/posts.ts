@@ -591,7 +591,7 @@ router.put('/:id', authRequired, validate({ params: commonSchemas.id, body: post
   // extraFields 合并语义：请求键（过白名单后）覆盖库中现有键，未传的现有键保留
   // （否则编辑漏带 direction 等扩展键会被整体抹除，帖子从对应筛选 tab 消失）
   const sanitizedExtra = sanitizeExtraFields(extraFields);
-  const existingExtra = JSON.parse(post.extra_fields || '{}');
+  const existingExtra = (() => { try { return JSON.parse(post.extra_fields || '{}'); } catch { return {}; } })();
   const finalExtra = mergeExtraFields(existingExtra, sanitizedExtra);
   // 风险标记跟随最新内容重建（白名单会剥离旧标记）
   if (risk.level === 'warn') {

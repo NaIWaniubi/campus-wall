@@ -161,6 +161,51 @@ describe('撮合引擎与意向出价闭环 · 集成', () => {
     expect(finalStatuses[offerB.body.data.id]).toBe('completed');
   });
 
+  // R6 审查：单进程 better-sqlite3 全同步路径，双击并发会被事件循环自然串行化，
+  // 但「UPDATE posts」与「UPDATE trade_offers」两个 autocommit 语句之间进程被杀
+  // （断电/OOM/部署重启）会留下撕裂态：soldAt 已标、出价没收口为 completed。
+  // 修复：两写包进单事务（原子）+ 事务内重查（多实例部署的纵深防御）。
+  it('重复标记交易完成被拒（事务内重查，R6 原子性守卫）', async () => {
+    const tradeSection = db.prepare("SELECT id FROM sections WHERE name LIKE '%二手%'").get() as any;
+    const post = createPost(seller, tradeSection.id, `重复成交守卫 ${TAG}`, `${TAG}，标价30`);
+    await request(app)
+      .post(`/api/trades/${post}/offers`)
+      .set('Authorization', auth(buyerA))
+      .send({ offerPrice: 28 });
+
+    const first = await request(app)
+      .post(`/api/trades/${post}/complete`)
+      .set('Authorization', auth(seller))
+      .send({});
+    expect(first.status).toBe(200);
+    expect(first.body.code).toBe(200);
+
+    const second = await request(app)
+      .post(`/api/trades/${post}/complete`)
+      .set('Authorization', auth(seller))
+      .send({ buyerId: buyerB });
+    expect(second.body.code).toBe(400);
+    expect(String(second.body.message)).toContain('已标记完成');
+  });
+
+  // R6 审查：并发双 complete（单进程下事件循环串行化到 handler 粒度，事务重查
+  // 在两种执行序下都恰好一成一败；多实例部署下事务内重查同样防双过闸）。
+  // 同时断言成功侧 soldAt 与出价 completed 同事务落库，读回一致。
+  it('并发双 complete 只生效一次（事务内重查，R6 原子性守卫）', async () => {
+    const tradeSection = db.prepare("SELECT id FROM sections WHERE name LIKE '%二手%'").get() as any;
+    const post = createPost(seller, tradeSection.id, `并发成交守卫 ${TAG}`, `${TAG}，标价30`);
+    const [a, b] = await Promise.all([
+      request(app).post(`/api/trades/${post}/complete`).set('Authorization', auth(seller)).send({}),
+      request(app).post(`/api/trades/${post}/complete`).set('Authorization', auth(seller)).send({}),
+    ]);
+    const codes = [a.body.code, b.body.code].sort();
+    expect(codes).toEqual([200, 400]);
+    const mine: any = await request(app)
+      .get(`/api/trades/${post}/my-rating`)
+      .set('Authorization', auth(seller));
+    expect(mine.body.data.isSold).toBe(true);
+  });
+
   it('买家可取消待确认出价，卖家可拒绝出价', async () => {
     const tradeSection = db.prepare("SELECT id FROM sections WHERE name LIKE '%二手%'").get() as any;
     const post1 = createPost(seller, tradeSection.id, `出一本考研数学 ${TAG}`, `${TAG}，标价20`);

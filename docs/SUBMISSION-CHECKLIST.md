@@ -23,14 +23,14 @@
 | 4 | 截图素材 | `captures/v5/`（21 张）+ `captures/v6/`（4 张） | ✅ 0 控制台错误 |
 | 5 | 公开访问链接 | Qoder Sites 部署（提示词已给） | ⏳ 部署后回填到材料 §4 与 §演示 |
 | 6 | 演示账号 | `23770001 / demo1234`、`admin / admin123` | ✅ 首启自动灌种子 |
-| 7 | 工程证据 | 测试 475 / E2E 16（含路由复用负向对照） / CI 四 job 全绿 / 雷达门 / AI 护栏 51/51 / RAG 检索门 recall@5=1.000 | ✅ 全部可复现（命令见材料 §3） |
+| 7 | 工程证据 | 测试 477 / E2E 16（含路由复用负向对照） / CI 四 job 全绿 / 雷达门 / AI 护栏 51/51 / RAG 检索门 recall@5=1.000 | ✅ 全部可复现（命令见材料 §3） |
 | 8 | 源码与部署说明 | 仓库 master + `docs/DEPLOY.md`（含 VPS 运营级部署 §3） | ✅ |
 
 ## C. 提交前 60 秒自查
 
 ```bash
 cd E:\校园墙
-npm test                # 期望 475 passed
+npm test                # 期望 477 passed
 npm run lint            # 期望 0 错误
 npm run check           # 期望 0 错误
 npx playwright test     # 期望 15 passed

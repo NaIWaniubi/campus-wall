@@ -1,0 +1,31 @@
+# Docker 构建上下文裁剪（docker 不吃 .gitignore，COPY . . 会照单全收）
+node_modules
+**/node_modules
+.git
+.github
+.zcode-site
+docs/.vitepress/cache
+docs/.vitepress/dist
+test-results
+playwright-report
+playwright/.cache
+
+# 运行期数据 / 密钥，绝不烤进镜像
+api/*.db
+api/*.db-shm
+api/*.db-wal
+api/backups
+uploads
+backups
+data
+tmp
+*.log
+.env
+.env.*
+!.env.example
+
+# 本地演示残留
+api/demo-assets
+scripts/probe*.ts
+.DS_Store
+Thumbs.db

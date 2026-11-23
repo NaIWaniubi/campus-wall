@@ -3,7 +3,34 @@
 > 目标：把「校园墙」变成一个评委/用户能直接点开的网址。
 > 部署包已构建并验证完成，位于 `.zcode-site/stage/`（前端产物 + 打包后的 Node 服务 + linux x64 依赖）。
 
-## 0. 部署包现状（已验收）
+## 0. Docker 一键启动（源码最短路径）
+
+容器化交付物位于仓库根：`Dockerfile`（多阶段：生产依赖 → 前端构建 → 运行时）+ `.dockerignore` + `docker-compose.yml`。构建上下文就是仓库根，**不需要预装任何东西**（linux x64 原生模块在镜像内编译）。
+
+```bash
+# 首次（一次）：
+echo "JWT_SECRET=$(openssl rand -hex 32)" > .env   # ≥32 字符；compose 自动读项目根 .env
+# （可选）覆盖超管首启口令：在 .env 加 ADMIN_INITIAL_PASSWORD=你的强口令
+
+# 起来：
+docker compose up -d --build
+# 浏览器打开 http://localhost:3000 —— SPA 与 API 同端口同源，空库首启自动建表+建超管
+
+# 验证（容器冒烟）：
+curl -s http://localhost:3000/api/health        # 200 且 db.ok=true
+curl -s http://localhost:3000/ | head -c 200   # 首页 HTML
+```
+
+| 项 | 说明 |
+|---|---|
+| 数据持久化 | `./data:/data`（campus.db / uploads / backups），重启不丢；重置演示数据：`docker compose down && rm ./data/campus.db*` 后重来 |
+| 健康探活 | `/api/health`，degraded（storage 故障 / 备份停摆）回 **503**——有意的，让编排介入而不是假装健康 |
+| 超管账号 | 由 `ADMIN_INITIAL_PASSWORD` 首启引导（默认 demo-admin-2026，正式部署必须覆盖） |
+| CJK 字体 | 镜像内置 fonts-noto-cjk——分享卡片图（sharp SVG 文字）不出方块 |
+| Web Push | VAPID 未配置时静默跳过，不影响其余功能 |
+| 与部署包差异 | 部署包 `.zcode-site/stage/` 用 node:sqlite（托管平台零原生依赖变体）；Docker 走仓库源码 better-sqlite3，两条链路口径一致、行为对齐 |
+
+## 1. 部署包现状（已验收）
 
 | 项 | 结果 |
 |---|---|
@@ -16,7 +43,7 @@
 | 验证环境 | **Ubuntu 24.04.1 + Node 24.22.2**（WSL2）：空目录冷启动 → 建库灌种子 → 登录 / 发帖 / 雷达 / 上传缩略图 / **今日简报 / AI 成稿 / AI 划重点** 全链路 200，**0 个 5xx** |
 | 复验方式 | `wsl -e bash -lc 'bash /mnt/e/校园墙/scripts/verify-stage-wsl.sh'`（拷到 ext4 后跑，脚本自带 health/5xx 断言） |
 
-## 1. 本机直接看（零配置，最快）
+## 2. 本机直接看（零配置，最快）
 
 ```bash
 cd E:\校园墙
@@ -38,7 +65,7 @@ V3 三个 AI 入口的自测顺序（都无需真模型）：
 2. 任意帖子 → 「AI 划重点」→ 3 条要点（风险帖会额外给红色提示）
 3. 发布页 → 「AI 一键成稿」输入「出九成新 iPad Air，1500 元，可小刀，东门当面」→ 标题/正文/板块/价格/标签一次填好
 
-## 2. Render 上线（推荐，支持 WebSocket + 常驻进程）
+## 3. Render 上线（推荐，支持 WebSocket + 常驻进程）
 
 Render 免费实例：0.5 vCPU / 512 MB，磁盘为临时盘（实例重启会重新灌演示数据）。
 
@@ -79,11 +106,11 @@ Render 免费实例：0.5 vCPU / 512 MB，磁盘为临时盘（实例重启会�
 
 > 注意：Render 免费实例闲置后会休眠，首次访问约 30–50 秒冷启动。答辩前先点一次预热。
 
-## 3. VPS 运营级部署（PM2 + Caddy，真运营用这个）
+## 4. VPS 运营级部署（PM2 + Caddy，真运营用这个）
 
 面向「校内服务器 / 云 VPS 长期运行」：持久盘、自动 HTTPS、进程守护、备份可恢复。Render 免费档只适合演示（临时盘 + 15 分钟休眠），真运营请落在 VPS。
 
-### 3.1 服务器准备
+### 4.1 服务器准备
 
 - Ubuntu 22.04 / 24.04（Debian 12 同理），**2C2G 起步**，20 GB 盘
 - Node.js 22 LTS 或 24（`node -v` 确认；项目零原生编译依赖，`better-sqlite3` 之外无 node-gyp）
@@ -100,7 +127,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo 
 sudo apt-get update && sudo apt-get install -y caddy
 ```
 
-### 3.2 目录布局（代码与数据分离，升级不丢数据）
+### 4.2 目录布局（代码与数据分离，升级不丢数据）
 
 ```bash
 sudo mkdir -p /opt/campus-wall /var/lib/campus-wall/{uploads,backups}
@@ -115,7 +142,7 @@ sudo chown -R campus:campus /opt/campus-wall /var/lib/campus-wall
 | `/var/lib/campus-wall/uploads/` | 用户上传图片 |
 | `/var/lib/campus-wall/backups/` | 每日热备（默认保留 7 份） |
 
-### 3.3 生产环境变量（/opt/campus-wall/.env）
+### 4.3 生产环境变量（/opt/campus-wall/.env）
 
 ```bash
 sudo -u campus tee /opt/campus-wall/.env >/dev/null <<'EOF'
@@ -147,7 +174,7 @@ sudo chmod 600 /opt/campus-wall/.env
 
 > 生产环境缺少 `JWT_SECRET` 或 `ADMIN_INITIAL_PASSWORD` 时服务**拒绝启动**（见 `api/utils/jwt.ts`、启动校验），这是刻意的 fail-fast。
 
-### 3.4 构建与启动（PM2）
+### 4.4 构建与启动（PM2）
 
 ```bash
 sudo -u campus git clone <仓库地址> /opt/campus-wall
@@ -162,7 +189,7 @@ sudo env PATH=$PATH pm2 startup systemd -u campus --hp /home/campus
 
 `ecosystem.config.cjs` 已设 `autorestart` / `max_restarts`，进程崩溃由 PM2 拉起；`server.ts` 的 uncaughtException 计数熔断（60s 内 >3 次优雅退出）也接的是这条路径。
 
-### 3.5 Caddy 反向代理（自动 HTTPS + WebSocket）
+### 4.5 Caddy 反向代理（自动 HTTPS + WebSocket）
 
 `/etc/caddy/Caddyfile`：
 
@@ -193,7 +220,7 @@ sudo systemctl reload caddy
 
 > 安全响应头（CSP/HSTS/X-Frame-Options 等）由应用自己发（`api/app.ts` 基础安全头中间件），Caddy 不要重复设置以免覆盖。
 
-### 3.6 上线自检（照抄可跑）
+### 4.6 上线自检（照抄可跑）
 
 ```bash
 curl -fsS https://wall.example.com/api/health              # {"code":200,...}
@@ -204,7 +231,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://wall.example.com/uploads/x.jpg 
 # new WebSocket('wss://wall.example.com/ws') → onopen 触发即通
 ```
 
-### 3.7 升级与回滚
+### 4.7 升级与回滚
 
 ```bash
 cd /opt/campus-wall
@@ -217,13 +244,13 @@ sudo -u campus pm2 reload campus-wall      # 零停机重载（先起新进程�
 
 回滚：`git checkout <上一个 tag/commit> && npm ci && npm run build && pm2 reload campus-wall`，库文件如需回退用 3.7 第一行的副本。
 
-### 3.8 备份与恢复
+### 4.8 备份与恢复
 
 - 应用内置热备：`BACKUP_INTERVAL_HOURS`（默认 24）到 `BACKUP_DIR`，保留 `BACKUP_KEEP`（默认 7）份；`BACKUP_ENCRYPTION_KEY`（64 位 hex）可加密落盘
 - 异地备份（强烈建议）：`rsync -a /var/lib/campus-wall/backups/ backup-host:/backup/campus-wall/`（cron 每日）
 - 恢复：`pm2 stop campus-wall && cp <备份文件> /var/lib/campus-wall/campus.db && pm2 start campus-wall`
 
-### 3.9 试点运营数据导出（实效验证）
+### 4.9 试点运营数据导出（实效验证）
 
 真运营/试点（如 50 人 × 2 周）跑完后，一条命令导出可引用的数据报告（规模 / 活跃 / 留存 / 审核时效 / 交易闭环）：
 
@@ -239,7 +266,7 @@ DB_PATH=/var/lib/campus-wall/campus.db npm run report:pilot -- --days 30 # 改�
   激活 = 注册 24h 内有发帖/评论；审核时效 = `audit_approve` 审计日志与帖子创建时间的差（分钟）
 - 注意：本地 `api/data.db` 会被集成测试写入假用户/假事件，**真实试点数字必须用生产库**
 
-## 4. ZCode Sites 上线（需等配额）
+## 5. ZCode Sites 上线（需等配额）
 
 2026-11-11 实测：免费版站点配额 `1/1` 已满（唯一站点「晚安营地」），新建站点被 `3605 Account quota exceeded` 拦下；
 `usage` 显示周期 `2026-11-01 → 2026-12-01`，`canDeploy: true`（可更新已有站点）。
@@ -254,13 +281,13 @@ node "C:/Users/chen/.zcode/cli/plugins/cache/zcode-plugins-official/zcode-site/0
 
 若想立刻用现有名额：`--site 2120002180268335104`（会覆盖「晚安营地」，不可恢复）。
 
-## 5. 数据与重置
+## 6. 数据与重置
 
 - 数据目录 `$DATA_DIR`：`campus.db`（SQLite）、`uploads/`（图片）、`backups/`（定时备份，保留 7 份）
 - 想重置演示数据：删掉 `$DATA_DIR/campus.db` 后重启，首启会自动重新灌种子
 - 想强制重灌：`DB_PATH=<path> node api/seed.mjs --force`（本地源码模式用 `npm run seed -- --force`）
 
-## 6. 可选：开启 Web Push 离线推送
+## 7. 可选：开启 Web Push 离线推送
 
 默认不开启（用户端设置页的推送入口自动隐藏），三选一开启方式：
 
@@ -270,7 +297,7 @@ node "C:/Users/chen/.zcode/cli/plugins/cache/zcode-plugins-official/zcode-site/0
 
 开启效果：用户设置页「消息推送 → 开启」后，离线也能收到评论/私信/匹配通知（点击直达消息页）；服务端在 VAPID 未配置时对通知发送路径静默跳过，配置错误的发送失败会按 404/410 自动清理失效订阅。
 
-## 7. 这台机器上的已知边界
+## 8. 这台机器上的已知边界
 
 - `cloudflared` / `localhost.run` 之类内网穿透在本机被网络策略拦（QUIC 与 7844 均不可达），无法用它临时对外发布。
 - Docker Desktop 未运行，容器镜像未在本机构建；但阶段包已在 WSL 真实 Linux 上跑通，等价于容器内运行。

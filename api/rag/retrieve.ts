@@ -5,7 +5,7 @@
  */
 import { logger } from '../utils/logger.js';
 import { db } from '../db.js';
-import { embedQuery } from './embedder.js';
+import { embedQuery, splitQueryTokens } from './embedder.js';
 import { searchByVector, searchByKeyword, deleteBySource } from './store.js';
 import type { VectorHit, UpsertChunk } from './store.js';
 
@@ -85,6 +85,13 @@ export async function retrieve(question: string, opts: RetrieveOptions = {}): Pr
 
   if (!merged.size) return [];
 
+  // R4 评测修复的第三件套——实义重叠校验：
+  // 哈希嵌入无监督区分「真实共享词面」与「词汇落桶碰撞」，互不相干短文本可得
+  // ~0.15 的伪余弦；再叠加同名词面（如「学生」）又会召回主题完全偏离的文档。
+  // 这里用与 hashEmbed 完全同口径的分词做词面交集校验：真实共享 token、或融合
+  // 分高到足以覆盖措辞差异，才允许进入引用集合。
+  const qTokenSet = new Set(splitQueryTokens(question));
+
   // 向量相似度 + 关键词命中融合排序
   const fused = Array.from(merged.values()).map((r) => ({
     ...r,
@@ -95,7 +102,10 @@ export async function retrieve(question: string, opts: RetrieveOptions = {}): Pr
   const sources: RagSource[] = [];
   let ref = 1;
   for (const f of fused) {
-    if (f.fused <= 0.05) continue; // 阈值以下视为噪声
+    // 实义重叠校验的落点：无真实共享词面的候选只能靠哈希碰撞或极端权重撑高分，
+    // 观测噪声上限约 0.10——低于 0.35 一律剔除（0.35 以上视为措辞差异大的强信号放行）
+    const realOverlap = hasRealOverlap(qTokenSet, f.content);
+    if (!realOverlap && f.fused < 0.35) continue; // 桶碰撞伪信号剔除
     sources.push({
       ref: ref++,
       title: f.title || (f.sourceType === 'kb' ? '平台知识库' : '站内帖子'),
@@ -107,6 +117,15 @@ export async function retrieve(question: string, opts: RetrieveOptions = {}): Pr
     if (sources.length >= topK) break;
   }
   return sources;
+}
+
+/** 查询与候选块是否存在真实共享词面（与 hashEmbed 同口径分词） */
+function hasRealOverlap(qTokens: Set<string>, content: string): boolean {
+  if (!qTokens.size) return true; // 无分词信息时不做校验，避免误杀
+  for (const t of splitQueryTokens(content)) {
+    if (qTokens.has(t)) return true;
+  }
+  return false;
 }
 
 /**

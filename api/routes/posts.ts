@@ -10,6 +10,7 @@ import { isWxContentEnabled, checkText, shouldRejectOnCheckError } from '../util
 import { postLimiter, readLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
+import { findSimilarCandidates, recentPublishedCandidates } from '../utils/similarity.js';
 import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/matching.js';
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
 import { applyDirectionFilter } from '../utils/direction-filter.js';
@@ -503,6 +504,28 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
     return fail(res, '发布失败，请稍后重试');
   }
   cacheInvalidate('posts');
+
+  // V3-P1 发布时相似帖检测：善意提醒而非拦截——命中高相似已有帖时站内通知作者
+  // 自查重复（复用 system 类型，不新增消息枚举）。与多模态/雷达同级旁路副作用，
+  // 任何异常绝不影响发布主流程。
+  if (status === 'published') {
+    try {
+      const sims = findSimilarCandidates(
+        { id: postId, title: title.trim(), content },
+        recentPublishedCandidates(postId),
+      );
+      if (sims.length) {
+        upsertNotification(
+          req.currentUser!.id,
+          'system',
+          `你的新帖《${title.trim()}》与已有帖子《${sims[0]!.title}》内容相似度较高，如为重复发布请考虑删除其一。`,
+          postId,
+        );
+      }
+    } catch (err: any) {
+      logger.warn('相似帖检测失败（不影响发布）', { error: err?.message });
+    }
+  }
 
   // 多模态图片理解：发布成功后异步分析首图（网关优先，启发式降级），
   // 结果写入 post_image_meta（标签/摘要/类别猜测），失败不影响发帖主流程。

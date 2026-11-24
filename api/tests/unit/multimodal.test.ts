@@ -66,7 +66,8 @@ describe('vision heuristicVision 启发式降级', () => {
     }
   });
 
-  it('analyzeImage 未配置网关时自动走启发式', async () => {
+  // sharp 冷启动编译在整库并发跑时可超默认 5s（与 multimodal-wiring 同款抖动）→ 提余量
+  it('analyzeImage 未配置网关时自动走启发式', { timeout: 30_000 }, async () => {
     const tmp = path.join(os.tmpdir(), `cw-vision-test2-${Date.now()}.png`);
     await sharp({
       create: { width: 600, height: 400, channels: 3, background: { r: 60, g: 100, b: 200 } },

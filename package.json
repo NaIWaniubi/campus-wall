@@ -31,6 +31,7 @@
     "report:pilot": "tsx scripts/pilot-report.ts",
     "eval:ai": "tsx scripts/eval-ai.ts",
     "eval:rag": "tsx scripts/eval-rag.ts",
+    "eval:similar": "tsx scripts/eval-similar-posts.ts",
     "bench": "node scripts/bench.mjs"
   },
   "engines": {

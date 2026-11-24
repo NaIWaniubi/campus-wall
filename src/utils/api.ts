@@ -49,6 +49,7 @@ export const postApi = {
   list: (params: { page?: number; pageSize?: number; sectionId?: number; keyword?: string; sort?: string; priceRange?: string; timeRange?: string; subType?: string; authorId?: number }) => request.get('/posts', { params }),
   detail: (id: number) => request.get(`/posts/${id}`),
   matches: (id: number) => request.get(`/posts/${id}/matches`),
+  similars: (id: number) => request.get(`/posts/${id}/similars`),
   publish: (data: CreatePostPayload) => request.post('/posts', data),
   edit: (id: number, data: UpdatePostPayload) => request.put(`/posts/${id}`, data),
   delete: (id: number) => request.delete(`/posts/${id}`),
@@ -183,9 +184,11 @@ export interface AiSummaryResult {
 
 /** 今日简报（/ai/digest） */
 export interface AiDigestResult {
-  date: string
+  date: string;
   /** 统计窗口文案：'24 小时' 或 '近 7 天'（冷清时自动放宽） */
   window?: string
+  /** 仅 personalized 路径返回；公开默认简报不含此字段 */
+  scope?: 'personal'
   stats: { posts: number; comments: number }
   sections: Array<{ name: string; n: number }>
   hot: { id: number; title: string; section: string; likes: number } | null
@@ -203,8 +206,9 @@ export const aiApi = {
   /** 帖子划重点：要点 + 风险提示（只传 postId，服务端取正文） */
   summarize: (data: { postId?: number; title?: string; content?: string }) =>
     request.post<AiSummaryResult>('/ai/summarize', data, { timeout: 65000 }),
-  /** 今日简报：当日动态概览 */
-  digest: () => request.get<AiDigestResult>('/ai/digest', { timeout: 20000 }),
+  /** 今日简报：登录用户传 personal，未登录保持公开全站版 */
+  digest: (scope?: 'personal') =>
+    request.get<AiDigestResult>('/ai/digest', { params: scope ? { scope } : undefined, timeout: 20000 }),
 }
 
 // 管理端 AI 设置

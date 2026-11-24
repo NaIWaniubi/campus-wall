@@ -61,6 +61,14 @@ jobs:
       - name: AI guard eval gate
         run: npm run eval:ai
 
+      # RAG 50 条六档检索评估：recall@5 / nDCG / MRR + 词面零交集防幻觉门。
+      - name: RAG retrieval eval gate
+        run: npm run eval:rag -- --gate
+
+      # 相似帖检测阈值标定门：真重复/同主题异文/无关对分离失败即 CI 失败。
+      - name: Similar-post threshold gate
+        run: npm run eval:similar -- --gate
+
       - name: Build
         run: npm run build
 
@@ -103,7 +111,7 @@ jobs:
         if: failure()
         run: tail -50 /tmp/lt-server.log
 
-  # 浏览器门：12 条核心用户流（浏览/搜索/登录/发帖/互动/审核）真 Chromium 跑。
+  # 浏览器门：17 条核心用户流（浏览/搜索/登录/发帖/互动/审核）真 Chromium 跑。
   # e2e-backend.mjs 用隔离库 api/e2e-test.db 自动重灌 seed，不污染任何共享状态。
   # 此前 E2E 只在本地跑过，V5 登录重构后就静默腐烂了 10 条——这条 job 防止「演示流只在我机器上能跑」。
   e2e:

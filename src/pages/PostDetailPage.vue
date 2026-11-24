@@ -39,6 +39,8 @@ function onThumbError(e: Event, fallback: string) {
 const commentInputRef = ref<HTMLInputElement | null>(null)
 // 失物招领智能匹配：与本帖相似的候选帖列表
 const matches = ref<any[]>([])
+// V3-P2 相关推荐：高文本相似优先 + 同板块兜底
+const relatedPosts = ref<Array<{ id: number; title: string; sectionName: string; likeCount: number }>>([])
 // ── AI 划重点（V3）：按需请求，点开才调模型，不拖慢首屏 ──
 const aiSummary = ref<{ points: string[]; risk: 'low' | 'medium' | 'high'; riskNote: string | null; offline: boolean } | null>(null)
 const aiSummaryOpen = ref(false)
@@ -313,6 +315,17 @@ async function fetchMatches() {
     matches.value = res.data || []
   } catch {
     matches.value = []
+  }
+}
+
+async function fetchRelatedPosts() {
+  const id = postId.value
+  try {
+    const res: any = await postApi.similars(id)
+    // 详情→详情快速切换时，旧请求不得覆盖新帖推荐
+    if (postId.value === id) relatedPosts.value = res.data || []
+  } catch {
+    if (postId.value === id) relatedPosts.value = []
   }
 }
 
@@ -608,6 +621,7 @@ async function loadAll() {
     return
   }
   fetchComments()
+  void fetchRelatedPosts()
   await fetchMatches()
   await fetchRadar()
   await fetchOffers()
@@ -624,6 +638,7 @@ function resetForNewPost() {
   post.value = null
   comments.value = []
   matches.value = []
+  relatedPosts.value = []
   radarMatches.value = []
   offersState.value = { isSeller: false, hasAccepted: false, myOffer: null, offers: [] }
   commentText.value = ''
@@ -1150,6 +1165,31 @@ function closeMoreMenu(e: MouseEvent) {
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- V3-P2 相关推荐：评论区之后的自然阅读终点，点击复用详情路由参数切换 -->
+      <section v-if="relatedPosts.length" class="ds-card p-4">
+        <div class="ds-section-head mb-3">
+          <span class="ds-section-head__num">05</span>
+          <h3 class="ds-title">相关推荐</h3>
+          <span class="ds-section-head__line"></span>
+        </div>
+        <p class="ds-sub mb-1.5">同板块与内容相近的帖子，或许你还会感兴趣</p>
+        <button
+          v-for="item in relatedPosts"
+          :key="item.id"
+          class="row-link hover-paper w-full text-left px-1.5 py-2.5 rounded-[10px] transition"
+          :aria-label="`查看相关帖子：${item.title}`"
+          @click="router.push(`/post/${item.id}`)"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="ds-tag shrink-0"><span class="ds-tag-dot" style="background: var(--violet)"></span>{{ item.sectionName || '校园' }}</span>
+            <span class="text-[14px] truncate flex-1" style="color: var(--ink)">{{ item.title }}</span>
+            <span class="ds-num text-[11px] shrink-0 flex items-center gap-1" style="color: var(--ink-mute)">
+              <Heart class="w-3 h-3" /> {{ item.likeCount }}
+            </span>
+          </div>
+        </button>
       </section>
     </main>
 

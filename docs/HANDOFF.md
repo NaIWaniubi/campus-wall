@@ -1,12 +1,12 @@
 # 交付说明（传智杯 AI WEB 赛道）
 
-> 最后更新：2026-11-18 · 仓库：https://github.com/NaIWaniubi/campus-wall（**Public**）
+> 最后更新：2026-11-24 · 仓库：https://github.com/NaIWaniubi/campus-wall（**Public**）
 
 ## 一、材料清单（全部就绪）
 
 | # | 材料 | 位置 | 状态 |
 |---|---|---|---|
-| 1 | **作品说明书 PDF**（≤30 页要求） | `dist-submission/校园墙-参赛说明书.pdf` | ✅ 28 页 / 3.1MB |
+| 1 | **作品说明书 PDF**（≤30 页要求） | `dist-submission/校园墙-参赛说明书.pdf` | ✅ 29 页 / 3.2MB |
 | 2 | 作品说明书（Markdown 源） | `docs/COMPETITION-SUBMISSION.md` | ✅ 含 AI 四子系统证据链 + 安全加固章 |
 | 3 | 作品速贴版（表单字数限制用） | `docs/SUBMISSION-ONEPAGE.md` | ✅ 约 1100 字 |
 | 4 | 演示视频分镜 | `docs/DEMO-SCRIPT.md` | ✅ 逐镜头旁白（90 秒版；扩 5-8 分钟按 7 镜头铺开） |
@@ -44,16 +44,25 @@
 
 ```bash
 cd E:\校园墙
-npm test                # 477 passed（API 369 + Web 57 + Mini 51）
-npx playwright test     # 15 passed
+npm test                # 500 passed（API 391 + Web 58 + Mini 51）
+npx playwright test     # 17 passed
 npm run lint            # 0 错误
 npm run check           # 0 错误
-npx tsx scripts/eval-ai.ts   # AI 护栏评估 29/29
-npm run eval:radar -- --gate # 失物雷达回归门
+npx tsx scripts/eval-ai.ts       # AI 护栏评估 29/29
+npm run eval:radar -- --gate     # 失物雷达回归门
+npm run eval:rag -- --gate       # RAG 50 条分层检索门
+npm run eval:similar -- --gate   # 相似帖阈值标定门
 node scripts/build-submission-pdf.mjs   # 重新生成 PDF（输出会打印页数）
 ```
 
-CI 四道门（GitHub Actions）：`verify (24.x)` / `Browser E2E (Playwright)` / `Contract load gate` / `Lighthouse gate` —— **全绿**。
+CI 五个 job（GitHub Actions）：`verify (24.x)` / `Docker build & smoke` / `Browser E2E (Playwright)` / `Contract load gate` / `Lighthouse gate` —— **全绿**。
+
+### V3 主链路 AI 深度扩展（2026-11-24）
+
+- **P1 发布时相似帖检测**：归一化 bigram Jaccard，标题/正文各半；9 组标注标定出可行区间 `(0.040, 0.816)`，生产阈值 `0.45`；命中仅发 `system` 站内提醒，不拦截、不改发布响应。
+- **P2 详情页相关推荐**：`GET /api/posts/:id/similars`，高文本相似优先 + 同板块兜底，top6 最小字段；自身/待审/删除/封禁作者全部排除；详情页评论区后展示，点击复用现有路由。
+- **P3 个性化日报**：`GET /api/ai/digest?scope=personal`，登录用户聚合订阅板块与近期点赞/评论互动；空订阅回退全站模板；用户级 60s 缓存 + AI 频控；模板优先，LLM 仅后台润色，失败静默降级。
+- **验证**：V3 新增 19 条测试，独立审查修复再补 4 条；全量 500/500、17 条 E2E、lint/typecheck/build/bundle 预算、相似度与 RAG 评估门全部通过。
 
 ## 四、本轮工作流审查修复摘要（19 个真实缺陷）
 

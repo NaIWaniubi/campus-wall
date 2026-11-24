@@ -142,3 +142,8 @@ export function debounce<T extends (...args: any[]) => void>(fn: T, wait = 300) 
   }
   return debounced
 }
+
+/** 请求归属判定：同序号且同账号/会话 key 才允许写回，防止 A→B 切号时旧响应串号。 */
+export function isLatestScopedRequest(seq: number, latestSeq: number, key: string, currentKey: string): boolean {
+  return seq === latestSeq && key === currentKey
+}

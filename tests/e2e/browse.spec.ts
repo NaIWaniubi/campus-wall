@@ -2,7 +2,12 @@
  * 流程 1：游客浏览（未登录首页信息流 + 搜索）
  */
 import { expect } from '@playwright/test'
-import { test } from './helpers'
+import { test, login } from './helpers'
+
+test('登录用户首页切换为个性化今日简报', async ({ page }) => {
+  await login(page)
+  await expect(page.getByRole('heading', { name: '我的今日校园' })).toBeVisible({ timeout: 15_000 })
+})
 
 test('游客可浏览首页信息流并看到种子帖子', async ({ page }) => {
   await page.goto('/')

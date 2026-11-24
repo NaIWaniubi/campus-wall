@@ -235,6 +235,8 @@ Pinia Options 式 store，通过 `pinia-plugin-persistedstate` 持久化到 `loc
 | 机制 | 位置 | 说明 |
 |---|---|---|
 | 失物招领智能匹配 | api/utils/match.ts + posts.ts | 发布时关键词 LIKE 打分（标题2/正文1，阈值≥2，30天窗），双向站内通知；GET /api/posts/:id/matches |
+| 发布时相似帖检测 | api/utils/similarity.ts + routes/posts.ts | 归一化 bigram Jaccard（标题/正文各半），9 组标注标定阈值 0.45；命中仅 system 通知，不拦截发布；GET /api/posts/:id/similars 复用同一相似度服务做详情页推荐 |
+| 个性化今日简报 | routes/ai.ts + HomePage.vue | GET /api/ai/digest?scope=personal：订阅板块热点 + 近期点赞/评论互动，用户级 60s 缓存，模板优先、LLM 后台润色；默认公开简报行为不变 |
 | 图片压缩管线 | api/routes/upload.ts | sharp：>1600px 重编码（jpeg q80/png）+ .thumb.webp 缩略图（q75）；**必须以 Buffer 为 sharp 输入**（路径输入会 mmap 持句柄致 Windows 覆盖写失败）；上传目录统一 `<root>/public/uploads` |
 | 热度排序+冷启动 | posts.ts 列表 | sort=hot 默认：(赞×2+评×3)/(小时+2)^1.5，≤30min ×1.5；置顶优先保留 |
 | 板块订阅+每日摘要 | routes/subscriptions.ts、jobs/dailyDigest.ts | toggle/list 接口；每日 DIGEST_HOUR（默认20点）汇总新帖数+最热帖，日期标记防重发，DIGEST_NOW=1 手动触发 |

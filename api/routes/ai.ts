@@ -2,7 +2,7 @@
  * AI 助手路由：基于官网内容作答 + 论坛相关讨论推荐
  * 支持非流式 /chat 与 SSE 流式 /chat/stream，带频控与敏感词拦截
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { bumpStats, checkRateLimit } from './ai/usage.js';
 import { extractTags, extractPrice } from './ai/text.js';
 import fs from 'fs';
@@ -868,6 +868,246 @@ export function ruleDigest() {
   };
 }
 
+/** SQLite CURRENT_TIMESTAMP 使用空格分隔；ISO 的 T 会让同日较早帖子被误排除 */
+function sqliteTimestamp(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function clipTitle(title: string, max = 18): string {
+  return title.length > max ? title.slice(0, max) + '…' : title;
+}
+
+/**
+ * 个性化日报规则版（V3-P3）：订阅板块当日热点 + 用户近期点赞/评论互动。
+ * 纯 SQL 聚合，毫秒级返回；空订阅回退全站规则版，保证首页永不空窗。
+ */
+export function rulePersonalDigest(userId: number, now = Date.now()) {
+  const subscribed = db
+    .prepare(
+      `SELECT s.id, s.name FROM subscriptions sub
+       JOIN sections s ON s.id = sub.section_id AND s.is_active = 1
+       WHERE sub.user_id = ?
+       ORDER BY s.sort ASC, s.id ASC`,
+    )
+    .all(userId) as Array<{ id: number; name: string }>;
+
+  if (!subscribed.length) {
+    const base = ruleDigest();
+    return {
+      ...base,
+      scope: 'personal' as const,
+      summary: `你还没有订阅板块，先看看全站动态。${base.summary}`,
+      offline: true,
+    };
+  }
+
+  const sectionIds = subscribed.map((s) => s.id);
+  const placeholders = sectionIds.map(() => '?').join(',');
+  // SQLite CURRENT_TIMESTAMP 为秒精度；下界额外留 1s，避免毫秒边界内容被漏统计。
+  const since24 = sqliteTimestamp(now - 24 * 3600 * 1000 - 1000);
+  const since7 = sqliteTimestamp(now - 7 * 24 * 3600 * 1000 - 1000);
+  const count24 = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM posts p JOIN users u ON u.id = p.user_id
+       WHERE p.status = 'published' AND u.status != 'banned'
+         AND p.section_id IN (${placeholders}) AND p.created_at >= ?`,
+    )
+    .get(...sectionIds, since24) as { n: number };
+  const since = count24.n > 0 ? since24 : since7;
+  const windowLabel = count24.n > 0 ? '24 小时' : '近 7 天';
+
+  const posts = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM posts p JOIN users u ON u.id = p.user_id
+       WHERE p.status = 'published' AND u.status != 'banned'
+         AND p.section_id IN (${placeholders}) AND p.created_at >= ?`,
+    )
+    .get(...sectionIds, since) as { n: number };
+  const comments = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM comments c
+       JOIN posts p ON p.id = c.post_id AND p.status = 'published'
+       JOIN users cu ON cu.id = c.user_id AND cu.status != 'banned'
+       WHERE c.status = 'active' AND p.section_id IN (${placeholders}) AND c.created_at >= ?`,
+    )
+    .get(...sectionIds, since) as { n: number };
+  const sections = db
+    .prepare(
+      `SELECT s.name, COUNT(*) AS n FROM posts p
+       JOIN sections s ON s.id = p.section_id
+       JOIN users u ON u.id = p.user_id AND u.status != 'banned'
+       WHERE p.status = 'published' AND p.section_id IN (${placeholders}) AND p.created_at >= ?
+       GROUP BY s.id ORDER BY n DESC, s.sort ASC LIMIT 3`,
+    )
+    .all(...sectionIds, since) as Array<{ name: string; n: number }>;
+  const subscribedHot = db
+    .prepare(
+      `SELECT p.id, p.title, p.like_count, s.name AS section_name FROM posts p
+       JOIN sections s ON s.id = p.section_id
+       JOIN users u ON u.id = p.user_id AND u.status != 'banned'
+       WHERE p.status = 'published' AND p.section_id IN (${placeholders}) AND p.created_at >= ?
+       ORDER BY p.is_top DESC, (p.like_count * 2 + p.comment_count) DESC, p.created_at DESC LIMIT 1`,
+    )
+    .get(...sectionIds, since) as { id: number; title: string; like_count: number; section_name: string } | undefined;
+  const interactions = db
+    .prepare(
+      `SELECT p.id, p.title, p.like_count, s.name AS section_name, MAX(i.interacted_at) AS interacted_at
+       FROM (
+         SELECT target_id AS post_id, created_at AS interacted_at FROM likes
+         WHERE user_id = ? AND target_type = 'post'
+         UNION ALL
+         SELECT post_id, created_at FROM comments WHERE user_id = ? AND status = 'active'
+       ) i
+       JOIN posts p ON p.id = i.post_id AND p.status = 'published'
+       JOIN users u ON u.id = p.user_id AND u.status != 'banned'
+       JOIN sections s ON s.id = p.section_id
+       WHERE p.created_at >= ?
+       GROUP BY p.id
+       ORDER BY interacted_at DESC, p.id DESC LIMIT 3`,
+    )
+    .all(userId, userId, since7) as Array<{
+    id: number;
+    title: string;
+    like_count: number;
+    section_name: string;
+    interacted_at: string;
+  }>;
+
+  const hotRow = subscribedHot ?? interactions[0];
+  const hot = hotRow
+    ? { id: hotRow.id, title: hotRow.title, section: hotRow.section_name, likes: hotRow.like_count }
+    : null;
+  const bits: string[] = [];
+  const firstInteraction = interactions[0];
+  if (posts.n > 0) {
+    bits.push(`你订阅的板块${windowLabel}有 ${posts.n} 条新动态、${comments.n} 条评论`);
+    if (sections[0]) bits.push(`最活跃的是「${sections[0].name}」（${sections[0].n} 条）`);
+    if (firstInteraction) bits.push(`你最近互动过《${clipTitle(firstInteraction.title)}》`);
+  } else if (firstInteraction) {
+    bits.push('你订阅的板块暂时没有新动态');
+    bits.push(`你最近互动过《${clipTitle(firstInteraction.title)}》`);
+  } else {
+    bits.push('你订阅的板块最近很安静，先去逛逛全站新鲜事吧');
+  }
+
+  return {
+    date: new Date(now).toISOString().slice(0, 10),
+    window: windowLabel,
+    scope: 'personal' as const,
+    stats: { posts: posts.n, comments: comments.n },
+    sections,
+    hot,
+    summary: bits.join('，') + '。',
+    tip: '订阅板块有新内容时，站内消息会提醒你；二手交易请当面验货，平台内沟通。',
+    offline: true,
+  };
+}
+
+interface PersonalDigestEntry {
+  ts: number;
+  data: any;
+  refreshing: boolean;
+  version: number;
+  pendingRefresh: boolean;
+}
+
+const personalDigestCache = new Map<number, PersonalDigestEntry>();
+const PERSONAL_DIGEST_TTL_MS = 60_000;
+const PERSONAL_DIGEST_RETENTION_MS = 10 * 60_000;
+
+/** 测试隔离路径：清理用户级缓存，避免跨用例复用旧数据 */
+export function clearPersonalDigestCacheForTest(): void {
+  personalDigestCache.clear();
+}
+
+/** 用户级 60s 缓存 + stale-while-revalidate；与公开全站缓存完全隔离 */
+export function getPersonalDigest(userId: number, now = Date.now(), autoRefresh = true): any {
+  for (const [id, entry] of personalDigestCache) {
+    if (now - entry.ts > PERSONAL_DIGEST_RETENTION_MS) personalDigestCache.delete(id);
+  }
+
+  let entry = personalDigestCache.get(userId);
+  if (entry) {
+    if (now - entry.ts > PERSONAL_DIGEST_TTL_MS) {
+      // 过期必须先重算规则基线与订阅/互动数据，再润色；否则旧 base 会被无限续期。
+      const base = rulePersonalDigest(userId, now);
+      entry.version += 1;
+      entry.data = base;
+      entry.ts = now;
+      if (autoRefresh) {
+        if (entry.refreshing) entry.pendingRefresh = true;
+        else void refreshPersonalDigest(userId);
+      }
+      return base;
+    }
+    return entry.data;
+  }
+
+  const base = rulePersonalDigest(userId, now);
+  entry = { ts: now, data: base, refreshing: false, version: 0, pendingRefresh: false };
+  personalDigestCache.set(userId, entry);
+  if (autoRefresh && isAiUsable()) void refreshPersonalDigest(userId);
+  return base;
+}
+
+/** 个性化摘要后台润色：模型不可用/失败/高危输出一律保留模板版 */
+export async function refreshPersonalDigest(userId: number): Promise<void> {
+  const entry = personalDigestCache.get(userId);
+  if (!entry || entry.refreshing) return;
+  entry.refreshing = true;
+  const versionAtStart = entry.version;
+  const commit = (data: any) => {
+    // 缓存过期重算会递增 version；旧 LLM 请求不得把新规则数据覆盖回旧摘要。
+    if (entry.version !== versionAtStart) return;
+    entry.data = data;
+    entry.ts = Date.now();
+  };
+  try {
+    const base = entry.data;
+    if (!isAiUsable() || (base.stats.posts === 0 && !base.hot)) {
+      commit({ ...base, offline: true });
+      return;
+    }
+    const out = await chatWithAI(
+      [
+        {
+          role: 'system',
+          content:
+            '你是校园墙的个人日报播报员。根据用户订阅板块与互动数据，用一句不超过 60 字的简体中文播报，语气自然，只输出这一句话，不要引号、不要 emoji。',
+        },
+        {
+          role: 'user',
+          content:
+            `统计窗口：${base.window}；新动态：${base.stats.posts} 条；评论：${base.stats.comments} 条；` +
+            `活跃板块：${(base.sections as Array<{ name: string; n: number }>).map((s) => `${s.name}(${s.n})`).join('、') || '无'}；` +
+            `热点帖子：${base.hot?.title ?? '无'}。`,
+        },
+      ],
+      512,
+      currentModels(),
+      { budgetMs: 60_000, perModelTimeoutMs: 55_000 } satisfies AiCallOptions,
+    );
+    bumpStats();
+    let line = (out.trim().split(/\n/)[0] ?? '').replace(/^["「]|["」]$/g, '').slice(0, 80);
+    const guardLine = inspectInput(line);
+    if (guardLine.level === 'high' || !line.trim()) {
+      commit({ ...base, offline: true });
+      return;
+    }
+    if (guardLine.level === 'medium') line = guardLine.sanitized.slice(0, 80);
+    commit(line.length >= 8 ? { ...base, summary: line, offline: false } : { ...base, offline: true });
+  } catch (err: any) {
+    logger.warn('个性化 AI 简报生成失败，保留模板版', { error: err?.message });
+    commit({ ...entry.data, offline: true });
+  } finally {
+    entry.refreshing = false;
+    if (entry.pendingRefresh) {
+      entry.pendingRefresh = false;
+      void refreshPersonalDigest(userId);
+    }
+  }
+}
+
 /**
  * 简报刷新：先由规则版兜底，AI 只负责把统计写成人话。
  * 关键设计：AI 永远在后台跑，HTTP 响应不等模型 —— 首屏稳定 <20ms。
@@ -929,7 +1169,34 @@ async function refreshDigest(): Promise<void> {
   }
 }
 
-router.get('/digest', (_req: Request, res: Response) => {
+/** 仅 personal 路径启用登录与 AI 频控；公开默认简报保持零门槛、无限流 */
+function personalDigestGuard(req: Request, res: Response, next: NextFunction): void {
+  if (req.query.scope === 'personal') {
+    authRequired(req, res, () => aiLimiter(req, res, next));
+    return;
+  }
+  next();
+}
+
+router.get('/digest', personalDigestGuard, (req: Request, res: Response) => {
+  if (req.query.scope === 'personal') {
+    try {
+      return success(res, getPersonalDigest(req.currentUser!.id));
+    } catch (err: any) {
+      logger.error('个性化今日简报失败', { error: err?.message });
+      return success(res, {
+        date: new Date().toISOString().slice(0, 10),
+        scope: 'personal',
+        stats: { posts: 0, comments: 0 },
+        sections: [],
+        hot: null,
+        summary: '你的个性化简报暂时取不到，稍后再来看看。',
+        tip: '',
+        offline: true,
+      });
+    }
+  }
+
   try {
     const now = Date.now();
     // 命中缓存：直接返回；过期则后台刷新，本次仍返回旧值（stale-while-revalidate）

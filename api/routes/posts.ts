@@ -10,7 +10,7 @@ import { isWxContentEnabled, checkText, shouldRejectOnCheckError } from '../util
 import { postLimiter, readLimiter, engageLimiter } from '../middleware/rateLimit.js';
 import { upsertNotification } from '../utils/notification.js';
 import { findLostFoundMatches, notifyLostFoundMatch, formatMatch, isLostFoundSection } from '../utils/match.js';
-import { findSimilarCandidates, recentPublishedCandidates } from '../utils/similarity.js';
+import { findSimilarCandidates, findRelatedCandidates, recentPublishedCandidates } from '../utils/similarity.js';
 import { findRadarMatches, MATCH_THRESHOLD, buildFtsQuery } from '../utils/matching.js';
 import { sanitizeExtraFields, mergeExtraFields } from '../utils/extra-fields.js';
 import { applyDirectionFilter } from '../utils/direction-filter.js';
@@ -95,6 +95,17 @@ export function formatPost(
     createdAt: post.created_at ? new Date(post.created_at).toISOString() : post.created_at,
     updatedAt: post.updated_at ? new Date(post.updated_at).toISOString() : post.updated_at,
   };
+}
+
+/**
+ * 帖子可见性唯一判定：详情与相关推荐共用，避免后续状态规则修改产生漂移。
+ * 匿名只影响作者输出，不改变数据库 user_id 的归属判定。
+ */
+function canViewPost(post: any, currentUserId?: number, role?: string): boolean {
+  const isAdmin = role === 'super_admin' || role === 'section_admin';
+  if (post.status !== 'published') return post.author_id === currentUserId || isAdmin;
+  if (post.author_status === 'banned' && post.author_id !== currentUserId && !isAdmin) return false;
+  return true;
 }
 
 // 帖子列表（支持板块筛选、分页、关键词）
@@ -366,6 +377,31 @@ router.get('/:id/share-card.png', async (req, res) => {
   }
 });
 
+// 详情页相关推荐（V3-P2）：高文本相似度优先，同板块兜底；可见性与详情接口同口径
+router.get('/:id/similars', authOptional, readLimiter, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return fail(res, '帖子不存在', 404, 404);
+
+  const post = db.prepare(`
+    SELECT p.id, p.user_id AS author_id, p.section_id AS sectionId, p.title, p.content, p.status, u.status AS author_status
+    FROM posts p
+    LEFT JOIN users u ON u.id = p.user_id
+    WHERE p.id = ?
+  `).get(id) as any;
+  if (!post) return fail(res, '帖子不存在', 404, 404);
+
+  const currentUserId = req.currentUser?.id;
+  if (!canViewPost(post, currentUserId, req.currentUser?.role)) {
+    return fail(res, '帖子不存在', 404, 404);
+  }
+
+  const related = findRelatedCandidates(post, recentPublishedCandidates(id, 500, post.sectionId), 6);
+  success(
+    res,
+    related.map(({ id, title, sectionName, likeCount }) => ({ id, title, sectionName, likeCount })),
+  );
+});
+
 // 帖子详情（R3 审查 P2：补读限流——原实现无 readLimiter，脚本循环刷浏览量可无限增长，
 // 且每次详情读取都是一次同步写 UPDATE，热门帖被分享时会串行化所有读者的读路径）
 router.get('/:id', authOptional, readLimiter, (req, res) => {
@@ -373,7 +409,7 @@ router.get('/:id', authOptional, readLimiter, (req, res) => {
   if (!id) return fail(res, '帖子不存在', 404, 404);
 
   const post = db.prepare(`
-    SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college, u.credit_score as author_credit_score,
+    SELECT p.*, u.id as author_id, u.nickname as author_nickname, u.avatar as author_avatar, u.college as author_college, u.credit_score as author_credit_score, u.status as author_status,
            s.name as section_name, s.icon as section_icon
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
@@ -383,20 +419,10 @@ router.get('/:id', authOptional, readLimiter, (req, res) => {
 
   if (!post) return fail(res, '帖子不存在', 404, 404);
 
-  // 权限校验：非发布状态仅作者和管理员可见
+  // 权限校验与相关推荐共用同一函数，避免匿名/待审/封禁规则漂移。
   const currentUserId = req.currentUser?.id;
-  const isAdmin = req.currentUser?.role === 'super_admin' || req.currentUser?.role === 'section_admin';
-  if (post.status !== 'published' && post.author_id !== currentUserId && !isAdmin) {
+  if (!canViewPost(post, currentUserId, req.currentUser?.role)) {
     return fail(res, '帖子不存在', 404, 404);
-  }
-
-  // 作者已封禁：列表接口已过滤（见 where 条件 u.status != 'banned'），
-  // 详情也必须一致，否则匿名访客仍可直读被封用户的昵称/学院/信誉分
-  if (post.status === 'published' && !isAdmin) {
-    const author = db.prepare('SELECT status FROM users WHERE id = ?').get(post.author_id) as any;
-    if (author && author.status === 'banned' && post.author_id !== currentUserId) {
-      return fail(res, '帖子不存在', 404, 404);
-    }
   }
 
   // 增加浏览量
@@ -512,7 +538,7 @@ router.post('/', authRequired, postLimiter, validate({ body: postSchemas.create 
     try {
       const sims = findSimilarCandidates(
         { id: postId, title: title.trim(), content },
-        recentPublishedCandidates(postId),
+        recentPublishedCandidates(postId, 500, section.id),
       );
       if (sims.length) {
         upsertNotification(

@@ -3,7 +3,7 @@
  * 重点固守：ASCII 词边界匹配（audit-quality P2-8 同源——防 USB 误杀 sb 规则回归）
  */
 import { describe, it, expect } from 'vitest'
-import { assessRisk, formatTime, creditColor, creditLevel, creditTitle } from '../helpers'
+import { assessRisk, formatTime, creditColor, creditLevel, creditTitle, isLatestScopedRequest } from '../helpers'
 
 describe('assessRisk 敏感词分级', () => {
   it('硬词命中 → review 并返回命中词', () => {
@@ -60,5 +60,13 @@ describe('creditColor / creditLevel / creditTitle 信誉档位边界', () => {
     expect(creditTitle(85).icon).toBe('medal')
     expect(creditTitle(65).icon).toBe('award')
     expect(creditTitle(30).icon).toBe('shield-alert')
+  })
+})
+
+describe('isLatestScopedRequest 账号切换竞态', () => {
+  it('只允许最新序号且当前账号 key 的请求写回', () => {
+    expect(isLatestScopedRequest(1, 1, 'user:1', 'user:1')).toBe(true)
+    expect(isLatestScopedRequest(1, 2, 'user:1', 'user:2')).toBe(false)
+    expect(isLatestScopedRequest(1, 1, 'user:1', 'user:2')).toBe(false)
   })
 })

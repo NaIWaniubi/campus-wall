@@ -15,29 +15,32 @@
 
 | # | 材料 | 文件 / 位置 | 状态 |
 |---|---|---|---|
-| 0 | **作品说明书 PDF（≤30 页）** | `dist-submission/校园墙-参赛说明书.pdf` | ✅ **28 页 / 3.1MB**（生成器 `node scripts/build-submission-pdf.mjs`） |
+| 0 | **作品说明书 PDF（≤30 页）** | `dist-submission/校园墙-参赛说明书.pdf` | ✅ **29 页 / 3.2MB**（生成器 `node scripts/build-submission-pdf.mjs`） |
 | 0b | **Public 仓库链接** | https://github.com/NaIWaniubi/campus-wall | ✅ **已转 Public**（密钥已审计：无真实凭证；生产强制 JWT_SECRET） |
-| 1 | 作品说明书（完整版） | `docs/COMPETITION-SUBMISSION.md` | ✅ 已更新至最新数字（413 测试 / 15 E2E / AI 四子系统 / 安全加固章） |
+| 1 | 作品说明书（完整版） | `docs/COMPETITION-SUBMISSION.md` | ✅ 已更新至最新数字（500 测试 / 17 E2E / AI 四子系统 + V3 主链路扩展 / 安全加固章） |
 | 2 | 作品速贴版（表单字数限制用） | `docs/SUBMISSION-ONEPAGE.md` | ✅ 约 1100 字，可直接粘贴 |
 | 3 | 演示视频分镜（90 秒 / 扩 5-8 分钟版） | `docs/DEMO-SCRIPT.md` | ✅ 逐镜头带旁白；**需本人录屏** |
 | 4 | 截图素材 | `captures/v5/`（21 张）+ `captures/v6/`（4 张） | ✅ 0 控制台错误 |
 | 5 | 公开访问链接 | Qoder Sites 部署（提示词已给） | ⏳ 部署后回填到材料 §4 与 §演示 |
 | 6 | 演示账号 | `23770001 / demo1234`、`admin / admin123` | ✅ 首启自动灌种子 |
-| 7 | 工程证据 | 测试 477 / E2E 16（含路由复用负向对照） / CI 四 job 全绿 / 雷达门 / AI 护栏 51/51 / RAG 检索门 recall@5=0.988（50 条六档含防幻觉负例） | ✅ 全部可复现（命令见材料 §3） |
+| 7 | 工程证据 | 测试 500 / E2E 17（含路由复用负向对照） / CI 五 job 全绿 / 雷达门 / AI 护栏 29/29 / RAG 检索门 recall@5=0.988 / 相似帖阈值门 0.45 | ✅ 全部可复现（命令见材料 §3） |
 | 8 | 源码与部署说明 | 仓库 master + `docs/DEPLOY.md`（含 VPS 运营级部署 §3） | ✅ |
 
 ## C. 提交前 60 秒自查
 
 ```bash
 cd E:\校园墙
-npm test                # 期望 477 passed
+npm test                # 期望 500 passed
 npm run lint            # 期望 0 错误
 npm run check           # 期望 0 错误
-npx playwright test     # 期望 15 passed
+npx playwright test     # 期望 17 passed
+npm run eval:similar -- --gate  # 相似帖阈值门
+npm run eval:rag -- --gate      # RAG 检索质量门
 ```
 
 - [ ] 演示链接可打开，`/api/health` 返回 200
-- [ ] 演示账号能登录并看到首页简报
+- [ ] 演示账号能登录并看到「我的今日校园」，游客看到「今日校园」
+- [ ] 详情页评论区之后能看到「相关推荐」，点击后标题与 URL 同步切换
 - [ ] 材料里的链接/账号与实际部署一致（部署后回填）
 - [ ] Public 仓库可匿名访问（浏览器无痕打开 https://github.com/NaIWaniubi/campus-wall）
 - [ ] PDF 页数 ≤30（生成脚本输出会打印页数）

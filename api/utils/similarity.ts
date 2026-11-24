@@ -92,25 +92,50 @@ export interface SimilarCandidate {
   score: number;
 }
 
+export interface PublishedCandidate {
+  id: number;
+  title: string;
+  content: string;
+  sectionId: number;
+  sectionName: string;
+  likeCount: number;
+}
+
+/** 推荐轨的同板块兜底权重：内容不相似时仍给出「同板块」的可解释相关性 */
+export const RELATED_SECTION_BOOST = 0.2;
+export const RELATED_MIN_SCORE = 0.2;
+
 /**
- * 取已发布候选集（排除自身 id；最近 LIMIT 条优先——刷屏/重复帖几乎总是近期帖，
- * 收窄候选同时控制分词成本）。封禁口径与列表/详情/RAG 三处一致。
+ * 取已发布候选集（排除自身 id）。传入 sectionId 时先取同板块最近 LIMIT 条，
+ * 不足部分再用全库最近帖兜底；封禁口径与列表/详情/RAG 三处一致。
  */
 export function recentPublishedCandidates(
   excludeId: number,
   limit = 500,
-): Array<{ id: number; title: string; content: string; sectionName: string; likeCount: number }> {
-  const rows = db
-    .prepare(
-      `SELECT p.id, p.title, p.content, s.name AS sectionName, p.like_count AS likeCount
+  sectionId?: number,
+): PublishedCandidate[] {
+  const cap = Math.max(0, Math.floor(limit));
+  if (!cap) return [];
+  const select = `SELECT p.id, p.title, p.content, p.section_id AS sectionId, s.name AS sectionName, p.like_count AS likeCount
        FROM posts p
        JOIN users u ON u.id = p.user_id
        LEFT JOIN sections s ON s.id = p.section_id
-       WHERE p.status = 'published' AND u.status != 'banned' AND p.id <> ?
-       ORDER BY p.id DESC LIMIT ?`,
-    )
-    .all(excludeId, limit) as Array<{ id: number; title: string; content: string; sectionName: string; likeCount: number }>;
-  return rows;
+       WHERE p.status = 'published' AND u.status != 'banned' AND p.id <> ?`;
+
+  if (sectionId) {
+    const sameSection = db
+      .prepare(`${select} AND p.section_id = ? ORDER BY p.id DESC LIMIT ?`)
+      .all(excludeId, sectionId, cap) as PublishedCandidate[];
+    if (sameSection.length >= cap) return sameSection;
+    const rest = db
+      .prepare(`${select} AND p.section_id <> ? ORDER BY p.id DESC LIMIT ?`)
+      .all(excludeId, sectionId, cap - sameSection.length) as PublishedCandidate[];
+    return [...sameSection, ...rest];
+  }
+
+  return db
+    .prepare(`${select} ORDER BY p.id DESC LIMIT ?`)
+    .all(excludeId, cap) as PublishedCandidate[];
 }
 
 /**
@@ -119,12 +144,32 @@ export function recentPublishedCandidates(
  */
 export function findSimilarCandidates(
   newPost: { id: number; title: string; content: string },
-  candidates: Array<{ id: number; title: string; content: string; sectionName: string; likeCount: number }>,
+  candidates: PublishedCandidate[],
   topK = 6
 ): SimilarCandidate[] {
   const scored = candidates
     .map((c) => ({ ...c, score: postSimilarity(newPost, c) }))
     .filter((c) => c.score >= similarNotifyThreshold && c.id !== newPost.id)
     .sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
+
+/**
+ * 详情页相关推荐（V3-P2）：高文本相似度优先，同板块作为可解释兜底。
+ * 与 P1 共用 postSimilarity，但推荐不能套用「防重复」的高阈值，否则普通帖轨道长期为空。
+ */
+export function findRelatedCandidates(
+  source: { id: number; title: string; content: string; sectionId: number },
+  candidates: PublishedCandidate[],
+  topK = 6
+): SimilarCandidate[] {
+  const scored = candidates
+    .map((c) => {
+      const lexical = postSimilarity(source, c);
+      const sameSection = c.sectionId === source.sectionId;
+      return { ...c, score: lexical + (sameSection ? RELATED_SECTION_BOOST : 0) };
+    })
+    .filter((c) => c.score >= RELATED_MIN_SCORE && c.id !== source.id)
+    .sort((a, b) => b.score - a.score || b.id - a.id);
   return scored.slice(0, topK);
 }

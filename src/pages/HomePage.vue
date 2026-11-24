@@ -11,6 +11,7 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { postApi, subscriptionApi, announcementApi, sectionApi, aiApi } from '@/utils/api'
 import { sectionColor } from '@/utils/sections'
+import { isLatestScopedRequest } from '@/utils/helpers'
 import { toast } from '@/utils/request'
 import { useVirtualList } from '@/composables/useVirtualList'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
@@ -45,15 +46,25 @@ const loadingMore = ref(false)
 const refreshing = ref(false)
 // 已订阅板块 id 集合（首页 Tab 铃铛角标）
 const subscribedSectionIds = ref<Set<number>>(new Set())
+let subscriptionRequestSeq = 0
+// 账号 A→B 时 isLoggedIn 仍为 true，必须用 user id 区分请求归属。
+const accountKey = () => userStore.isLoggedIn ? `user:${userStore.user?.id ?? 'unknown'}` : 'anon'
 
 async function loadSubscriptions() {
- if (!userStore.isLoggedIn) return
+ const seq = ++subscriptionRequestSeq
+ const key = accountKey()
+ const isCurrent = () => isLatestScopedRequest(seq, subscriptionRequestSeq, key, accountKey())
+ if (!userStore.isLoggedIn) {
+ if (isCurrent()) subscribedSectionIds.value = new Set()
+ return
+ }
  try {
  const res: any = await subscriptionApi.list()
  const items = res?.data || res || []
- subscribedSectionIds.value = new Set(items.map((s: any) => s.sectionId ?? s.id))
+ if (isCurrent()) subscribedSectionIds.value = new Set(items.map((s: any) => s.sectionId ?? s.id))
  } catch {
- // 静默失败：未登录/网络问题都不影响首页
+ // 静默失败：旧账号的角标不得留在新账号上
+ if (isCurrent()) subscribedSectionIds.value = new Set()
  }
 }
 
@@ -253,16 +264,27 @@ async function loadRailData() {
  }
 }
 
-// ── 今日校园 · AI 简报（V3）：服务端 60s 缓存，未接入大模型时走站内统计，永不空窗 ──
+// ── 今日校园 · AI 简报（V3）：服务端 60s 缓存，登录用户走个性化，游客保持全站版 ──
 const digest = ref<any>(null)
+let digestRequestSeq = 0
 async function loadDigest() {
+ const seq = ++digestRequestSeq
+ const key = accountKey()
+ const isCurrent = () => isLatestScopedRequest(seq, digestRequestSeq, key, accountKey())
+ const scope = userStore.isLoggedIn ? 'personal' as const : undefined
  try {
- const res: any = await aiApi.digest()
- digest.value = res?.data ?? null
+ const res: any = await aiApi.digest(scope)
+ // 登录态/账号切换时，旧请求不得覆盖新账号的简报
+ if (isCurrent()) digest.value = res?.data ?? null
  } catch {
- digest.value = null // 简报失败不影响信息流
+ if (isCurrent()) digest.value = null // 简报失败不影响信息流
  }
 }
+
+watch(accountKey, () => {
+ void loadDigest()
+ void loadSubscriptions()
+})
 
 onMounted(() => {
  loadDigest()
@@ -423,7 +445,7 @@ watch(list, () => nextTick(updateScrollMargin))
  <Sparkles class="w-4 h-4" style="color: var(--lime)" />
  </span>
  <div class="min-w-0">
- <h2 class="text-sm font-semibold leading-tight" style="color: var(--ink)">今日校园</h2>
+ <h2 class="text-sm font-semibold leading-tight" style="color: var(--ink)">{{ digest.scope === 'personal' ? '我的今日校园' : '今日校园' }}</h2>
  <p class="text-[11px]" style="color: var(--ink-mute)">{{ digest.date }}<template v-if="digest.window"> · {{ digest.window }}</template></p>
  </div>
  <span class="ml-auto dopa-chip flex-shrink-0">{{ digest.offline ? '站内统计' : 'AI 生成' }}</span>

@@ -126,6 +126,66 @@ export function buildOpenApiDocument() {
       },
     },
 
+    '/api/posts/{id}/similars': {
+      get: {
+        summary: '详情页相关推荐（高文本相似优先，同板块兜底）',
+        tags: ['posts'],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'integer' } }],
+        responses: {
+          200: ok({
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' },
+                title: { type: 'string' },
+                sectionName: { type: 'string' },
+                likeCount: { type: 'integer' },
+              },
+              required: ['id', 'title', 'sectionName', 'likeCount'],
+            },
+          }),
+          404: { description: '帖子不存在或当前用户不可见' },
+        },
+      },
+    },
+
+    '/api/ai/digest': {
+      get: {
+        summary: '今日简报（默认公开全站版；scope=personal 需登录）',
+        tags: ['ai'],
+        parameters: [
+          {
+            in: 'query',
+            name: 'scope',
+            required: false,
+            schema: { type: 'string', enum: ['personal'] },
+          },
+        ],
+        responses: {
+          200: ok({
+            type: 'object',
+            properties: {
+              date: { type: 'string' },
+              window: { type: 'string' },
+              scope: { type: 'string', enum: ['personal'] },
+              stats: {
+                type: 'object',
+                properties: { posts: { type: 'integer' }, comments: { type: 'integer' } },
+                required: ['posts', 'comments'],
+              },
+              sections: { type: 'array', items: { type: 'object' } },
+              hot: { type: ['object', 'null'] },
+              summary: { type: 'string' },
+              tip: { type: 'string' },
+              offline: { type: 'boolean' },
+            },
+          }),
+          401: { description: 'personal 路径未登录或登录已失效' },
+        },
+      },
+    },
+
     /* ---------- conversations ---------- */
     '/api/conversations': {
       get: {

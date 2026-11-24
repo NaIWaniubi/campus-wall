@@ -10,6 +10,8 @@ import {
   tokenizeBigrams,
   jaccardSimilarity,
   postSimilarity,
+  findRelatedCandidates,
+  type PublishedCandidate,
 } from '../../utils/similarity.js';
 
 describe('相似度函数', () => {
@@ -67,5 +69,34 @@ describe('相似度函数', () => {
     const s2 = postSimilarity({ title: '问', content: base }, { title: '问', content: different });
     expect(s1).toBeGreaterThan(s2);
     expect(s2).toBeLessThan(0.05);
+  });
+});
+
+describe('详情页相关推荐', () => {
+  const source = { id: 1, title: '出九成新 iPad Air', content: '64G，1450 元，当面交易。', sectionId: 5 };
+  const candidate = (id: number, title: string, content: string, sectionId: number): PublishedCandidate => ({
+    id,
+    title,
+    content,
+    sectionId,
+    sectionName: sectionId === 5 ? '二手交易' : '互助问答',
+    likeCount: id,
+  });
+
+  it('同板块零词面重叠也可作为兜底，跨板块无关帖与自身被排除', () => {
+    const list = findRelatedCandidates(source, [
+      candidate(1, source.title, source.content, 5),
+      candidate(2, '出售闲置显示器', '24 寸显示器，无磕碰。', 5),
+      candidate(3, '周五拼车回市区', '平摊高速费。', 3),
+    ]);
+    expect(list.map((item) => item.id)).toEqual([2]);
+  });
+
+  it('高文本相似的跨板块帖优先于同板块兜底帖', () => {
+    const list = findRelatedCandidates(source, [
+      candidate(2, '出售闲置显示器', '24 寸显示器，无磕碰。', 5),
+      candidate(3, source.title, source.content, 3),
+    ]);
+    expect(list.map((item) => item.id)).toEqual([3, 2]);
   });
 });
